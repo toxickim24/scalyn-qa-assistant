@@ -264,7 +264,7 @@ final class GitHub_Updater {
 	 * @param array $result     Installation result data.
 	 * @return array Modified result data with corrected destination paths.
 	 */
-	public function post_install( bool $response, array $hook_extra, array $result ): array {
+	public function post_install( mixed $response, array $hook_extra, array $result ): array {
 		// Only act on our plugin.
 		if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->plugin_basename ) {
 			return $result;
