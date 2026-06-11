@@ -55,6 +55,17 @@ $seo_checks     = isset( $results['seo'] ) && is_array( $results['seo'] ) ? $res
 $content_checks = isset( $results['content'] ) && is_array( $results['content'] ) ? $results['content'] : array();
 $func_checks    = isset( $results['functionality'] ) && is_array( $results['functionality'] ) ? $results['functionality'] : array();
 
+// Sort checks: fail first, warning second, pass last.
+$sort_checks = static function ( $a, $b ): int {
+	$order = array( 'fail' => 0, 'warning' => 1, 'pass' => 2 );
+	$a_val = $order[ $a->status ] ?? 3;
+	$b_val = $order[ $b->status ] ?? 3;
+	return $a_val <=> $b_val;
+};
+usort( $seo_checks, $sort_checks );
+usort( $content_checks, $sort_checks );
+usort( $func_checks, $sort_checks );
+
 // Build a lookup of ignored check IDs for this post.
 $ignored_check_ids = array();
 foreach ( $ignore_rules as $rule ) {
@@ -118,12 +129,12 @@ $permalink     = get_permalink( $post_id );
 				<span class="dashicons dashicons-update" aria-hidden="true"></span>
 				<?php esc_html_e( 'Rescan', 'scalyn-qa-assistant' ); ?>
 			</button>
-			<button type="button" id="scalyn-add-note" class="scalyn-btn scalyn-btn--secondary">
+			<button type="button" id="scalyn-add-note" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
 				<span class="dashicons dashicons-edit" aria-hidden="true"></span>
 				<?php esc_html_e( 'Add Note', 'scalyn-qa-assistant' ); ?>
 			</button>
 			<?php if ( ! empty( $edit_post_url ) ) : ?>
-				<a href="<?php echo esc_url( $edit_post_url ); ?>" class="scalyn-btn scalyn-btn--secondary">
+				<a href="<?php echo esc_url( $edit_post_url ); ?>" class="scalyn-btn scalyn-btn--secondary" target="_blank" rel="noopener noreferrer">
 					<span class="dashicons dashicons-admin-post" aria-hidden="true"></span>
 					<?php esc_html_e( 'Edit Post', 'scalyn-qa-assistant' ); ?>
 				</a>
@@ -508,63 +519,47 @@ $permalink     = get_permalink( $post_id );
 					<?php esc_html_e( 'No QA notes yet. Click "Add Note" to create one.', 'scalyn-qa-assistant' ); ?>
 				</p>
 			<?php else : ?>
-				<?php
-				// Sort notes by created_at descending (newest first).
-				usort(
-					$notes,
-					function ( $a, $b ) {
-						$a_time = isset( $a['created_at'] ) ? $a['created_at'] : '';
-						$b_time = isset( $b['created_at'] ) ? $b['created_at'] : '';
-						return strcmp( $b_time, $a_time );
-					}
-				);
-
-				foreach ( $notes as $note ) :
-					$note_id      = isset( $note['id'] ) ? $note['id'] : '';
-					$note_content = isset( $note['content'] ) ? $note['content'] : '';
-					$note_author  = isset( $note['author'] ) ? $note['author'] : '';
-					$note_date    = isset( $note['created_at'] ) ? $note['created_at'] : '';
-
-					$note_time_display = '';
-					if ( ! empty( $note_date ) ) {
-						$note_timestamp = strtotime( $note_date );
-						if ( false !== $note_timestamp ) {
-							$note_time_display = sprintf(
-								/* translators: %s: Human-readable time difference. */
-								esc_html__( '%s ago', 'scalyn-qa-assistant' ),
-								human_time_diff( $note_timestamp, current_time( 'timestamp' ) )
-							);
-						}
-					}
-					?>
-					<div class="scalyn-note" data-note-id="<?php echo esc_attr( $note_id ); ?>">
-						<div class="scalyn-note__header">
-							<span class="scalyn-note__author">
-								<span class="dashicons dashicons-admin-users" aria-hidden="true"></span>
-								<?php echo esc_html( $note_author ); ?>
-							</span>
-							<?php if ( ! empty( $note_time_display ) ) : ?>
-								<span class="scalyn-note__date" title="<?php echo esc_attr( $note_date ); ?>">
-									<?php echo esc_html( $note_time_display ); ?>
-								</span>
-							<?php endif; ?>
-						</div>
-						<div class="scalyn-note__body">
-							<?php echo wp_kses_post( wpautop( $note_content ) ); ?>
-						</div>
-						<div class="scalyn-note__actions">
-							<button
-								type="button"
-								class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-delete-note"
-								data-note-id="<?php echo esc_attr( $note_id ); ?>"
-								data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
-								title="<?php esc_attr_e( 'Delete note', 'scalyn-qa-assistant' ); ?>"
-							>
-								<span class="dashicons dashicons-trash" aria-hidden="true"></span>
-							</button>
-						</div>
-					</div>
-				<?php endforeach; ?>
+				<table class="scalyn-table scalyn-table--compact">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Note', 'scalyn-qa-assistant' ); ?></th>
+							<th style="width:100px;"><?php esc_html_e( 'Author', 'scalyn-qa-assistant' ); ?></th>
+							<th style="width:100px;"><?php esc_html_e( 'Date', 'scalyn-qa-assistant' ); ?></th>
+							<th style="width:50px;"></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $notes as $index => $note ) :
+							$note_content = $note['content'] ?? '';
+							$note_author  = $note['author'] ?? $note['user_name'] ?? '';
+							$note_date    = $note['created_at'] ?? $note['date'] ?? '';
+							$note_time    = '';
+							if ( $note_date ) {
+								$ts = strtotime( $note_date );
+								if ( $ts ) {
+									$note_time = human_time_diff( $ts, current_time( 'timestamp' ) ) . ' ' . __( 'ago', 'scalyn-qa-assistant' );
+								}
+							}
+							?>
+							<tr>
+								<td><?php echo esc_html( $note_content ); ?></td>
+								<td><?php echo esc_html( $note_author ); ?></td>
+								<td title="<?php echo esc_attr( $note_date ); ?>"><?php echo esc_html( $note_time ); ?></td>
+								<td>
+									<button
+										type="button"
+										class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-delete-note"
+										data-index="<?php echo esc_attr( (string) $index ); ?>"
+										data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
+										title="<?php esc_attr_e( 'Delete', 'scalyn-qa-assistant' ); ?>"
+									>
+										<span class="dashicons dashicons-trash" aria-hidden="true"></span>
+									</button>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
 			<?php endif; ?>
 		</div>
 	</div>

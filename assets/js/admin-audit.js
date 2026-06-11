@@ -18,6 +18,15 @@
     // -------------------------------------------------------------------------
 
     /**
+     * Get post_id from URL query parameter.
+     * @returns {string|null}
+     */
+    function getPostIdFromUrl() {
+        var params = new URLSearchParams(window.location.search);
+        return params.get('post_id') || null;
+    }
+
+    /**
      * Wrapper for fetch() that adds the REST nonce header and base URL.
      *
      * @param {string} endpoint - Relative endpoint path.
@@ -592,10 +601,10 @@
      */
     function initAddNote() {
         document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.scalyn-add-note');
+            var btn = e.target.closest('.scalyn-add-note') || e.target.closest('#scalyn-add-note');
             if (!btn) return;
 
-            var postId = btn.getAttribute('data-post-id') || scalynQA.currentPostId;
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl() || scalynQA.currentPostId;
             if (!postId) return;
 
             if (typeof Swal === 'undefined') return;
@@ -622,17 +631,13 @@
                     body: JSON.stringify({ content: result.value.trim() }),
                 })
                     .then(function (response) {
-                        if (response.success && response.data) {
-                            updateNotesSection(response.data.notes);
-                            if (typeof ScalynAlert !== 'undefined') {
-                                ScalynAlert.toast('Note added successfully');
-                            }
+                        if (response.success) {
+                            ScalynAlert && ScalynAlert.toast('Note added');
+                            window.location.reload();
                         }
                     })
                     .catch(function (err) {
-                        if (typeof ScalynAlert !== 'undefined') {
-                            ScalynAlert.error('Error', err.message || 'Failed to add note.');
-                        }
+                        ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to add note.');
                     });
             });
         });
@@ -661,9 +666,9 @@
 
                 fetchApi('notes/' + postId + '/' + index, { method: 'DELETE' })
                     .then(function (response) {
-                        if (response.success && response.data) {
-                            updateNotesSection(response.data.notes);
+                        if (response.success) {
                             ScalynAlert.toast('Note deleted');
+                            window.location.reload();
                         }
                     })
                     .catch(function (err) {
@@ -699,31 +704,23 @@
      */
     function initCreateSnapshot() {
         document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.scalyn-create-snapshot');
+            var btn = e.target.closest('.scalyn-create-snapshot') || e.target.closest('#scalyn-create-snapshot');
             if (!btn) return;
 
-            var postId = btn.getAttribute('data-post-id') || scalynQA.currentPostId;
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl() || scalynQA.currentPostId;
             if (!postId) return;
 
             btn.disabled = true;
 
             fetchApi('snapshots/' + postId, { method: 'POST' })
                 .then(function (response) {
-                    if (response.success && response.data) {
-                        if (response.data.snapshot) {
-                            appendSnapshot(response.data.snapshot);
-                        }
-                        if (typeof ScalynAlert !== 'undefined') {
-                            ScalynAlert.toast('Snapshot created');
-                        }
+                    if (response.success) {
+                        ScalynAlert && ScalynAlert.toast('Snapshot saved');
+                        window.location.reload();
                     }
                 })
                 .catch(function (err) {
-                    if (typeof ScalynAlert !== 'undefined') {
-                        ScalynAlert.error('Error', err.message || 'Failed to create snapshot.');
-                    }
-                })
-                .finally(function () {
+                    ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to create snapshot.');
                     btn.disabled = false;
                 });
         });
@@ -750,10 +747,10 @@
      */
     function initGenerateAiMeta() {
         document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.scalyn-generate-ai-meta');
+            var btn = e.target.closest('.scalyn-generate-ai-meta') || e.target.closest('#scalyn-generate-ai');
             if (!btn) return;
 
-            var postId = btn.getAttribute('data-post-id') || scalynQA.currentPostId;
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl() || scalynQA.currentPostId;
             if (!postId) return;
 
             btn.disabled = true;
@@ -1029,21 +1026,12 @@
                 })
                     .then(function (response) {
                         if (response.success) {
-                            // Hide the check item.
-                            var checkItem = btn.closest('.scalyn-check-item');
-                            if (checkItem) {
-                                checkItem.style.opacity = '0.4';
-                                checkItem.style.pointerEvents = 'none';
-                            }
-                            if (typeof ScalynAlert !== 'undefined') {
-                                ScalynAlert.toast('Check ignored');
-                            }
+                            ScalynAlert && ScalynAlert.toast('Check ignored');
+                            window.location.reload();
                         }
                     })
                     .catch(function (err) {
-                        if (typeof ScalynAlert !== 'undefined') {
-                            ScalynAlert.error('Error', err.message || 'Failed to ignore check.');
-                        }
+                        ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to ignore check.');
                     });
             });
         });
@@ -1072,9 +1060,8 @@
                 fetchApi('ignore/' + ruleId, { method: 'DELETE' })
                     .then(function (response) {
                         if (response.success) {
-                            var ruleRow = btn.closest('.scalyn-ignore-rule');
-                            if (ruleRow) ruleRow.remove();
                             ScalynAlert.toast('Ignore rule removed');
+                            window.location.reload();
                         }
                     })
                     .catch(function (err) {
