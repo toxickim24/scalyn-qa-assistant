@@ -99,7 +99,7 @@ class Audit_Page {
 		$paged = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$post_type = isset( $_GET['post_type'] ) ? sanitize_key( $_GET['post_type'] ) : '';
+		$post_type = isset( $_GET['filter_type'] ) ? sanitize_key( $_GET['filter_type'] ) : '';
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$status_filter = isset( $_GET['status'] ) ? sanitize_key( $_GET['status'] ) : '';

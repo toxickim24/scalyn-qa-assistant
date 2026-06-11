@@ -102,7 +102,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(r\\) for r in d.get\\('routes',{}\\).keys\\(\\) if 'template' in r]\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(r\\) for r in d.get\\('routes',{}\\).keys\\(\\) if 'template' in r]\")",
+      "Bash(gh release:*)",
+      "Bash(git tag:*)"
     ]
   }
 }

@@ -47,18 +47,67 @@ class Launch_Checker {
 	 *
 	 * @return Check_Item[] Array of check results.
 	 */
+	/**
+	 * Get launch checklist settings (thresholds + enabled checks).
+	 */
+	private function get_launch_settings(): array {
+		$settings = get_option( 'scalyn_qa_launch_settings', array() );
+		return is_array( $settings ) ? $settings : array();
+	}
+
+	/**
+	 * Get a PHP threshold value from settings.
+	 */
+	private function get_threshold( string $key, int $default ): int {
+		$settings   = $this->get_launch_settings();
+		$thresholds = $settings['thresholds'] ?? array();
+		return (int) ( $thresholds[ $key ] ?? $default );
+	}
+
+	/**
+	 * Check if a specific check is enabled in launch settings.
+	 */
+	private function is_check_enabled( string $check_id ): bool {
+		$settings = $this->get_launch_settings();
+		$enabled  = $settings['enabled_checks'] ?? null;
+
+		// If no settings saved yet, all checks are enabled.
+		if ( null === $enabled || ! is_array( $enabled ) ) {
+			return true;
+		}
+
+		return in_array( $check_id, $enabled, true );
+	}
+
 	public function run_checks(): array {
-		$checks = array(
-			$this->check_seo_plugin_installed(),
-			$this->check_sitemap_exists(),
-			$this->check_ga4_configured(),
-			$this->check_gtm_configured(),
-			$this->check_ssl_enabled(),
-			$this->check_favicon_exists(),
-			$this->check_contact_page_exists(),
-			$this->check_privacy_policy_exists(),
-			$this->check_plugin_conflicts(),
+		$all_checks = array(
+			'search_engine_visibility' => $this->check_search_engine_visibility(),
+			'seo_plugin_installed'     => $this->check_seo_plugin_installed(),
+			'sitemap_exists'           => $this->check_sitemap_exists(),
+			'llms_txt'                 => $this->check_llms_txt(),
+			'ga4_configured'           => $this->check_ga4_configured(),
+			'gtm_configured'           => $this->check_gtm_configured(),
+			'ssl_enabled'              => $this->check_ssl_enabled(),
+			'favicon_exists'           => $this->check_favicon_exists(),
+			'contact_page_exists'      => $this->check_contact_page_exists(),
+			'privacy_policy_exists'    => $this->check_privacy_policy_exists(),
+			'plugin_conflicts'         => $this->check_plugin_conflicts(),
+			'php_memory_limit'         => $this->check_php_memory_limit(),
+			'php_max_execution_time'   => $this->check_php_max_execution_time(),
+			'php_max_input_time'       => $this->check_php_max_input_time(),
+			'php_post_max_size'        => $this->check_php_post_max_size(),
+			'php_upload_max_size'      => $this->check_php_upload_max_size(),
+			'security_plugin'          => $this->check_security_plugin(),
+			'cache_plugin'             => $this->check_cache_plugin(),
 		);
+
+		// Filter to only enabled checks.
+		$checks = array();
+		foreach ( $all_checks as $check_id => $check_item ) {
+			if ( $this->is_check_enabled( $check_id ) ) {
+				$checks[] = $check_item;
+			}
+		}
 
 		// Serialize results for storage.
 		$serialized = array_map(
@@ -79,6 +128,82 @@ class Launch_Checker {
 	 *
 	 * @return Check_Item
 	 */
+	/**
+	 * Check if search engines are discouraged from indexing the site.
+	 *
+	 * WordPress Settings → Reading → "Discourage search engines from indexing this site"
+	 *
+	 * @since 1.0.6
+	 *
+	 * @return Check_Item
+	 */
+	private function check_search_engine_visibility(): Check_Item {
+		$discouraged = '0' !== get_option( 'blog_public', '1' );
+
+		if ( $discouraged ) {
+			return new Check_Item(
+				id:        'search_engine_visibility',
+				label:     __( 'Search Engine Visibility', 'scalyn-qa-assistant' ),
+				status:    'fail',
+				message:   __( 'Search engines are discouraged from indexing this site. Go to Settings → Reading to fix this before launch.', 'scalyn-qa-assistant' ),
+				category:  'functionality',
+				severity:  'critical',
+				quick_fix: null,
+				tooltip:   __( 'WordPress has a setting that tells search engines not to index your site. This must be disabled before launching or your site will not appear in Google.', 'scalyn-qa-assistant' ),
+			);
+		}
+
+		return new Check_Item(
+			id:        'search_engine_visibility',
+			label:     __( 'Search Engine Visibility', 'scalyn-qa-assistant' ),
+			status:    'pass',
+			message:   __( 'Search engines are allowed to index this site.', 'scalyn-qa-assistant' ),
+			category:  'functionality',
+			severity:  'critical',
+			quick_fix: null,
+			tooltip:   __( 'WordPress is configured to allow search engine indexing. This is correct for a live site.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check if llms.txt exists at the site root.
+	 *
+	 * llms.txt is a proposed standard for providing LLM-friendly content,
+	 * similar to robots.txt for search engines.
+	 *
+	 * @since 1.0.6
+	 *
+	 * @return Check_Item
+	 */
+	private function check_llms_txt(): Check_Item {
+		$url      = home_url( '/llms.txt' );
+		$response = wp_remote_head( $url, array( 'timeout' => 5, 'sslverify' => true ) );
+
+		if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+			return new Check_Item(
+				id:        'llms_txt',
+				label:     __( 'llms.txt', 'scalyn-qa-assistant' ),
+				status:    'pass',
+				message:   __( 'llms.txt file found. LLMs can discover your site content.', 'scalyn-qa-assistant' ),
+				category:  'functionality',
+				severity:  'info',
+				quick_fix: null,
+				tooltip:   __( 'llms.txt is a standard that helps AI language models understand your site content, similar to how robots.txt helps search engines.', 'scalyn-qa-assistant' ),
+			);
+		}
+
+		return new Check_Item(
+			id:        'llms_txt',
+			label:     __( 'llms.txt', 'scalyn-qa-assistant' ),
+			status:    'warning',
+			message:   __( 'No llms.txt found. Consider adding one to help AI models discover your content.', 'scalyn-qa-assistant' ),
+			category:  'functionality',
+			severity:  'info',
+			quick_fix: null,
+			tooltip:   __( 'llms.txt is a proposed standard (llmstxt.org) that provides a markdown file at your site root to help LLMs understand your site. It is optional but recommended for AI discoverability.', 'scalyn-qa-assistant' ),
+		);
+	}
+
 	private function check_seo_plugin_installed(): Check_Item {
 		$integration = SEO_Integration::detect();
 
@@ -621,5 +746,245 @@ class Launch_Checker {
 		$cached_html = is_string( $body ) ? $body : '';
 
 		return $cached_html;
+	}
+
+	/**
+	 * Parse a PHP size string (e.g. '128M') to megabytes.
+	 */
+	private function parse_size_mb( string $size ): int {
+		$size  = trim( $size );
+		$value = (int) $size;
+		$unit  = strtolower( substr( $size, -1 ) );
+
+		return match ( $unit ) {
+			'g' => $value * 1024,
+			'm' => $value,
+			'k' => (int) round( $value / 1024 ),
+			default => $value,
+		};
+	}
+
+	/**
+	 * Check PHP memory limit (minimum 512MB).
+	 */
+	private function check_php_memory_limit(): Check_Item {
+		$raw       = ini_get( 'memory_limit' );
+		$mb        = $this->parse_size_mb( $raw ?: '0' );
+		$threshold = $this->get_threshold( 'memory_limit', 512 );
+		$pass      = $mb >= $threshold || -1 === (int) $raw;
+
+		return new Check_Item(
+			id:        'php_memory_limit',
+			label:     __( 'PHP Memory Limit', 'scalyn-qa-assistant' ),
+			status:    $pass ? 'pass' : 'warning',
+			message:   $pass
+				? sprintf( __( 'Memory limit is %s.', 'scalyn-qa-assistant' ), esc_html( $raw ) )
+				: sprintf( __( 'Memory limit is %s. Recommended: %dM or higher.', 'scalyn-qa-assistant' ), esc_html( $raw ), $threshold ),
+			category:  'functionality',
+			severity:  'warning',
+			quick_fix: null,
+			tooltip:   __( 'WordPress recommends at least 256MB, but 512MB or more is ideal for plugins and page builders.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check PHP max execution time (minimum 90s).
+	 */
+	private function check_php_max_execution_time(): Check_Item {
+		$value     = (int) ini_get( 'max_execution_time' );
+		$threshold = $this->get_threshold( 'max_execution_time', 90 );
+		$pass      = 0 === $value || $value >= $threshold;
+
+		return new Check_Item(
+			id:        'php_max_execution_time',
+			label:     __( 'PHP Max Execution Time', 'scalyn-qa-assistant' ),
+			status:    $pass ? 'pass' : 'warning',
+			message:   $pass
+				? sprintf( __( 'Max execution time is %ds.', 'scalyn-qa-assistant' ), $value )
+				: sprintf( __( 'Max execution time is %ds. Recommended: %ds or higher.', 'scalyn-qa-assistant' ), $value, $threshold ),
+			category:  'functionality',
+			severity:  'warning',
+			quick_fix: null,
+			tooltip:   __( 'Scripts that run longer than this limit will be terminated. 90 seconds is recommended for complex operations.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check PHP max input time (minimum 90s).
+	 */
+	private function check_php_max_input_time(): Check_Item {
+		$value     = (int) ini_get( 'max_input_time' );
+		$threshold = $this->get_threshold( 'max_input_time', 90 );
+		$pass      = -1 === $value || $value >= $threshold;
+
+		return new Check_Item(
+			id:        'php_max_input_time',
+			label:     __( 'PHP Max Input Time', 'scalyn-qa-assistant' ),
+			status:    $pass ? 'pass' : 'warning',
+			message:   $pass
+				? sprintf( __( 'Max input time is %ds.', 'scalyn-qa-assistant' ), $value )
+				: sprintf( __( 'Max input time is %ds. Recommended: %ds or higher.', 'scalyn-qa-assistant' ), $value, $threshold ),
+			category:  'functionality',
+			severity:  'info',
+			quick_fix: null,
+			tooltip:   __( 'Maximum time PHP will spend parsing input data such as POST and file uploads.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check PHP post_max_size (minimum 128MB).
+	 */
+	private function check_php_post_max_size(): Check_Item {
+		$raw       = ini_get( 'post_max_size' );
+		$mb        = $this->parse_size_mb( $raw ?: '0' );
+		$threshold = $this->get_threshold( 'post_max_size', 128 );
+		$pass      = $mb >= $threshold;
+
+		return new Check_Item(
+			id:        'php_post_max_size',
+			label:     __( 'PHP Post Max Size', 'scalyn-qa-assistant' ),
+			status:    $pass ? 'pass' : 'warning',
+			message:   $pass
+				? sprintf( __( 'Post max size is %s.', 'scalyn-qa-assistant' ), esc_html( $raw ) )
+				: sprintf( __( 'Post max size is %s. Recommended: %dM or higher.', 'scalyn-qa-assistant' ), esc_html( $raw ), $threshold ),
+			category:  'functionality',
+			severity:  'info',
+			quick_fix: null,
+			tooltip:   __( 'Maximum size of POST data that PHP will accept. Affects large form submissions and imports.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check PHP upload_max_filesize (minimum 64MB).
+	 */
+	private function check_php_upload_max_size(): Check_Item {
+		$raw       = ini_get( 'upload_max_filesize' );
+		$mb        = $this->parse_size_mb( $raw ?: '0' );
+		$threshold = $this->get_threshold( 'upload_max_size', 64 );
+		$pass      = $mb >= $threshold;
+
+		return new Check_Item(
+			id:        'php_upload_max_size',
+			label:     __( 'PHP Upload Max Size', 'scalyn-qa-assistant' ),
+			status:    $pass ? 'pass' : 'warning',
+			message:   $pass
+				? sprintf( __( 'Upload max size is %s.', 'scalyn-qa-assistant' ), esc_html( $raw ) )
+				: sprintf( __( 'Upload max size is %s. Recommended: %dM or higher.', 'scalyn-qa-assistant' ), esc_html( $raw ), $threshold ),
+			category:  'functionality',
+			severity:  'info',
+			quick_fix: null,
+			tooltip:   __( 'Maximum file size for uploads. Should be at least 64MB for media-heavy sites.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check if a security plugin is installed and active.
+	 */
+	private function check_security_plugin(): Check_Item {
+		if ( ! function_exists( 'is_plugin_active' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$security_plugins = array(
+			'wordfence/wordfence.php'                     => 'Wordfence',
+			'sucuri-scanner/sucuri.php'                    => 'Sucuri',
+			'better-wp-security/better-wp-security.php'   => 'Solid Security (iThemes)',
+			'all-in-one-wp-security-and-firewall/wp-security.php' => 'All In One WP Security',
+			'wp-simple-firewall/icwp-wpsf.php'            => 'Shield Security',
+			'defender-security/wp-defender.php'            => 'Defender',
+			'jetpack/jetpack.php'                         => 'Jetpack',
+			'limit-login-attempts-reloaded/limit-login-attempts-reloaded.php' => 'Limit Login Attempts',
+		);
+
+		$found = array();
+		foreach ( $security_plugins as $file => $name ) {
+			if ( is_plugin_active( $file ) ) {
+				$found[] = $name;
+			}
+		}
+
+		if ( ! empty( $found ) ) {
+			return new Check_Item(
+				id:        'security_plugin',
+				label:     __( 'Security Plugin', 'scalyn-qa-assistant' ),
+				status:    'pass',
+				message:   sprintf(
+					__( 'Security plugin detected: %s.', 'scalyn-qa-assistant' ),
+					esc_html( implode( ', ', $found ) ),
+				),
+				category:  'functionality',
+				severity:  'warning',
+				quick_fix: null,
+				tooltip:   __( 'A security plugin helps protect your site from brute force attacks, malware, and vulnerabilities.', 'scalyn-qa-assistant' ),
+			);
+		}
+
+		return new Check_Item(
+			id:        'security_plugin',
+			label:     __( 'Security Plugin', 'scalyn-qa-assistant' ),
+			status:    'warning',
+			message:   __( 'No security plugin detected. Consider installing Wordfence, Sucuri, or Solid Security.', 'scalyn-qa-assistant' ),
+			category:  'functionality',
+			severity:  'warning',
+			quick_fix: null,
+			tooltip:   __( 'A security plugin adds firewall protection, malware scanning, and login security to your WordPress site.', 'scalyn-qa-assistant' ),
+		);
+	}
+
+	/**
+	 * Check if a caching plugin is installed and active.
+	 */
+	private function check_cache_plugin(): Check_Item {
+		if ( ! function_exists( 'is_plugin_active' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$cache_plugins = array(
+			'wp-super-cache/wp-cache.php'                 => 'WP Super Cache',
+			'w3-total-cache/w3-total-cache.php'           => 'W3 Total Cache',
+			'wp-fastest-cache/wpFastestCache.php'         => 'WP Fastest Cache',
+			'litespeed-cache/litespeed-cache.php'         => 'LiteSpeed Cache',
+			'wp-rocket/wp-rocket.php'                     => 'WP Rocket',
+			'autoptimize/autoptimize.php'                 => 'Autoptimize',
+			'cache-enabler/cache-enabler.php'             => 'Cache Enabler',
+			'sg-cachepress/sg-cachepress.php'             => 'SG Optimizer',
+			'breeze/breeze.php'                           => 'Breeze',
+			'hummingbird-performance/wp-hummingbird.php'  => 'Hummingbird',
+			'nitropack/main.php'                          => 'NitroPack',
+		);
+
+		$found = array();
+		foreach ( $cache_plugins as $file => $name ) {
+			if ( is_plugin_active( $file ) ) {
+				$found[] = $name;
+			}
+		}
+
+		if ( ! empty( $found ) ) {
+			return new Check_Item(
+				id:        'cache_plugin',
+				label:     __( 'Cache Plugin', 'scalyn-qa-assistant' ),
+				status:    'pass',
+				message:   sprintf(
+					__( 'Cache plugin detected: %s.', 'scalyn-qa-assistant' ),
+					esc_html( implode( ', ', $found ) ),
+				),
+				category:  'functionality',
+				severity:  'warning',
+				quick_fix: null,
+				tooltip:   __( 'A caching plugin improves page load speed by serving static versions of your pages.', 'scalyn-qa-assistant' ),
+			);
+		}
+
+		return new Check_Item(
+			id:        'cache_plugin',
+			label:     __( 'Cache Plugin', 'scalyn-qa-assistant' ),
+			status:    'warning',
+			message:   __( 'No caching plugin detected. Consider installing WP Rocket, LiteSpeed Cache, or WP Super Cache.', 'scalyn-qa-assistant' ),
+			category:  'functionality',
+			severity:  'warning',
+			quick_fix: null,
+			tooltip:   __( 'Caching significantly improves page load times and reduces server load. Essential for production sites.', 'scalyn-qa-assistant' ),
+		);
 	}
 }

@@ -55,11 +55,33 @@ class Scoring_Engine {
 	 * @param array<string, Check_Item[]> $results Grouped results keyed by category.
 	 * @return Score
 	 */
-	public static function calculate( array $results ): Score {
+	public static function calculate( array $results, int $post_id = 0 ): Score {
+		// Build ignored check IDs for this post.
+		$ignored_ids = array();
+		if ( $post_id > 0 ) {
+			$post_ignores = \Scalyn\QA\Models\Ignore_Rule::get_for_post( $post_id );
+			foreach ( $post_ignores as $rule ) {
+				$ignored_ids[ $rule->check_id ] = true;
+			}
+		}
+		$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
+		foreach ( $global_ignores as $rule ) {
+			if ( 'global' === $rule->type || 0 === $rule->post_id ) {
+				$ignored_ids[ $rule->check_id ] = true;
+			}
+		}
+
 		$category_scores = array();
 
 		foreach ( array( 'seo', 'content', 'functionality' ) as $category ) {
 			$items = $results[ $category ] ?? array();
+			// Filter out ignored checks.
+			if ( ! empty( $ignored_ids ) ) {
+				$items = array_filter(
+					$items,
+					static fn( $item ): bool => ! isset( $ignored_ids[ $item->id ?? ( $item['id'] ?? '' ) ] ),
+				);
+			}
 			$category_scores[ $category ] = self::calculate_category_score( $items );
 		}
 
@@ -136,12 +158,50 @@ class Scoring_Engine {
 		$qa_scores = array_merge( $content_scores, $functionality_scores );
 		$qa_ready  = self::safe_average( $qa_scores );
 
-		// Launch Ready comes from the Launch_Checker stored option.
+		// Launch Ready — calculated from stored launch check items, excluding ignored.
 		$launch_data  = get_option( 'scalyn_qa_launch_results', array() );
 		$launch_ready = 0;
 
-		if ( is_array( $launch_data ) && isset( $launch_data['score'] ) ) {
-			$launch_ready = max( 0, min( 100, (int) $launch_data['score'] ) );
+		if ( is_array( $launch_data ) && ! empty( $launch_data ) ) {
+			// Build ignored check IDs set.
+			$ignored_ids = array();
+			$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
+			foreach ( $global_ignores as $rule ) {
+				if ( 'global' === $rule->type || 0 === $rule->post_id ) {
+					$ignored_ids[ $rule->check_id ] = true;
+				}
+			}
+
+			if ( isset( $launch_data['score'] ) ) {
+				// REST response format — recalculate excluding ignored.
+				$checks = $launch_data['checks'] ?? array();
+				$total  = 0;
+				$pass   = 0;
+				foreach ( $checks as $item ) {
+					if ( is_array( $item ) && ! isset( $ignored_ids[ $item['id'] ?? '' ] ) ) {
+						++$total;
+						if ( ( $item['status'] ?? '' ) === 'pass' ) {
+							++$pass;
+						}
+					}
+				}
+				$launch_ready = $total > 0 ? (int) round( ( $pass / $total ) * 100 ) : 0;
+			} else {
+				// Flat array of check items.
+				$total = 0;
+				$pass  = 0;
+				foreach ( $launch_data as $item ) {
+					if ( is_array( $item ) && ! isset( $ignored_ids[ $item['id'] ?? '' ] ) ) {
+						++$total;
+						if ( ( $item['status'] ?? '' ) === 'pass' ) {
+							++$pass;
+						}
+					}
+				}
+				if ( $total > 0 ) {
+					$launch_ready = (int) round( ( $pass / $total ) * 100 );
+				}
+			}
 		}
 
 		// Overall: weighted average of the three pillars.

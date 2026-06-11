@@ -74,6 +74,16 @@ class Link_Checker implements Analyzer_Interface {
 	}
 
 	/**
+	 * Generate a unique check ID for a specific link URL.
+	 *
+	 * @param string $url The link URL.
+	 * @return string Unique ID like 'link_a1b2c3d4'.
+	 */
+	private function link_check_id( string $url ): string {
+		return 'link_' . substr( md5( $url ), 0, 8 );
+	}
+
+	/**
 	 * Get the human-readable label for this analyzer.
 	 *
 	 * @since 1.0.0
@@ -345,7 +355,7 @@ class Link_Checker implements Analyzer_Interface {
 
 		if ( ! is_email( $email ) ) {
 			return new Check_Item(
-				id:        'broken_links',
+				id:        $this->link_check_id( $url ),
 				label:     __( 'Broken Link', 'scalyn-qa-assistant' ),
 				status:    'warning',
 				message:   sprintf(
@@ -384,7 +394,7 @@ class Link_Checker implements Analyzer_Interface {
 		// Allow digits, plus sign, hyphens, spaces, parentheses, and dots.
 		if ( ! preg_match( '/^\+?[\d\s\-().]+$/', $phone ) ) {
 			return new Check_Item(
-				id:        'broken_links',
+				id:        $this->link_check_id( $url ),
 				label:     __( 'Broken Link', 'scalyn-qa-assistant' ),
 				status:    'warning',
 				message:   sprintf(
@@ -428,7 +438,7 @@ class Link_Checker implements Analyzer_Interface {
 		// Check if the ID exists in the content using DOMXPath.
 		if ( ! $parser->has_element_id( $anchor_id ) ) {
 			return new Check_Item(
-				id:        'broken_links',
+				id:        $this->link_check_id( $url ),
 				label:     __( 'Broken Link', 'scalyn-qa-assistant' ),
 				status:    'warning',
 				message:   sprintf(
@@ -468,7 +478,7 @@ class Link_Checker implements Analyzer_Interface {
 		$host = wp_parse_url( $url, PHP_URL_HOST );
 		if ( is_string( $host ) && $this->is_bot_blocking_domain( $host ) ) {
 			return new Check_Item(
-				id:        'broken_links',
+				id:        $this->link_check_id( $url ),
 				label:     __( 'Link Check Skipped', 'scalyn-qa-assistant' ),
 				status:    'pass',
 				message:   sprintf(

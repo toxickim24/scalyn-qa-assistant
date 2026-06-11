@@ -65,6 +65,7 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 			?>
 		<?php endif; ?>
 
+		<?php if ( 'pass' !== $status ) : ?>
 		<button
 			type="button"
 			class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-ignore-check"
@@ -74,5 +75,6 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 		>
 			<span class="dashicons dashicons-hidden" aria-hidden="true"></span>
 		</button>
+		<?php endif; ?>
 	</div>
 </div>

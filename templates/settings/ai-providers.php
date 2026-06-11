@@ -138,12 +138,6 @@ $mask_key = function ( string $key ): string {
 	<!-- AI Master Toggle -->
 	<div class="scalyn-card" id="scalyn-tab-panel-ai-providers" role="tabpanel">
 		<div class="scalyn-toggle-row">
-			<label for="scalyn-ai-enabled" class="scalyn-toggle-label">
-				<strong><?php esc_html_e( 'Enable AI Features', 'scalyn-qa-assistant' ); ?></strong>
-				<span class="scalyn-field-description">
-					<?php esc_html_e( 'When enabled, AI-powered features such as meta description generation and content suggestions become available.', 'scalyn-qa-assistant' ); ?>
-				</span>
-			</label>
 			<input
 				type="checkbox"
 				id="scalyn-ai-enabled"
@@ -152,6 +146,12 @@ $mask_key = function ( string $key ): string {
 				<?php checked( $ai_enabled ); ?>
 				class="scalyn-toggle-checkbox"
 			>
+			<label for="scalyn-ai-enabled" class="scalyn-toggle-label">
+				<strong><?php esc_html_e( 'Enable AI Features', 'scalyn-qa-assistant' ); ?></strong>
+				<span class="scalyn-field-description">
+					<?php esc_html_e( 'When enabled, AI-powered features such as meta description generation and content suggestions become available.', 'scalyn-qa-assistant' ); ?>
+				</span>
+			</label>
 		</div>
 	</div>
 

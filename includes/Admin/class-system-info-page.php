@@ -75,6 +75,9 @@ class System_Info_Page {
 			'active_theme'       => wp_get_theme()->get( 'Name' ) . ' ' . wp_get_theme()->get( 'Version' ),
 			'memory_limit'       => ini_get( 'memory_limit' ),
 			'max_execution_time' => ini_get( 'max_execution_time' ),
+			'max_input_time'     => ini_get( 'max_input_time' ),
+			'post_max_size'      => ini_get( 'post_max_size' ),
+			'upload_max_size'    => ini_get( 'upload_max_filesize' ),
 
 			// SEO & AI.
 			'seo_plugin'     => $this->get_seo_plugin_name(),

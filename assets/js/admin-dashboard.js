@@ -420,6 +420,154 @@
     /**
      * Initialize all dashboard functionality on DOMContentLoaded.
      */
+    /**
+     * Handle Launch Checklist "Run Check" button.
+     */
+    function initLaunchScan() {
+        var btn = document.getElementById('scalyn-launch-scan');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            btn.disabled = true;
+            var origText = btn.textContent;
+            btn.textContent = 'Checking...';
+
+            fetchApi('launch/scan', { method: 'POST' })
+                .then(function (response) {
+                    if (response.success) {
+                        if (typeof ScalynAlert !== 'undefined') {
+                            ScalynAlert.toast('Launch check complete');
+                        }
+                        window.location.reload();
+                    }
+                })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.error('Error', err.message || 'Launch check failed.');
+                    }
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                });
+        });
+    }
+
+    /**
+     * Handle individual Rescan buttons on dashboard and launch pages.
+     */
+    function initRescanButtons() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-rescan');
+            if (!btn) return;
+
+            var postId = btn.getAttribute('data-post-id');
+            if (!postId) return;
+
+            btn.disabled = true;
+            var origText = btn.textContent;
+            btn.textContent = 'Scanning...';
+
+            fetchApi('scan/' + postId, { method: 'POST' })
+                .then(function () {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.toast('Scan complete');
+                    }
+                    window.location.reload();
+                })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.error('Error', err.message || 'Scan failed.');
+                    }
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                });
+        });
+    }
+
+    /**
+     * Handle "Ignore Check" buttons on launch checklist page.
+     */
+    function initIgnoreCheck() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-ignore-check');
+            if (!btn) return;
+
+            var checkId = btn.getAttribute('data-check-id');
+            if (!checkId) return;
+
+            var postId = btn.getAttribute('data-post-id') || '0';
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Ignore This Check',
+                    text: 'Provide a reason (optional):',
+                    input: 'text',
+                    inputPlaceholder: 'Reason (optional)',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ignore',
+                    confirmButtonColor: '#F59E0B',
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+
+                    fetchApi('ignore', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            type: parseInt(postId, 10) > 0 ? 'check' : 'global',
+                            check_id: checkId,
+                            post_id: parseInt(postId, 10) > 0 ? parseInt(postId, 10) : null,
+                            reason: result.value || '',
+                        }),
+                    }).then(function (response) {
+                        if (response.success) {
+                            ScalynAlert && ScalynAlert.toast('Check ignored — recalculating...');
+                            // Re-run launch scan to recalculate scores.
+                            return fetchApi('launch/scan', { method: 'POST' });
+                        }
+                    }).then(function () {
+                        window.location.reload();
+                    }).catch(function (err) {
+                        ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to ignore check.');
+                    });
+                });
+            }
+        });
+    }
+
+    /**
+     * Handle "Restore" (remove ignore) buttons.
+     */
+    function initRemoveIgnore() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-remove-ignore');
+            if (!btn) return;
+
+            var ruleId = btn.getAttribute('data-rule-id');
+            if (!ruleId) return;
+
+            if (typeof ScalynAlert !== 'undefined') {
+                ScalynAlert.confirm('Restore Check', 'This check will be evaluated again.', 'Restore')
+                    .then(function (result) {
+                        if (!result.isConfirmed) return;
+                        fetchApi('ignore/' + ruleId, { method: 'DELETE' })
+                            .then(function (response) {
+                                if (response.success) {
+                                    ScalynAlert.toast('Check restored — recalculating...');
+                                    return fetchApi('launch/scan', { method: 'POST' });
+                                }
+                            })
+                            .then(function () {
+                                window.location.reload();
+                            })
+                            .catch(function (err) {
+                                ScalynAlert.error('Error', err.message || 'Failed to restore check.');
+                            });
+                    });
+            }
+        });
+    }
+
     function init() {
         // Animate existing score circles rendered server-side.
         animateAllScoreCircles();
@@ -430,7 +578,11 @@
         // Bind event handlers.
         handleScanAll();
         initAuditLinks();
+        initRescanButtons();
         initTooltips();
+        initLaunchScan();
+        initIgnoreCheck();
+        initRemoveIgnore();
 
         // Start auto-refresh.
         startAutoRefresh();

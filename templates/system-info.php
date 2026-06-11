@@ -145,7 +145,10 @@ $plain_text .= 'MySQL Version: ' . esc_html( $info['mysql_version'] ?? '' ) . "\
 $plain_text .= 'Web Server: ' . esc_html( $info['web_server'] ?? '' ) . "\n";
 $plain_text .= 'Active Theme: ' . esc_html( $info['active_theme'] ?? '' ) . "\n";
 $plain_text .= 'Memory Limit: ' . esc_html( $info['memory_limit'] ?? '' ) . "\n";
-$plain_text .= 'Max Execution Time: ' . esc_html( $info['max_execution_time'] ?? '' ) . "s\n\n";
+$plain_text .= 'Max Execution Time: ' . esc_html( $info['max_execution_time'] ?? '' ) . "s\n";
+$plain_text .= 'Max Input Time: ' . esc_html( $info['max_input_time'] ?? '' ) . "s\n";
+$plain_text .= 'Post Max Size: ' . esc_html( $info['post_max_size'] ?? '' ) . "\n";
+$plain_text .= 'Upload Max Size: ' . esc_html( $info['upload_max_size'] ?? '' ) . "\n\n";
 
 $plain_text .= "--- SEO & AI ---\n";
 $plain_text .= 'Active SEO Plugin: ' . ( $seo_plugin_name ? esc_html( $seo_plugin_name ) : 'None' ) . "\n";
@@ -316,6 +319,27 @@ if ( ! empty( $info['migration_log'] ) && is_array( $info['migration_log'] ) ) {
 				</span>
 			</span>
 			<span class="scalyn-status-row__extra"><?php echo $exec_note; ?></span>
+		</div>
+
+		<div class="scalyn-status-row">
+			<span class="scalyn-status__dot scalyn-status__dot--green"></span>
+			<span class="scalyn-status-row__label"><?php esc_html_e( 'Max Input Time', 'scalyn-qa-assistant' ); ?></span>
+			<span class="scalyn-status-row__value"><?php echo esc_html( $info['max_input_time'] ?? '0' ); ?>s</span>
+			<span class="scalyn-status-row__extra"><?php esc_html_e( 'Maximum time to parse input data', 'scalyn-qa-assistant' ); ?></span>
+		</div>
+
+		<div class="scalyn-status-row">
+			<span class="scalyn-status__dot scalyn-status__dot--green"></span>
+			<span class="scalyn-status-row__label"><?php esc_html_e( 'Post Max Size', 'scalyn-qa-assistant' ); ?></span>
+			<span class="scalyn-status-row__value"><?php echo esc_html( $info['post_max_size'] ?? 'Unknown' ); ?></span>
+			<span class="scalyn-status-row__extra"><?php esc_html_e( 'Maximum size of POST data', 'scalyn-qa-assistant' ); ?></span>
+		</div>
+
+		<div class="scalyn-status-row">
+			<span class="scalyn-status__dot scalyn-status__dot--green"></span>
+			<span class="scalyn-status-row__label"><?php esc_html_e( 'Upload Max Size', 'scalyn-qa-assistant' ); ?></span>
+			<span class="scalyn-status-row__value"><?php echo esc_html( $info['upload_max_size'] ?? 'Unknown' ); ?></span>
+			<span class="scalyn-status-row__extra"><?php esc_html_e( 'Maximum file upload size', 'scalyn-qa-assistant' ); ?></span>
 		</div>
 	</div>
 

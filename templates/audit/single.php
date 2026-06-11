@@ -66,10 +66,17 @@ usort( $seo_checks, $sort_checks );
 usort( $content_checks, $sort_checks );
 usort( $func_checks, $sort_checks );
 
-// Build a lookup of ignored check IDs for this post.
+// Build a lookup of ignored check IDs — both per-post and global.
 $ignored_check_ids = array();
 foreach ( $ignore_rules as $rule ) {
-	$ignored_check_ids[ $rule->check_id ] = true;
+	$ignored_check_ids[ $rule->check_id ] = $rule;
+}
+// Also include global ignores.
+$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
+foreach ( $global_ignores as $rule ) {
+	if ( 'global' === $rule->type || ( null === $rule->post_id || 0 === $rule->post_id ) ) {
+		$ignored_check_ids[ $rule->check_id ] = $rule;
+	}
 }
 
 // Compute human-readable scan time.
@@ -263,11 +270,23 @@ $permalink     = get_permalink( $post_id );
 								?>
 							</summary>
 							<div class="scalyn-ignored-section__list">
-								<?php foreach ( $ignored_seo as $check ) : ?>
-									<?php
-									$item = $check->to_array();
-									include SCALYN_QA_PLUGIN_DIR . 'templates/partials/check-item.php';
-									?>
+								<?php foreach ( $ignored_seo as $check ) :
+									$rule = $ignored_check_ids[ $check->id ] ?? null;
+								?>
+									<div class="scalyn-check-item scalyn-check-item--ignored" style="opacity:0.6;">
+										<span class="scalyn-check-icon" aria-hidden="true"><span class="dashicons dashicons-hidden"></span></span>
+										<div class="scalyn-check-content">
+											<strong class="scalyn-check-label"><?php echo esc_html( $check->label ); ?></strong>
+											<?php if ( $rule && ! empty( $rule->reason ) ) : ?>
+												<span class="scalyn-check-message"><?php echo esc_html( $rule->reason ); ?></span>
+											<?php endif; ?>
+										</div>
+										<div class="scalyn-check-actions">
+											<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-remove-ignore" data-rule-id="<?php echo esc_attr( $rule ? $rule->id : '' ); ?>" title="<?php esc_attr_e( 'Restore', 'scalyn-qa-assistant' ); ?>">
+												<span class="dashicons dashicons-visibility" aria-hidden="true"></span> <?php esc_html_e( 'Restore', 'scalyn-qa-assistant' ); ?>
+											</button>
+										</div>
+									</div>
 								<?php endforeach; ?>
 							</div>
 						</details>
@@ -387,11 +406,23 @@ $permalink     = get_permalink( $post_id );
 								?>
 							</summary>
 							<div class="scalyn-ignored-section__list">
-								<?php foreach ( $ignored_func as $check ) : ?>
-									<?php
-									$item = $check->to_array();
-									include SCALYN_QA_PLUGIN_DIR . 'templates/partials/check-item.php';
-									?>
+								<?php foreach ( $ignored_func as $check ) :
+									$rule = $ignored_check_ids[ $check->id ] ?? null;
+								?>
+									<div class="scalyn-check-item scalyn-check-item--ignored" style="opacity:0.6;">
+										<span class="scalyn-check-icon" aria-hidden="true"><span class="dashicons dashicons-hidden"></span></span>
+										<div class="scalyn-check-content">
+											<strong class="scalyn-check-label"><?php echo esc_html( $check->label ); ?></strong>
+											<?php if ( $rule && ! empty( $rule->reason ) ) : ?>
+												<span class="scalyn-check-message"><?php echo esc_html( $rule->reason ); ?></span>
+											<?php endif; ?>
+										</div>
+										<div class="scalyn-check-actions">
+											<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-remove-ignore" data-rule-id="<?php echo esc_attr( $rule ? $rule->id : '' ); ?>" title="<?php esc_attr_e( 'Restore', 'scalyn-qa-assistant' ); ?>">
+												<span class="dashicons dashicons-visibility" aria-hidden="true"></span> <?php esc_html_e( 'Restore', 'scalyn-qa-assistant' ); ?>
+											</button>
+										</div>
+									</div>
 								<?php endforeach; ?>
 							</div>
 						</details>

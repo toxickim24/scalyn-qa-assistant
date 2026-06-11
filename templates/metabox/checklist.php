@@ -167,7 +167,7 @@ $audit_url = admin_url( 'admin.php?page=scalyn-qa-audits&post_id=' . $post_id );
 
 		<!-- No scan results -->
 		<div class="scalyn-metabox__empty">
-			<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+			<span class="dashicons dashicons-info" aria-hidden="true"></span>
 			<p>
 				<?php esc_html_e( 'No scan results yet. Click "Scan Now" to analyze this content, or save the post to trigger an automatic scan.', 'scalyn-qa-assistant' ); ?>
 			</p>

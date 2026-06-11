@@ -348,6 +348,35 @@
   color: var(--scalyn-primary);
 }
 
+/* Checks Grid (for settings checkboxes) */
+.scalyn-checks-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.375rem 1.5rem;
+  padding: 0.5rem 0;
+}
+
+.scalyn-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--scalyn-text-default);
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.scalyn-checkbox-label input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+@media screen and (max-width: 768px) {
+  .scalyn-checks-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ==========================================================================
    Badge Component
    ========================================================================== */
@@ -778,6 +807,172 @@ a.scalyn-btn--ghost:visited {
   text-align: center;
 }
 
+/* ==========================================================================
+   Dashboard Hero
+   ========================================================================== */
+
+.scalyn-dashboard-hero {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  padding: 1.5rem 2rem;
+  background: var(--scalyn-surface);
+  border: 1px solid var(--scalyn-border);
+  border-radius: var(--scalyn-radius-lg);
+  margin-bottom: 0.75rem;
+}
+
+.scalyn-dashboard-hero__main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.scalyn-dashboard-hero__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.scalyn-dashboard-hero__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-dashboard-hero__categories {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+/* Category score row with progress bar */
+.scalyn-category-score {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.scalyn-category-score__header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.scalyn-category-score__header .dashicons {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-category-score__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--scalyn-text-strong);
+}
+
+.scalyn-category-score__bar {
+  flex: 1;
+  height: 8px;
+  background: var(--scalyn-neutral-100);
+  border-radius: var(--scalyn-radius-full);
+  overflow: hidden;
+}
+
+.scalyn-category-score__fill {
+  height: 100%;
+  border-radius: var(--scalyn-radius-full);
+  transition: width 0.6s ease;
+}
+
+.scalyn-category-score__fill--green  { background: var(--scalyn-success); }
+.scalyn-category-score__fill--yellow { background: var(--scalyn-warning); }
+.scalyn-category-score__fill--red    { background: var(--scalyn-danger); }
+
+.scalyn-category-score__value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--scalyn-text-strong);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Score circle large variant (dashboard hero) */
+.scalyn-score-circle--large {
+  width: 100px;
+  height: 100px;
+}
+
+.scalyn-score-circle--large::after {
+  width: 80px;
+  height: 80px;
+}
+
+.scalyn-score-circle--large .scalyn-score-circle__value {
+  font-size: 2rem;
+}
+
+.scalyn-score-circle--large .scalyn-score-circle__unit {
+  font-size: 0.875rem;
+}
+
+/* Quick Actions list */
+.scalyn-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.scalyn-action-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--scalyn-border-light);
+  color: var(--scalyn-text-default);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  transition: color 0.15s ease;
+}
+
+.scalyn-action-link:last-child {
+  border-bottom: none;
+}
+
+.scalyn-action-link:hover {
+  color: var(--scalyn-primary);
+}
+
+.scalyn-action-link .dashicons {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--scalyn-text-muted);
+  transition: color 0.15s ease;
+}
+
+.scalyn-action-link:hover .dashicons {
+  color: var(--scalyn-primary);
+}
+
+/* Responsive hero */
+@media screen and (max-width: 768px) {
+  .scalyn-dashboard-hero {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.25rem;
+  }
+}
+
 .scalyn-score-card__label {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -901,6 +1096,83 @@ a.scalyn-btn--ghost:visited {
 
 .scalyn-check-item--fail .scalyn-check-item__title {
   color: var(--scalyn-danger-text);
+}
+
+/* ==========================================================================
+   KPI Stats Component
+   ========================================================================== */
+
+.scalyn-kpi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.scalyn-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--scalyn-border-light);
+}
+
+.scalyn-kpi:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.scalyn-kpi:first-child {
+  padding-top: 0;
+}
+
+.scalyn-kpi__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--scalyn-radius-md);
+  flex-shrink: 0;
+  background: var(--scalyn-neutral-100);
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-kpi__icon .dashicons {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+  line-height: 1;
+}
+
+.scalyn-kpi__icon--success { background: var(--scalyn-success-light); color: var(--scalyn-success); }
+.scalyn-kpi__icon--warning { background: var(--scalyn-warning-light); color: var(--scalyn-warning); }
+.scalyn-kpi__icon--danger  { background: var(--scalyn-danger-light);  color: var(--scalyn-danger); }
+.scalyn-kpi__icon--primary { background: var(--scalyn-primary-light); color: var(--scalyn-primary); }
+.scalyn-kpi__icon--neutral { background: var(--scalyn-neutral-100);   color: var(--scalyn-neutral-400); }
+
+.scalyn-kpi__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.scalyn-kpi__value {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--scalyn-text-strong);
+  line-height: 1.2;
+}
+
+.scalyn-kpi__unit {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-kpi__label {
+  font-size: 0.6875rem;
+  color: var(--scalyn-text-faint);
+  line-height: 1.3;
 }
 
 /* Check-item list container */
@@ -2017,6 +2289,33 @@ a.scalyn-btn--ghost:visited {
 /* ==========================================================================
    Toggle / Switch
    ========================================================================== */
+
+.scalyn-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.scalyn-toggle-row .scalyn-toggle-checkbox {
+  margin-top: 0.1875rem;
+  flex-shrink: 0;
+}
+
+.scalyn-toggle-row .scalyn-toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  cursor: pointer;
+}
+
+.scalyn-toggle-row .scalyn-toggle-label strong {
+  font-size: 0.8125rem;
+  color: var(--scalyn-text-strong);
+}
+
+.scalyn-toggle-row .scalyn-field-description {
+  margin: 0;
+}
 
 .scalyn-toggle {
   position: relative;

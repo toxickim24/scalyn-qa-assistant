@@ -283,6 +283,7 @@
      */
     function initListPage() {
         initStatusFilter();
+        initTypeFilter();
         initRescanButtons();
         initScanAll();
     }
@@ -295,34 +296,37 @@
         if (!filterSelect) return;
 
         filterSelect.addEventListener('change', function () {
-            var status = this.value;
-            var rows = document.querySelectorAll('.scalyn-table tbody tr[data-post-id]');
+            var params = new URLSearchParams(window.location.search);
 
-            rows.forEach(function (row) {
-                if (!status) {
-                    row.style.display = '';
-                    return;
-                }
+            if (this.value) {
+                params.set('status', this.value);
+            } else {
+                params.delete('status');
+            }
 
-                // Check the overall score badge status.
-                var badges = row.querySelectorAll('.scalyn-badge');
-                var overallBadge = badges[badges.length - 1]; // Last badge is overall.
-                var rowStatus = '';
+            params.delete('paged');
+            window.location.search = params.toString();
+        });
+    }
 
-                if (overallBadge) {
-                    if (overallBadge.classList.contains('scalyn-badge--green')) rowStatus = 'green';
-                    else if (overallBadge.classList.contains('scalyn-badge--yellow')) rowStatus = 'yellow';
-                    else if (overallBadge.classList.contains('scalyn-badge--red')) rowStatus = 'red';
-                }
+    /**
+     * Initialize post type filtering — navigates with query param.
+     */
+    function initTypeFilter() {
+        var filterSelect = document.getElementById('scalyn-filter-type');
+        if (!filterSelect) return;
 
-                // Handle unscanned filter.
-                if (status === 'unscanned') {
-                    var hasScore = row.querySelector('.scalyn-badge');
-                    row.style.display = hasScore ? 'none' : '';
-                } else {
-                    row.style.display = (rowStatus === status) ? '' : 'none';
-                }
-            });
+        filterSelect.addEventListener('change', function () {
+            var params = new URLSearchParams(window.location.search);
+
+            if (this.value) {
+                params.set('filter_type', this.value);
+            } else {
+                params.delete('filter_type');
+            }
+
+            params.delete('paged');
+            window.location.search = params.toString();
         });
     }
 
@@ -331,10 +335,10 @@
      */
     function initRescanButtons() {
         document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.scalyn-rescan');
+            var btn = e.target.closest('.scalyn-rescan') || e.target.closest('#scalyn-rescan');
             if (!btn) return;
 
-            var postId = btn.getAttribute('data-post-id');
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl();
             if (!postId) return;
 
             btn.disabled = true;
@@ -342,11 +346,11 @@
 
             fetchApi('scan/' + postId, { method: 'POST' })
                 .then(function (response) {
-                    if (response.success && response.data) {
-                        updateTableRow(postId, response.data);
+                    if (response.success) {
                         if (typeof ScalynAlert !== 'undefined') {
                             ScalynAlert.toast('Scan complete');
                         }
+                        window.location.reload();
                     }
                 })
                 .catch(function (err) {
@@ -521,10 +525,10 @@
      */
     function initSingleRescan() {
         document.addEventListener('click', function (e) {
-            var btn = e.target.closest('#scalyn-rescan-btn, .scalyn-rescan-single');
+            var btn = e.target.closest('#scalyn-rescan, #scalyn-rescan-btn, .scalyn-rescan-single, .scalyn-rescan');
             if (!btn) return;
 
-            var postId = btn.getAttribute('data-post-id') || scalynQA.currentPostId;
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl() || scalynQA.currentPostId;
             if (!postId) return;
 
             btn.disabled = true;
@@ -535,14 +539,9 @@
 
             fetchApi('scan/' + postId, { method: 'POST' })
                 .then(function (response) {
-                    if (typeof ScalynAlert !== 'undefined') {
-                        ScalynAlert.close();
-                        ScalynAlert.success('Scan Complete', 'Page has been rescanned successfully.');
-                    }
-
-                    // Reload the results section.
-                    if (response.success && response.data) {
-                        updateSinglePageResults(response.data);
+                    if (response.success) {
+                        ScalynAlert && ScalynAlert.toast('Scan complete');
+                        window.location.reload();
                     }
                 })
                 .catch(function (err) {
@@ -1026,9 +1025,13 @@
                 })
                     .then(function (response) {
                         if (response.success) {
-                            ScalynAlert && ScalynAlert.toast('Check ignored');
-                            window.location.reload();
+                            ScalynAlert && ScalynAlert.toast('Check ignored — rescanning...');
+                            // Rescan to recalculate scores without ignored checks.
+                            return fetchApi('scan/' + postId, { method: 'POST' });
                         }
+                    })
+                    .then(function () {
+                        window.location.reload();
                     })
                     .catch(function (err) {
                         ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to ignore check.');
@@ -1057,12 +1060,18 @@
             ).then(function (result) {
                 if (!result.isConfirmed) return;
 
+                var postId = getPostIdFromUrl();
                 fetchApi('ignore/' + ruleId, { method: 'DELETE' })
                     .then(function (response) {
                         if (response.success) {
-                            ScalynAlert.toast('Ignore rule removed');
-                            window.location.reload();
+                            ScalynAlert.toast('Check restored — rescanning...');
+                            if (postId) {
+                                return fetchApi('scan/' + postId, { method: 'POST' });
+                            }
                         }
+                    })
+                    .then(function () {
+                        window.location.reload();
                     })
                     .catch(function (err) {
                         ScalynAlert.error('Error', err.message || 'Failed to remove ignore rule.');

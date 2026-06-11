@@ -200,8 +200,22 @@ class Dashboard_Page {
 			return $summary;
 		}
 
+		// Build ignored check IDs (global ignores).
+		$ignored_ids = array();
+		$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
+		foreach ( $global_ignores as $rule ) {
+			if ( 'global' === $rule->type || null === $rule->post_id || 0 === $rule->post_id ) {
+				$ignored_ids[ $rule->check_id ] = true;
+			}
+		}
+
 		foreach ( $results as $item ) {
 			if ( ! is_array( $item ) || ! isset( $item['status'] ) ) {
+				continue;
+			}
+
+			// Skip ignored checks.
+			if ( isset( $ignored_ids[ $item['id'] ?? '' ] ) ) {
 				continue;
 			}
 

@@ -2,7 +2,7 @@
 
 Website QA, SEO validation, and launch readiness tool for WordPress.
 
-Built for internal use by [Scalyn](https://scalyn.com).
+Built for internal use by [Scalyn](https://scalyn.global/).
 
 ## Documentation
 

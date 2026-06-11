@@ -34,8 +34,10 @@ if ( $score >= 80 ) {
 
 // Group checks by their ID prefix for category assignment.
 $category_map = array(
-	'seo_plugin_installed' => 'seo',
-	'sitemap_exists'       => 'seo',
+	'search_engine_visibility' => 'seo',
+	'seo_plugin_installed'     => 'seo',
+	'sitemap_exists'           => 'seo',
+	'llms_txt'                 => 'seo',
 	'ga4_configured'       => 'analytics',
 	'gtm_configured'       => 'analytics',
 	'ssl_enabled'          => 'technical',
@@ -43,6 +45,13 @@ $category_map = array(
 	'contact_page_exists'  => 'content',
 	'privacy_policy_exists' => 'content',
 	'plugin_conflicts'     => 'plugin_health',
+	'php_memory_limit'     => 'technical',
+	'php_max_execution_time' => 'technical',
+	'php_max_input_time'   => 'technical',
+	'php_post_max_size'    => 'technical',
+	'php_upload_max_size'  => 'technical',
+	'security_plugin'      => 'plugin_health',
+	'cache_plugin'         => 'plugin_health',
 );
 
 $category_labels = array(
@@ -53,7 +62,16 @@ $category_labels = array(
 	'plugin_health' => __( 'Plugin Health', 'scalyn-qa-assistant' ),
 );
 
-// Sort results into categories.
+// Load global ignore rules.
+$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
+$ignored_ids    = array();
+foreach ( $global_ignores as $rule ) {
+	if ( 'global' === $rule->type || 0 === $rule->post_id ) {
+		$ignored_ids[ $rule->check_id ] = $rule;
+	}
+}
+
+// Sort results into categories, separating ignored checks.
 $grouped = array(
 	'seo'           => array(),
 	'analytics'     => array(),
@@ -62,11 +80,17 @@ $grouped = array(
 	'plugin_health' => array(),
 );
 
+$ignored_checks = array();
+
 foreach ( $results as $check ) {
 	$check_id = $check->id;
 	$group    = isset( $category_map[ $check_id ] ) ? $category_map[ $check_id ] : 'technical';
 
-	$grouped[ $group ][] = $check;
+	if ( isset( $ignored_ids[ $check_id ] ) ) {
+		$ignored_checks[] = $check;
+	} else {
+		$grouped[ $group ][] = $check;
+	}
 }
 
 // Format the last scan time.
@@ -192,6 +216,7 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 									?>
 								<?php endif; ?>
 
+								<?php if ( 'pass' !== $c_status ) : ?>
 								<button
 									type="button"
 									class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-ignore-check"
@@ -201,6 +226,7 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 								>
 									<span class="dashicons dashicons-hidden" aria-hidden="true"></span>
 								</button>
+								<?php endif; ?>
 							</div>
 						</div>
 					<?php endforeach; ?>
@@ -208,6 +234,48 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 			<?php endif; ?>
 		</div>
 	<?php endforeach; ?>
+
+	<?php if ( ! empty( $ignored_checks ) ) : ?>
+	<!-- Ignored Checks Section -->
+	<div class="scalyn-card" id="scalyn-launch-ignored">
+		<details>
+			<summary class="scalyn-card__title" style="cursor:pointer;">
+				<?php esc_html_e( 'Ignored Checks', 'scalyn-qa-assistant' ); ?>
+				<span class="scalyn-badge scalyn-badge--gray"><?php echo esc_html( (string) count( $ignored_checks ) ); ?></span>
+			</summary>
+			<div class="scalyn-check-list scalyn-check-list--compact" style="margin-top:0.75rem;">
+				<?php foreach ( $ignored_checks as $check ) :
+					$item     = $check->to_array();
+					$check_id = $item['id'] ?? '';
+					$rule     = $ignored_ids[ $check_id ] ?? null;
+				?>
+					<div class="scalyn-check-item scalyn-check-item--ignored" style="opacity:0.6;">
+						<span class="scalyn-check-icon" aria-hidden="true">
+							<span class="dashicons dashicons-hidden"></span>
+						</span>
+						<div class="scalyn-check-content">
+							<strong class="scalyn-check-label"><?php echo esc_html( $item['label'] ?? '' ); ?></strong>
+							<?php if ( $rule && ! empty( $rule->reason ) ) : ?>
+								<span class="scalyn-check-message"><?php echo esc_html( $rule->reason ); ?></span>
+							<?php endif; ?>
+						</div>
+						<div class="scalyn-check-actions">
+							<button
+								type="button"
+								class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-remove-ignore"
+								data-rule-id="<?php echo esc_attr( $rule ? $rule->id : '' ); ?>"
+								title="<?php esc_attr_e( 'Restore this check', 'scalyn-qa-assistant' ); ?>"
+							>
+								<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+								<?php esc_html_e( 'Restore', 'scalyn-qa-assistant' ); ?>
+							</button>
+						</div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		</details>
+	</div>
+	<?php endif; ?>
 
 	<!-- Loading overlay for AJAX scan -->
 	<div id="scalyn-launch-loading" class="scalyn-loading" style="display: none;" aria-hidden="true">

@@ -389,6 +389,24 @@ class Settings_Controller extends REST_Controller {
 		// Save general settings.
 		update_option( self::SETTINGS_OPTION, $settings, false );
 
+		// Handle launch checklist settings.
+		if ( array_key_exists( 'launch_settings', $params ) && is_array( $params['launch_settings'] ) ) {
+			$ls = $params['launch_settings'];
+			$launch_data = array(
+				'thresholds' => array(
+					'memory_limit'       => max( 64, (int) ( $ls['thresholds']['memory_limit'] ?? 512 ) ),
+					'max_execution_time' => max( 30, (int) ( $ls['thresholds']['max_execution_time'] ?? 90 ) ),
+					'max_input_time'     => max( 30, (int) ( $ls['thresholds']['max_input_time'] ?? 90 ) ),
+					'post_max_size'      => max( 8, (int) ( $ls['thresholds']['post_max_size'] ?? 128 ) ),
+					'upload_max_size'    => max( 2, (int) ( $ls['thresholds']['upload_max_size'] ?? 64 ) ),
+				),
+				'enabled_checks' => isset( $ls['enabled_checks'] ) && is_array( $ls['enabled_checks'] )
+					? array_map( 'sanitize_key', $ls['enabled_checks'] )
+					: array(),
+			);
+			update_option( 'scalyn_qa_launch_settings', $launch_data, false );
+		}
+
 		// Handle AI config separately via AI_Manager.
 		if ( array_key_exists( 'ai_config', $params ) && is_array( $params['ai_config'] ) ) {
 			// Also sync enable_ai to general settings from ai_config.enabled

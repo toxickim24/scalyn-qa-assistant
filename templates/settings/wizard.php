@@ -188,7 +188,7 @@ $yoast_install_url = wp_nonce_url(
 		<?php else : ?>
 			<!-- Wizard was dismissed -->
 			<div class="scalyn-alert scalyn-alert--neutral">
-				<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+				<span class="dashicons dashicons-info" aria-hidden="true"></span>
 				<div class="scalyn-alert__body">
 					<strong><?php esc_html_e( 'SEO Setup Wizard Dismissed', 'scalyn-qa-assistant' ); ?></strong>
 					<p>

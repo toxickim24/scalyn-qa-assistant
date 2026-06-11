@@ -91,6 +91,7 @@ final class Admin_Assets {
 			'dashboard' => 'admin-dashboard.js',
 			'audits'    => 'admin-audit.js',
 			'settings'  => 'admin-settings.js',
+			'launch'    => 'admin-dashboard.js',
 		);
 
 		if ( null !== $page_key && isset( $page_scripts[ $page_key ] ) ) {

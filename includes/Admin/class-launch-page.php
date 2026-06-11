@@ -15,6 +15,7 @@ namespace Scalyn\QA\Admin;
 defined( 'ABSPATH' ) || exit;
 
 use Scalyn\QA\Models\Check_Item;
+use Scalyn\QA\Models\Ignore_Rule;
 
 /**
  * Class Launch_Page
@@ -32,8 +33,23 @@ class Launch_Page {
 	 */
 	public function render(): void {
 		$results   = $this->get_launch_results();
-		$counts    = $this->calculate_counts( $results );
 		$last_scan = get_option( 'scalyn_qa_launch_last_scan', null );
+
+		// Filter out ignored checks for count/score calculation.
+		$global_ignores = Ignore_Rule::get_all();
+		$ignored_ids    = array();
+		foreach ( $global_ignores as $rule ) {
+			if ( 'global' === $rule->type || 0 === $rule->post_id ) {
+				$ignored_ids[ $rule->check_id ] = true;
+			}
+		}
+
+		$active_results = array_filter(
+			$results,
+			static fn( Check_Item $item ): bool => ! isset( $ignored_ids[ $item->id ] ),
+		);
+
+		$counts = $this->calculate_counts( $active_results );
 
 		$data = array(
 			'results'   => $results,

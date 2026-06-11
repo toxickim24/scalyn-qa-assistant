@@ -295,7 +295,7 @@ final class Metabox {
 			}
 		}
 
-		$scores = Scoring_Engine::calculate( $results );
+		$scores = Scoring_Engine::calculate( $results, $post_id );
 
 		$scan_result = new Scan_Result(
 			post_id:    $post_id,

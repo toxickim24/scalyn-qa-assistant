@@ -19,6 +19,6 @@ if ( empty( $text ) ) {
 }
 ?>
 <span class="scalyn-tooltip" tabindex="0" role="button" aria-label="<?php esc_attr_e( 'More information', 'scalyn-qa-assistant' ); ?>">
-	<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+	<span class="dashicons dashicons-info" aria-hidden="true"></span>
 	<span class="scalyn-tooltip__content"><?php echo esc_html( $text ); ?></span>
 </span>

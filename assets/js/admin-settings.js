@@ -647,6 +647,50 @@
     /**
      * Initialize the wizard tab.
      */
+    // -------------------------------------------------------------------------
+    // Launch Checklist Settings Tab
+    // -------------------------------------------------------------------------
+
+    function initLaunchSettingsTab() {
+        var form = document.getElementById('scalyn-launch-settings-form');
+        if (!form) return;
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            var thresholds = {
+                memory_limit: parseInt(form.querySelector('[name="memory_limit"]').value, 10) || 512,
+                max_execution_time: parseInt(form.querySelector('[name="max_execution_time"]').value, 10) || 90,
+                max_input_time: parseInt(form.querySelector('[name="max_input_time"]').value, 10) || 90,
+                post_max_size: parseInt(form.querySelector('[name="post_max_size"]').value, 10) || 128,
+                upload_max_size: parseInt(form.querySelector('[name="upload_max_size"]').value, 10) || 64,
+            };
+
+            var enabledChecks = [];
+            form.querySelectorAll('input[name="enabled_checks[]"]:checked').forEach(function (cb) {
+                enabledChecks.push(cb.value);
+            });
+
+            fetchApi('settings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    launch_settings: {
+                        thresholds: thresholds,
+                        enabled_checks: enabledChecks,
+                    },
+                }),
+            }).then(function () {
+                ScalynAlert && ScalynAlert.toast('Launch settings saved');
+            }).catch(function (err) {
+                ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to save launch settings.');
+            });
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Wizard Tab
+    // -------------------------------------------------------------------------
+
     function initWizardTab() {
         initInstallSeoPlugin();
         initDismissWizard();
@@ -1092,6 +1136,43 @@
      * Initialize GitHub update check and save settings handlers.
      */
     function initGitHubUpdates() {
+        // Auto-check on page load.
+        var latestEl = document.getElementById('scalyn-github-latest-version');
+        if (latestEl && latestEl.textContent.trim() === 'Not checked') {
+            fetchApi('updates/check', { method: 'POST' })
+                .then(function (response) {
+                    var data = response.data || response;
+                    if (data.latest_version) {
+                        latestEl.innerHTML = '<code>' + data.latest_version + '</code>';
+                        if (data.status === 'update_available') {
+                            latestEl.innerHTML += ' <span style="color:var(--scalyn-warning);font-weight:600;">— Update available</span>';
+                        } else {
+                            latestEl.innerHTML += ' <span style="color:var(--scalyn-success);">✓ Up to date</span>';
+                        }
+                    } else if (data.status === 'error' || data.status === 'up_to_date') {
+                        // No release found or already up to date — show current version
+                        var ver = (typeof scalynQA !== 'undefined' && scalynQA.settings && scalynQA.settings.version) ? scalynQA.settings.version : '';
+                        if (!ver) {
+                            var installedEl = document.querySelector('.scalyn-form-table code');
+                            ver = installedEl ? installedEl.textContent.trim() : '';
+                        }
+                        if (ver) {
+                            latestEl.innerHTML = '<code>' + ver + '</code> <span style="color:var(--scalyn-success);">✓ Up to date</span>';
+                        } else {
+                            latestEl.innerHTML = '<span style="color:var(--scalyn-text-muted);">No releases published yet</span>';
+                        }
+                    }
+                    var checkedEl = document.getElementById('scalyn-github-last-checked');
+                    if (checkedEl) checkedEl.textContent = 'Just now';
+                })
+                .catch(function () {
+                    // No release on GitHub — not an error, just no releases yet
+                    latestEl.innerHTML = '<span style="color:var(--scalyn-text-muted);">No releases published yet</span>';
+                    var checkedEl = document.getElementById('scalyn-github-last-checked');
+                    if (checkedEl) checkedEl.textContent = 'Just now';
+                });
+        }
+
         // Check for Updates button.
         var checkBtn = document.getElementById('scalyn-check-updates');
         if (checkBtn) {
@@ -1134,6 +1215,12 @@
                                 ScalynAlert.success('Update Available', 'Version ' + data.latest_version + ' is available.');
                             } else if (data.status === 'up_to_date') {
                                 ScalynAlert.toast('You are running the latest version.', 'success');
+                            } else if (data.status === 'error' && data.message && data.message.indexOf('No GitHub release') !== -1) {
+                                // No release yet — not a real error
+                                ScalynAlert.toast('No releases published yet. Create a release on GitHub to enable update checks.', 'info');
+                                if (latestEl) {
+                                    latestEl.innerHTML = '<span style="color:var(--scalyn-text-muted);">No releases published yet</span>';
+                                }
                             } else {
                                 ScalynAlert.error('Check Failed', data.message || 'Could not check for updates.');
                             }
@@ -1366,8 +1453,24 @@
         var panel = document.getElementById('scalyn-backup-info');
         if (!panel) return;
 
-        fetchApi('settings/backup', { method: 'GET' })
+        // Check if backup info was already rendered server-side.
+        if (panel.getAttribute('data-has-backup') === '1') {
+            panel.style.display = 'block';
+            return;
+        }
+
+        // No backup — keep panel hidden, no AJAX needed.
+        return;
+
+        // Legacy fetch (kept for reference but not called).
+        fetch(scalynQA.restUrl + 'settings/backup', {
+            method: 'GET',
+            headers: { 'X-WP-Nonce': scalynQA.nonce },
+            credentials: 'same-origin',
+        })
+            .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (response) {
+                if (!response) return;
                 if (response.success && response.data) {
                     var dateEl = document.getElementById('scalyn-backup-date');
                     var byEl = document.getElementById('scalyn-backup-by');
@@ -1478,6 +1581,9 @@
                 break;
             case 'templates':
                 initTemplatesTab();
+                break;
+            case 'launch':
+                initLaunchSettingsTab();
                 break;
             case 'wizard':
                 initWizardTab();

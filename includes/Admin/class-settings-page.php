@@ -33,6 +33,7 @@ class Settings_Page {
 		'general'      => 'General',
 		'ai-providers' => 'AI Providers',
 		'templates'    => 'Templates',
+		'launch'       => 'Launch Checklist',
 		'wizard'       => 'Setup Wizard',
 		'advanced'     => 'Advanced',
 	);
@@ -116,6 +117,12 @@ class Settings_Page {
 			$settings['templates'] = $templates;
 		}
 
+		// Merge launch checklist settings.
+		$launch_settings = get_option( 'scalyn_qa_launch_settings', array() );
+		if ( is_array( $launch_settings ) ) {
+			$settings['launch_settings'] = $launch_settings;
+		}
+
 		$data = array(
 			'tabs'        => $tabs,
 			'current_tab' => $current_tab,
@@ -140,6 +147,7 @@ class Settings_Page {
 		return match ( $tab ) {
 			'ai-providers' => 'settings/ai-providers.php',
 			'templates'    => 'settings/templates.php',
+			'launch'       => 'settings/launch.php',
 			'wizard'       => 'settings/wizard.php',
 			'advanced'     => 'settings/advanced.php',
 			default        => 'settings/general.php',

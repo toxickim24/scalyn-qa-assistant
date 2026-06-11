@@ -83,7 +83,7 @@ final class Plugin {
 
 				$registry->register( new Analyzers\SEO_Analyzer() );
 				$registry->register( new Analyzers\Content_Analyzer() );
-				$registry->register( new Analyzers\Heading_Analyzer() );
+				// Note: Heading_Analyzer is NOT registered separately — Content_Analyzer delegates to it.
 				$registry->register( new Analyzers\Link_Checker() );
 				$registry->register( new Analyzers\Form_Button_Analyzer() );
 

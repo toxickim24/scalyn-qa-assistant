@@ -210,14 +210,22 @@ $max_ai_requests_per_day  = isset( $settings['max_ai_requests_per_day'] ) ? (int
 			</tr>
 		</table>
 
-		<div id="scalyn-backup-info" class="scalyn-card scalyn-card--subtle" style="display:none;">
+		<?php
+		$backup = get_option( 'scalyn_qa_settings_backup', null );
+		$has_backup = is_array( $backup ) && ! empty( $backup );
+		?>
+		<div id="scalyn-backup-info" class="scalyn-card scalyn-card--subtle" data-has-backup="<?php echo $has_backup ? '1' : '0'; ?>" style="<?php echo $has_backup ? '' : 'display:none;'; ?>">
 			<p>
 				<strong><?php esc_html_e( 'Last backup:', 'scalyn-qa-assistant' ); ?></strong>
-				<span id="scalyn-backup-date"></span>
+				<span id="scalyn-backup-date"><?php
+					if ( $has_backup && ! empty( $backup['created_at'] ) ) {
+						echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $backup['created_at'] ) ) );
+					}
+				?></span>
 				<?php esc_html_e( 'by', 'scalyn-qa-assistant' ); ?>
-				<span id="scalyn-backup-by"></span>
+				<span id="scalyn-backup-by"><?php echo esc_html( $backup['created_by'] ?? '' ); ?></span>
 			</p>
-			<button id="scalyn-rollback-settings" type="button" class="scalyn-btn scalyn-btn--danger">
+			<button id="scalyn-rollback-settings" type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--danger">
 				<?php esc_html_e( 'Rollback to Previous Settings', 'scalyn-qa-assistant' ); ?>
 			</button>
 		</div>

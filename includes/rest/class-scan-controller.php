@@ -253,7 +253,7 @@ class Scan_Controller extends REST_Controller {
 	 */
 	private function execute_scan( int $post_id ): Scan_Result {
 		$results = $this->registry->run_all( $post_id );
-		$scores  = Scoring_Engine::calculate( $results );
+		$scores  = Scoring_Engine::calculate( $results, $post_id );
 
 		$scan_result = new Scan_Result(
 			post_id:    $post_id,
