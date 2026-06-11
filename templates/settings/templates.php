@@ -19,25 +19,23 @@ $settings    = isset( $settings ) ? $settings : array();
 $tabs        = isset( $tabs ) ? $tabs : array();
 $current_tab = isset( $current_tab ) ? $current_tab : 'templates';
 
-// Retrieve stored templates with a default template.
-$templates = isset( $settings['templates'] ) && is_array( $settings['templates'] ) ? $settings['templates'] : array();
+// Retrieve stored templates (indexed array with 'id' field per item).
+$templates_raw = isset( $settings['templates'] ) && is_array( $settings['templates'] ) ? $settings['templates'] : array();
+
+// Build keyed array: id => template data.
+$templates = array();
+foreach ( $templates_raw as $tpl ) {
+	if ( isset( $tpl['id'] ) ) {
+		$templates[ $tpl['id'] ] = $tpl;
+	}
+}
 
 if ( empty( $templates ) ) {
 	$templates = array(
 		'default' => array(
+			'id'     => 'default',
 			'name'   => __( 'Default Template', 'scalyn-qa-assistant' ),
-			'checks' => array(
-				'meta_title_exists'      => true,
-				'meta_description_exists' => true,
-				'heading_structure'      => true,
-				'image_alt_text'         => true,
-				'internal_links'         => true,
-				'content_length'         => true,
-				'broken_links'           => true,
-				'featured_image'         => true,
-				'open_graph'             => true,
-				'readability'            => true,
-			),
+			'checks' => array( 'meta_title_exists', 'meta_description_exists', 'heading_structure', 'image_alt_text', 'internal_links', 'broken_links', 'featured_image' ),
 		),
 	);
 }
@@ -65,7 +63,18 @@ $available_checks = array(
 
 // Current template data.
 $current_template_data = isset( $templates[ $active_template ] ) ? $templates[ $active_template ] : reset( $templates );
-$current_checks        = isset( $current_template_data['checks'] ) && is_array( $current_template_data['checks'] ) ? $current_template_data['checks'] : array();
+// Checks can be either ['check_id' => true] (old) or ['check_id', 'check_id'] (API format).
+$raw_checks     = isset( $current_template_data['checks'] ) && is_array( $current_template_data['checks'] ) ? $current_template_data['checks'] : array();
+$current_checks = array();
+foreach ( $raw_checks as $key => $value ) {
+	if ( is_string( $key ) ) {
+		// Old format: associative.
+		$current_checks[ $key ] = $value;
+	} else {
+		// API format: flat array of check IDs.
+		$current_checks[ $value ] = true;
+	}
+}
 ?>
 <div class="scalyn-wrap">
 

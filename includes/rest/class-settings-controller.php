@@ -108,7 +108,7 @@ class Settings_Controller extends REST_Controller {
 		// PUT & DELETE /settings/templates/{id}.
 		register_rest_route(
 			$this->namespace,
-			'/settings/templates/(?P<template_id>[a-f0-9-]+)',
+			'/settings/templates/(?P<template_id>[\\w-]+)',
 			array(
 				array(
 					'methods'             => \WP_REST_Server::EDITABLE,
@@ -126,7 +126,7 @@ class Settings_Controller extends REST_Controller {
 		// POST /settings/templates/{id}/duplicate.
 		register_rest_route(
 			$this->namespace,
-			'/settings/templates/(?P<template_id>[a-f0-9-]+)/duplicate',
+			'/settings/templates/(?P<template_id>[\\w-]+)/duplicate',
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'duplicate_template' ),
@@ -1076,7 +1076,33 @@ class Settings_Controller extends REST_Controller {
 	private function get_templates(): array {
 		$templates = get_option( self::TEMPLATES_OPTION, array() );
 
-		return is_array( $templates ) ? $templates : array();
+		if ( ! is_array( $templates ) ) {
+			$templates = array();
+		}
+
+		// Seed default template if none exist.
+		if ( empty( $templates ) ) {
+			$templates = array(
+				array(
+					'id'         => 'default',
+					'name'       => 'Default Template',
+					'checks'     => array(
+						'meta_title_exists',
+						'meta_description_exists',
+						'heading_structure',
+						'image_alt_text',
+						'internal_links',
+						'content_length',
+						'broken_links',
+						'featured_image',
+					),
+					'created_at' => gmdate( 'c' ),
+				),
+			);
+			update_option( self::TEMPLATES_OPTION, $templates, false );
+		}
+
+		return $templates;
 	}
 
 	/**

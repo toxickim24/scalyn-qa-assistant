@@ -110,6 +110,12 @@ class Settings_Page {
 			}
 		}
 
+		// Merge templates into settings for template tab access.
+		$templates = get_option( 'scalyn_qa_templates', array() );
+		if ( is_array( $templates ) && ! empty( $templates ) ) {
+			$settings['templates'] = $templates;
+		}
+
 		$data = array(
 			'tabs'        => $tabs,
 			'current_tab' => $current_tab,
