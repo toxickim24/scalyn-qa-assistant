@@ -511,11 +511,8 @@
         initAddNote();
         initDeleteNote();
         initCreateSnapshot();
-        initGenerateAiMeta();
-        initCopyMeta();
-        initApplyAiMeta();
-        initEditAiMeta();
-        initRegenerateAi();
+        initInlineAiActions();
+        initGenerateAllAi();
         initAiContentReview();
         initIgnoreCheck();
         initRemoveIgnore();
@@ -782,29 +779,30 @@
     }
 
     /**
-     * Display AI results in the AI section.
+     * Display AI results inline below the relevant check items.
      *
-     * @param {Object} data - AI response data.
+     * @param {Object} data - AI response data with title and description.
      */
     function displayAiResults(data) {
-        var resultsEl = document.getElementById('scalyn-ai-results');
-        if (!resultsEl) return;
-
-        var titleText = document.getElementById('scalyn-ai-title-text');
-        var titleLength = document.getElementById('scalyn-ai-title-length');
-        var descText = document.getElementById('scalyn-ai-description-text');
-        var descLength = document.getElementById('scalyn-ai-description-length');
-
-        if (titleText) {
-            titleText.textContent = data.title || '';
-            if (titleLength) titleLength.textContent = (data.title || '').length + ' characters';
-        }
-        if (descText) {
-            descText.textContent = data.description || '';
-            if (descLength) descLength.textContent = (data.description || '').length + ' characters';
+        // Show title result inline.
+        var titlePanel = document.querySelector('.scalyn-ai-inline-result[data-check-id="meta_title_exists"]');
+        if (titlePanel && data.title) {
+            var titleText = titlePanel.querySelector('.scalyn-ai-inline-result__text');
+            var titleMeta = titlePanel.querySelector('.scalyn-ai-inline-result__meta');
+            if (titleText) titleText.textContent = data.title;
+            if (titleMeta) titleMeta.textContent = data.title.length + ' characters';
+            titlePanel.style.display = '';
         }
 
-        resultsEl.style.display = '';
+        // Show description result inline.
+        var descPanel = document.querySelector('.scalyn-ai-inline-result[data-check-id="meta_description_exists"]');
+        if (descPanel && data.description) {
+            var descText = descPanel.querySelector('.scalyn-ai-inline-result__text');
+            var descMeta = descPanel.querySelector('.scalyn-ai-inline-result__meta');
+            if (descText) descText.textContent = data.description;
+            if (descMeta) descMeta.textContent = data.description.length + ' characters';
+            descPanel.style.display = '';
+        }
     }
 
     /**
@@ -995,6 +993,134 @@
     }
 
     /**
+     * Initialize the main "Generate with AI" button that runs meta generation + content review.
+     */
+    function initGenerateAllAi() {
+        var btn = document.getElementById('scalyn-generate-all-ai');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl();
+            if (!postId) return;
+
+            btn.disabled = true;
+            if (typeof ScalynAlert !== 'undefined') {
+                ScalynAlert.loading('Running AI analysis — generating meta suggestions and reviewing content...');
+            }
+
+            // Run both in parallel.
+            Promise.all([
+                fetchApi('ai/generate/' + postId, { method: 'POST' }),
+                fetchApi('ai/review/' + postId, { method: 'POST' }),
+            ])
+                .then(function (responses) {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.close();
+
+                    var metaResponse = responses[0];
+                    var reviewResponse = responses[1];
+
+                    if (metaResponse.success && metaResponse.data) {
+                        displayAiResults(metaResponse.data);
+                    }
+
+                    if (reviewResponse.success && reviewResponse.data) {
+                        displayReviewResults(reviewResponse.data);
+                    }
+
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.toast('AI analysis complete');
+                    }
+                })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.close();
+                        ScalynAlert.error('AI Analysis Failed', err.message || 'An error occurred.');
+                    }
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                });
+        });
+    }
+
+    /**
+     * Initialize inline AI actions (copy suggestion, apply to SEO plugin).
+     */
+    function initInlineAiActions() {
+        // Load saved AI meta drafts if available.
+        var savedMetaEl = document.getElementById('scalyn-saved-ai-meta');
+        if (savedMetaEl) {
+            try {
+                var savedMeta = JSON.parse(savedMetaEl.textContent);
+                if (savedMeta && (savedMeta.title || savedMeta.description)) {
+                    displayAiResults(savedMeta);
+                }
+            } catch (e) {
+                // Ignore parse errors.
+            }
+        }
+
+        // Copy inline AI suggestion.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-ai-inline-copy');
+            if (!btn) return;
+            var panel = btn.closest('.scalyn-ai-inline-result');
+            if (!panel) return;
+            var text = panel.querySelector('.scalyn-ai-inline-result__text');
+            if (text && text.textContent) {
+                navigator.clipboard.writeText(text.textContent).then(function () {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Copied to clipboard');
+                });
+            }
+        });
+
+        // Apply inline AI suggestion to SEO plugin.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-ai-inline-apply');
+            if (!btn) return;
+            var field = btn.getAttribute('data-field');
+            var postId = btn.getAttribute('data-post-id');
+            if (!postId || postId === '0') postId = getPostIdFromUrl();
+            if (!postId || postId === '0') {
+                var rescanBtn = document.getElementById('scalyn-rescan');
+                if (rescanBtn) postId = rescanBtn.getAttribute('data-post-id');
+            }
+            if (!field || !postId || postId === '0') return;
+
+            var panel = btn.closest('.scalyn-ai-inline-result');
+            if (!panel) return;
+            var text = panel.querySelector('.scalyn-ai-inline-result__text');
+            if (!text || !text.textContent) return;
+
+            var payload = {};
+            payload[field] = text.textContent;
+
+            btn.disabled = true;
+            fetchApi('ai/apply/' + postId, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            })
+                .then(function (response) {
+                    if (response.success) {
+                        if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Applied — rescanning...');
+                        return fetchApi('scan/' + postId, {
+                            method: 'POST',
+                        });
+                    }
+                })
+                .then(function () {
+                    window.location.reload();
+                })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.error('Apply Failed', err.message || 'Failed to apply suggestion.');
+                    }
+                    btn.disabled = false;
+                });
+        });
+    }
+
+    /**
      * Initialize AI Content Review button and regenerate.
      */
     function initAiContentReview() {
@@ -1039,6 +1165,63 @@
         if (regenBtn) {
             regenBtn.addEventListener('click', function () { runReview(regenBtn); });
         }
+
+        // Load saved review data if available.
+        var savedDataEl = document.getElementById('scalyn-saved-review-data');
+        if (savedDataEl) {
+            try {
+                var savedData = JSON.parse(savedDataEl.textContent);
+                if (savedData && savedData.summary) {
+                    displayReviewResults(savedData);
+                }
+            } catch (e) {
+                // Ignore parse errors.
+            }
+        }
+
+        // Copy suggestion to clipboard.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-review-copy');
+            if (!btn) return;
+            var row = btn.closest('tr');
+            if (!row) return;
+            // Get suggestion text from the 4th column.
+            var cells = row.querySelectorAll('td');
+            var suggestion = cells[3] ? cells[3].textContent.trim() : '';
+            if (suggestion) {
+                navigator.clipboard.writeText(suggestion).then(function () {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Suggestion copied to clipboard');
+                });
+            }
+        });
+
+        // Mark as resolved.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-review-resolve');
+            if (!btn) return;
+            var row = btn.closest('tr');
+            if (!row) return;
+            var idx = parseInt(row.getAttribute('data-issue-index'), 10);
+            if (!isNaN(idx)) updateReviewIssueStatus(idx, 'resolved');
+        });
+
+        // Ignore issue.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-review-ignore');
+            if (!btn) return;
+            var row = btn.closest('tr');
+            if (!row) return;
+            var idx = parseInt(row.getAttribute('data-issue-index'), 10);
+            if (!isNaN(idx)) updateReviewIssueStatus(idx, 'ignored');
+        });
+
+        // Restore dismissed issue.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-review-restore');
+            if (!btn) return;
+            var idx = parseInt(btn.getAttribute('data-issue-index'), 10);
+            if (!isNaN(idx)) updateReviewIssueStatus(idx, null);
+        });
     }
 
     /**
@@ -1050,6 +1233,8 @@
         var scoreBadge = document.getElementById('scalyn-review-score-badge');
         var issuesWrap = document.getElementById('scalyn-review-issues-wrap');
         var issuesBody = document.getElementById('scalyn-review-issues-body');
+        var emptyState = document.getElementById('scalyn-review-empty');
+        if (emptyState) emptyState.style.display = 'none';
 
         if (!resultsEl) return;
 
@@ -1066,13 +1251,17 @@
             issuesBody.innerHTML = '';
 
             var issues = data.issues || [];
-            if (issues.length > 0 && issuesWrap) {
+            var activeIssues = issues.filter(function (i) { return i.status !== 'resolved' && i.status !== 'ignored'; });
+            var dismissedIssues = issues.filter(function (i) { return i.status === 'resolved' || i.status === 'ignored'; });
+
+            if (activeIssues.length > 0 && issuesWrap) {
                 issuesWrap.style.display = '';
 
                 var severityBadge = { error: 'red', warning: 'yellow', suggestion: 'neutral' };
 
-                issues.forEach(function (issue) {
+                activeIssues.forEach(function (issue, idx) {
                     var row = document.createElement('tr');
+                    row.setAttribute('data-issue-index', issues.indexOf(issue));
                     row.innerHTML =
                         '<td><span class="scalyn-badge scalyn-badge--neutral">' + escHtml(issue.type || '') + '</span></td>' +
                         '<td><span class="scalyn-badge scalyn-badge--' + (severityBadge[issue.severity] || 'neutral') + '">' + escHtml(issue.severity || '') + '</span></td>' +
@@ -1080,15 +1269,96 @@
                             '<strong>' + escHtml(issue.text || '') + '</strong>' +
                             (issue.context ? '<br><small style="color:var(--scalyn-text-muted)">' + escHtml(issue.context) + '</small>' : '') +
                         '</td>' +
-                        '<td>' + escHtml(issue.suggestion || '') + '</td>';
+                        '<td>' + escHtml(issue.suggestion || '') + '</td>' +
+                        '<td style="white-space:nowrap;">' +
+                            '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-review-copy" title="Copy suggestion">' +
+                                '<span class="dashicons dashicons-clipboard" aria-hidden="true"></span>' +
+                            '</button>' +
+                            '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-review-resolve" title="Mark as resolved">' +
+                                '<span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>' +
+                            '</button>' +
+                            '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-review-ignore" title="Ignore">' +
+                                '<span class="dashicons dashicons-hidden" aria-hidden="true"></span>' +
+                            '</button>' +
+                        '</td>';
                     issuesBody.appendChild(row);
                 });
             } else if (issuesWrap) {
+                issuesWrap.style.display = activeIssues.length > 0 ? '' : 'none';
+            }
+
+            // Show dismissed issues in a collapsed section.
+            var dismissedWrap = document.getElementById('scalyn-review-dismissed-wrap');
+            if (dismissedIssues.length > 0) {
+                if (!dismissedWrap) {
+                    dismissedWrap = document.createElement('div');
+                    dismissedWrap.id = 'scalyn-review-dismissed-wrap';
+                    issuesWrap.parentNode.insertBefore(dismissedWrap, issuesWrap.nextSibling);
+                }
+                var severityBadge2 = { error: 'red', warning: 'yellow', suggestion: 'neutral' };
+                var dismissedHtml = '<details class="scalyn-ignored-section" style="margin-top:0.75rem;">' +
+                    '<summary class="scalyn-ignored-section__toggle">' + dismissedIssues.length + ' resolved/ignored issue' + (dismissedIssues.length !== 1 ? 's' : '') + '</summary>' +
+                    '<div class="scalyn-ignored-section__list"><table class="scalyn-table scalyn-table--compact"><tbody>';
+                dismissedIssues.forEach(function (issue) {
+                    var badge = issue.status === 'resolved' ? 'green' : 'neutral';
+                    var label = issue.status === 'resolved' ? 'Resolved' : 'Ignored';
+                    dismissedHtml +=
+                        '<tr style="opacity:0.6;">' +
+                        '<td><span class="scalyn-badge scalyn-badge--neutral">' + escHtml(issue.type || '') + '</span></td>' +
+                        '<td><span class="scalyn-badge scalyn-badge--' + badge + '">' + label + '</span></td>' +
+                        '<td><strong>' + escHtml(issue.text || '') + '</strong></td>' +
+                        '<td>' + escHtml(issue.suggestion || '') + '</td>' +
+                        '<td><button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-review-restore" data-issue-index="' + issues.indexOf(issue) + '" title="Restore"><span class="dashicons dashicons-visibility" aria-hidden="true"></span></button></td>' +
+                        '</tr>';
+                });
+                dismissedHtml += '</tbody></table></div></details>';
+                dismissedWrap.innerHTML = dismissedHtml;
+            } else if (dismissedWrap) {
+                dismissedWrap.innerHTML = '';
+            }
+
+            // Update active count in summary.
+            if (activeIssues.length === 0 && dismissedIssues.length > 0 && issuesWrap) {
                 issuesWrap.style.display = 'none';
             }
         }
 
         resultsEl.style.display = '';
+    }
+
+    /**
+     * Update a review issue status and save to server.
+     */
+    function updateReviewIssueStatus(issueIndex, newStatus) {
+        var savedDataEl = document.getElementById('scalyn-saved-review-data');
+        if (!savedDataEl) return;
+
+        var data;
+        try { data = JSON.parse(savedDataEl.textContent); } catch (e) { return; }
+
+        if (!data || !data.issues || !data.issues[issueIndex]) return;
+
+        data.issues[issueIndex].status = newStatus;
+        savedDataEl.textContent = JSON.stringify(data);
+
+        // Get post ID from the review button or URL.
+        var postId = null;
+        var reviewBtn = document.getElementById('scalyn-review-content');
+        if (reviewBtn) postId = reviewBtn.getAttribute('data-post-id');
+        if (!postId) postId = getPostIdFromUrl();
+        if (!postId && scalynQA) postId = scalynQA.currentPostId;
+
+        if (postId) {
+            fetchApi('ai/review/' + postId + '/update', {
+                method: 'POST',
+                body: JSON.stringify({ issues: data.issues }),
+            }).catch(function (err) {
+                console.error('Scalyn QA: Failed to save review status.', err);
+            });
+        }
+
+        // Re-render.
+        displayReviewResults(data);
     }
 
     function escHtml(str) {
@@ -1205,7 +1475,7 @@
 
             switch (action) {
                 case 'generate-ai-meta':
-                    triggerAiGeneration(postId);
+                    triggerAiGeneration(postId, btn);
                     break;
 
                 case 'upload-featured-image':
@@ -1230,10 +1500,12 @@
      * Trigger AI meta generation from quick fix.
      *
      * @param {string|number} postId - Post ID.
+     * @param {Element} triggerBtn - The button that triggered the generation.
      */
-    function triggerAiGeneration(postId) {
+    function triggerAiGeneration(postId, triggerBtn) {
         if (!postId) return;
 
+        if (triggerBtn) triggerBtn.disabled = true;
         if (typeof ScalynAlert !== 'undefined') {
             ScalynAlert.loading('Generating AI suggestions...');
         }
@@ -1245,6 +1517,9 @@
                 }
                 if (response.success && response.data) {
                     displayAiResults(response.data);
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.toast('AI suggestions generated');
+                    }
                 }
             })
             .catch(function (err) {
@@ -1252,6 +1527,9 @@
                     ScalynAlert.close();
                     ScalynAlert.error('AI Generation Failed', err.message || 'An error occurred.');
                 }
+            })
+            .finally(function () {
+                if (triggerBtn) triggerBtn.disabled = false;
             });
     }
 

@@ -177,6 +177,25 @@ class AI_Controller extends REST_Controller {
 				),
 			),
 		);
+
+		// POST /ai/review/{post_id}/update — update review issue statuses.
+		register_rest_route(
+			$this->namespace,
+			'/ai/review/(?P<post_id>\d+)/update',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'update_review_issues' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
 	}
 
 	/**
@@ -225,6 +244,40 @@ class AI_Controller extends REST_Controller {
 		}
 
 		return $this->success( $result );
+	}
+
+	/**
+	 * Update review issue statuses (resolved/ignored).
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function update_review_issues( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission to edit this post.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$saved = get_post_meta( $post_id, '_scalyn_qa_content_review', true );
+
+		if ( ! is_array( $saved ) ) {
+			return $this->error( 'no_review', __( 'No review data found for this post.', 'scalyn-qa-assistant' ), 404 );
+		}
+
+		$params = $request->get_json_params();
+		$issues = $params['issues'] ?? null;
+
+		if ( ! is_array( $issues ) ) {
+			return $this->error( 'invalid_issues', __( 'Issues array is required.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		$saved['issues'] = $issues;
+		update_post_meta( $post_id, '_scalyn_qa_content_review', $saved );
+
+		return $this->success( array( 'updated' => true ) );
 	}
 
 	/**

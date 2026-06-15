@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Scalyn\QA\Analyzers\Analyzer_Registry;
 use Scalyn\QA\Models\Scan_Result;
+use Scalyn\QA\Models\Snapshot;
 use Scalyn\QA\Scoring\Scoring_Engine;
 
 /**
@@ -263,6 +264,20 @@ class Scan_Controller extends REST_Controller {
 		);
 
 		$scan_result->save();
+
+		// Create a snapshot for trend tracking.
+		try {
+			$all_items = array();
+			foreach ( $results as $category_items ) {
+				if ( is_array( $category_items ) ) {
+					$all_items = array_merge( $all_items, $category_items );
+				}
+			}
+
+			Snapshot::create( $post_id, $scores, $all_items );
+		} catch ( \Throwable $e ) {
+			\Scalyn\QA\Debug_Logger::log( 'scan', 'Snapshot creation failed: ' . $e->getMessage() );
+		}
 
 		return $scan_result;
 	}

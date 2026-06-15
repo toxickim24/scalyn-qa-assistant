@@ -1001,10 +1001,54 @@ a.scalyn-btn--ghost:visited {
 .scalyn-check-item {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.625rem 0.75rem;
   border-bottom: 1px solid var(--scalyn-border-light);
   transition: background-color 0.15s ease;
+}
+
+.scalyn-ai-inline-result {
+  width: 100%;
+  background: var(--scalyn-bg-subtle, #f8f9fa);
+  border: 1px solid var(--scalyn-border-light);
+  border-radius: var(--scalyn-radius);
+  padding: 0.75rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.scalyn-ai-inline-result__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.scalyn-ai-inline-result__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--scalyn-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.scalyn-ai-inline-result__text {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  color: var(--scalyn-text-strong);
+}
+
+.scalyn-ai-inline-result__meta {
+  font-size: 0.75rem;
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-ai-inline-result__actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .scalyn-check-item:last-child {

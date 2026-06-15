@@ -114,7 +114,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_h1_exists( array $headings ): Check_Item {
-		$tooltip  = __( 'Every page should have exactly one H1 tag as the main heading.', 'scalyn-qa-assistant' );
+		$tooltip  = __( 'The H1 is the main heading of your page. Add or edit it in the post editor. Most themes use the post title as H1, but page builders may require adding one manually.', 'scalyn-qa-assistant' );
 		$h1_count = 0;
 
 		foreach ( $headings as $heading ) {
@@ -131,7 +131,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 				message:   __( 'Page has exactly one H1 heading.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'info',
-				quick_fix: 'jump_to_heading',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -141,10 +141,10 @@ class Heading_Analyzer implements Analyzer_Interface {
 				id:        'h1_exists',
 				label:     __( 'H1 Heading', 'scalyn-qa-assistant' ),
 				status:    'fail',
-				message:   __( 'No H1 heading found. Every page should have exactly one H1.', 'scalyn-qa-assistant' ),
+				message:   __( 'No H1 heading found. Add one in the post editor — it should be the main title of your page content.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'critical',
-				quick_fix: 'jump_to_heading',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -155,12 +155,12 @@ class Heading_Analyzer implements Analyzer_Interface {
 			status:    'warning',
 			message:   sprintf(
 				/* translators: %d: number of H1 tags found */
-				__( 'Multiple H1 headings found (%d). Use only one H1 per page.', 'scalyn-qa-assistant' ),
+				__( 'Multiple H1 headings found (%d). Change the extra H1s to H2 or lower in the post editor — only one H1 should exist per page.', 'scalyn-qa-assistant' ),
 				$h1_count,
 			),
 			category:  'content',
 			severity:  'warning',
-			quick_fix: 'jump_to_heading',
+			quick_fix: null,
 			tooltip:   $tooltip,
 			details:   array( 'h1_count' => $h1_count ),
 		);
@@ -175,17 +175,17 @@ class Heading_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_heading_hierarchy( array $headings ): Check_Item {
-		$tooltip = __( 'Headings should follow a logical hierarchy (H1->H2->H3) without skipping levels.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'Headings should follow H1 → H2 → H3 order without skipping levels. Fix by changing the heading level in the post editor toolbar.', 'scalyn-qa-assistant' );
 
 		if ( count( $headings ) === 0 ) {
 			return new Check_Item(
 				id:        'heading_hierarchy',
 				label:     __( 'Heading Hierarchy', 'scalyn-qa-assistant' ),
 				status:    'pass',
-				message:   __( 'No headings found to check hierarchy.', 'scalyn-qa-assistant' ),
+				message:   __( 'No headings found — not applicable.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'info',
-				quick_fix: 'jump_to_heading',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -217,7 +217,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 				message:   __( 'Heading hierarchy is correct. No levels are skipped.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'info',
-				quick_fix: 'jump_to_heading',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -228,12 +228,12 @@ class Heading_Analyzer implements Analyzer_Interface {
 			status:    'warning',
 			message:   sprintf(
 				/* translators: %s: list of skipped heading levels */
-				__( 'Heading levels are skipped: %s. Maintain a logical order.', 'scalyn-qa-assistant' ),
+				__( 'Heading levels are skipped: %s. Open the post editor, find the out-of-order headings, and adjust their level (e.g., change H4 to H3).', 'scalyn-qa-assistant' ),
 				implode( ', ', $skipped_levels ),
 			),
 			category:  'content',
 			severity:  'warning',
-			quick_fix: 'jump_to_heading',
+			quick_fix: null,
 			tooltip:   $tooltip,
 			details:   array( 'skipped_levels' => $skipped_levels ),
 		);
@@ -248,7 +248,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_empty_headings( array $headings ): Check_Item {
-		$tooltip       = __( 'Empty headings create poor document structure and confuse screen readers.', 'scalyn-qa-assistant' );
+		$tooltip       = __( 'Empty headings hurt accessibility and SEO. Find them in the post editor and either add text or remove the empty heading block.', 'scalyn-qa-assistant' );
 		$empty_tags    = array();
 
 		foreach ( $headings as $heading ) {
@@ -267,7 +267,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 				message:   __( 'No empty headings found.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'info',
-				quick_fix: 'jump_to_heading',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -278,13 +278,13 @@ class Heading_Analyzer implements Analyzer_Interface {
 			status:    'fail',
 			message:   sprintf(
 				/* translators: 1: count of empty headings, 2: list of heading levels */
-				__( '%1$d empty heading(s) found: %2$s. Add meaningful text to all headings.', 'scalyn-qa-assistant' ),
+				__( '%1$d empty heading(s) found: %2$s. Open the post editor and either add text to these headings or remove them.', 'scalyn-qa-assistant' ),
 				$empty_count,
 				implode( ', ', $empty_tags ),
 			),
 			category:  'content',
 			severity:  'critical',
-			quick_fix: 'jump_to_heading',
+			quick_fix: null,
 			tooltip:   $tooltip,
 			details:   array(
 				'empty_count' => $empty_count,

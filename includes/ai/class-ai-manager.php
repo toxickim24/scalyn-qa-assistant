@@ -297,13 +297,19 @@ class AI_Manager {
 				$this->log_request( $post_id, $provider_key, $provider->get_slug(), true, $content_length );
 				AI_Health_Monitor::record_success( $provider_key, $elapsed );
 
-				return array(
-					'summary'  => $data['summary'] ?? '',
-					'score'    => max( 0, min( 100, (int) ( $data['score'] ?? 0 ) ) ),
-					'issues'   => $data['issues'] ?? array(),
-					'provider' => $provider->get_name(),
-					'model'    => $provider->get_slug(),
+				$review_result = array(
+					'summary'    => $data['summary'] ?? '',
+					'score'      => max( 0, min( 100, (int) ( $data['score'] ?? 0 ) ) ),
+					'issues'     => $data['issues'] ?? array(),
+					'provider'   => $provider->get_name(),
+					'model'      => $provider->get_slug(),
+					'reviewed_at' => gmdate( 'c' ),
 				);
+
+				// Save to post meta so results persist across page loads.
+				update_post_meta( $post_id, '_scalyn_qa_content_review', $review_result );
+
+				return $review_result;
 			} catch ( \Throwable $e ) {
 				$last_error = $e->getMessage();
 				AI_Health_Monitor::record_failure( $provider_key, $e->getMessage() );

@@ -34,7 +34,7 @@ $status_icons = array(
 $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'dashicons-marker';
 ?>
 <div
-	class="scalyn-check-item scalyn-check-item--<?php echo esc_attr( $status ); ?> scalyn-check-item--<?php echo esc_attr( $severity ); ?>"
+	class="scalyn-check-item scalyn-check-item--<?php echo esc_attr( $status ); ?><?php echo 'pass' !== $status ? ' scalyn-check-item--' . esc_attr( $severity ) : ''; ?>"
 	data-check-id="<?php echo esc_attr( $item_id ); ?>"
 	data-status="<?php echo esc_attr( $status ); ?>"
 	data-severity="<?php echo esc_attr( $severity ); ?>"
@@ -77,4 +77,25 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 		</button>
 		<?php endif; ?>
 	</div>
+
+	<?php if ( in_array( $item_id, array( 'meta_title_exists', 'meta_description_exists' ), true ) ) : ?>
+	<!-- Inline AI result panel (hidden until generated) -->
+	<div class="scalyn-ai-inline-result" data-check-id="<?php echo esc_attr( $item_id ); ?>" style="display:none;">
+		<div class="scalyn-ai-inline-result__content">
+			<span class="scalyn-ai-inline-result__label"><?php esc_html_e( 'AI Suggestion:', 'scalyn-qa-assistant' ); ?></span>
+			<p class="scalyn-ai-inline-result__text"></p>
+			<span class="scalyn-ai-inline-result__meta"></span>
+		</div>
+		<div class="scalyn-ai-inline-result__actions">
+			<button type="button" class="scalyn-btn scalyn-btn--small scalyn-ai-inline-copy" title="<?php esc_attr_e( 'Copy', 'scalyn-qa-assistant' ); ?>">
+				<span class="dashicons dashicons-clipboard" aria-hidden="true"></span>
+				<?php esc_html_e( 'Copy', 'scalyn-qa-assistant' ); ?>
+			</button>
+			<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-ai-inline-apply" data-field="<?php echo esc_attr( str_contains( $item_id, 'title' ) ? 'title' : 'description' ); ?>" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>" title="<?php esc_attr_e( 'Apply to SEO plugin', 'scalyn-qa-assistant' ); ?>">
+				<span class="dashicons dashicons-yes" aria-hidden="true"></span>
+				<?php esc_html_e( 'Apply', 'scalyn-qa-assistant' ); ?>
+			</button>
+		</div>
+	</div>
+	<?php endif; ?>
 </div>

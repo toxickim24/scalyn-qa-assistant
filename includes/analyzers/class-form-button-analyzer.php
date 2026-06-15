@@ -91,7 +91,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_empty_buttons( HTML_Parser $parser ): Check_Item {
-		$tooltip       = __( 'Buttons without text or labels are inaccessible and confusing for users.', 'scalyn-qa-assistant' );
+		$tooltip       = __( 'Buttons need visible text or an aria-label for accessibility. Find the empty buttons in the post editor and add text content or an aria-label attribute.', 'scalyn-qa-assistant' );
 		$empty_count   = 0;
 		$empty_details = array();
 		$buttons       = $parser->get_buttons();
@@ -131,8 +131,8 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			message:   sprintf(
 				/* translators: %d: number of empty buttons */
 				_n(
-					'%d button found without text content or accessible label.',
-					'%d buttons found without text content or accessible labels.',
+					'%d button found without text or aria-label. Add visible text or an aria-label attribute in the post editor.',
+					'%d buttons found without text or aria-label. Add visible text or aria-label attributes in the post editor.',
 					$empty_count,
 					'scalyn-qa-assistant',
 				),
@@ -158,7 +158,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_placeholder_links( HTML_Parser $parser ): Check_Item {
-		$tooltip           = __( 'Placeholder links (#) indicate unfinished work. Replace with real URLs or proper button elements.', 'scalyn-qa-assistant' );
+		$tooltip           = __( 'Links with href="#" or "javascript:void(0)" are placeholders. In the post editor, replace them with real URLs or convert them to button elements.', 'scalyn-qa-assistant' );
 		$raw_placeholders  = $parser->get_placeholder_links();
 		$placeholder_count = count( $raw_placeholders );
 		$placeholder_links = array();
@@ -178,7 +178,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 				message:   __( 'No placeholder links found.', 'scalyn-qa-assistant' ),
 				category:  'functionality',
 				severity:  'info',
-				quick_fix: 'edit_link',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -199,7 +199,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			),
 			category:  'functionality',
 			severity:  'warning',
-			quick_fix: 'edit_link',
+			quick_fix: null,
 			tooltip:   $tooltip,
 			details:   array(
 				'placeholder_count' => $placeholder_count,
@@ -217,7 +217,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_form_has_submit( HTML_Parser $parser ): Check_Item {
-		$tooltip = __( 'Forms should have a clear submit button for usability.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'Every form needs a submit button so users can complete their action. Add a <button type="submit"> or <input type="submit"> inside the form in the post editor or page builder.', 'scalyn-qa-assistant' );
 		$forms   = $parser->get_forms();
 
 		if ( 0 === count( $forms ) ) {
@@ -297,7 +297,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_popup_triggers( HTML_Parser $parser ): Check_Item {
-		$tooltip      = __( 'Popup triggers should point to valid popup targets to prevent broken interactions.', 'scalyn-qa-assistant' );
+		$tooltip      = __( 'Popup trigger elements should reference a valid popup ID. Verify in your page builder or theme settings that each trigger points to an existing popup.', 'scalyn-qa-assistant' );
 		$raw_triggers = $parser->get_popup_triggers();
 		$triggers     = array();
 

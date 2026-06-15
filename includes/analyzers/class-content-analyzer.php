@@ -128,9 +128,9 @@ class Content_Analyzer implements Analyzer_Interface {
 					self::MIN_WORD_COUNT,
 				),
 			category:  'content',
-			severity:  'warning',
+			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
-			tooltip:   __( 'Pages with more content tend to rank better. 300+ words is a good baseline.', 'scalyn-qa-assistant' ),
+			tooltip:   __( 'Search engines prefer pages with substantial content. Add more text, examples, or sections in the post editor to reach at least 300 words.', 'scalyn-qa-assistant' ),
 		);
 	}
 
@@ -150,7 +150,7 @@ class Content_Analyzer implements Analyzer_Interface {
 				category:  'content',
 				severity:  'info',
 				quick_fix: null,
-				tooltip:   __( 'Headings should use title case or sentence case, not all lowercase.', 'scalyn-qa-assistant' ),
+				tooltip:   __( 'Capitalize the first letter of each heading. Edit headings in the post editor to use sentence case (e.g., "Our services" instead of "our services").', 'scalyn-qa-assistant' ),
 			);
 		}
 
@@ -182,9 +182,9 @@ class Content_Analyzer implements Analyzer_Interface {
 					implode( '; ', array_slice( $bad_headings, 0, 3 ) ),
 				),
 			category:  'content',
-			severity:  'warning',
+			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
-			tooltip:   __( 'Headings should use title case or sentence case for a professional appearance.', 'scalyn-qa-assistant' ),
+			tooltip:   __( 'Capitalize the first letter of each heading. Edit headings in the post editor to use sentence case (e.g., "Our services" instead of "our services").', 'scalyn-qa-assistant' ),
 		);
 	}
 
@@ -202,7 +202,7 @@ class Content_Analyzer implements Analyzer_Interface {
 				category:  'content',
 				severity:  'info',
 				quick_fix: null,
-				tooltip:   __( 'Paragraphs should end with proper punctuation (period, question mark, exclamation mark, or colon).', 'scalyn-qa-assistant' ),
+				tooltip:   __( 'Every paragraph should end with proper punctuation (. ! ? or :). Review the flagged paragraphs in the post editor and add the missing punctuation.', 'scalyn-qa-assistant' ),
 			);
 		}
 
@@ -238,9 +238,9 @@ class Content_Analyzer implements Analyzer_Interface {
 					implode( '; ', array_slice( $bad_paragraphs, 0, 2 ) ),
 				),
 			category:  'content',
-			severity:  'warning',
+			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
-			tooltip:   __( 'Paragraphs should end with a period, question mark, exclamation mark, or other closing punctuation.', 'scalyn-qa-assistant' ),
+			tooltip:   __( 'Every paragraph should end with proper punctuation (. ! ? or :). Review the flagged paragraphs in the post editor and add the missing punctuation.', 'scalyn-qa-assistant' ),
 		);
 	}
 
@@ -298,9 +298,9 @@ class Content_Analyzer implements Analyzer_Interface {
 					$max_streak,
 				),
 			category:  'content',
-			severity:  'warning',
+			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
-			tooltip:   __( 'Multiple consecutive short paragraphs can make content feel choppy. Group related ideas together.', 'scalyn-qa-assistant' ),
+			tooltip:   __( 'Multiple single-sentence paragraphs in a row can feel choppy. In the post editor, combine related short paragraphs into fuller ones with 2-3 sentences each.', 'scalyn-qa-assistant' ),
 		);
 	}
 

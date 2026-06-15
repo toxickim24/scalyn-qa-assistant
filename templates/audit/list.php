@@ -151,7 +151,7 @@ $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=sc
 								$scan_time = sprintf(
 									/* translators: %s: Human-readable time difference. */
 									esc_html__( '%s ago', 'scalyn-qa-assistant' ),
-									human_time_diff( $scan_timestamp, current_time( 'timestamp' ) )
+									human_time_diff( $scan_timestamp, time() )
 								);
 							}
 						}

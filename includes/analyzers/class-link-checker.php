@@ -386,7 +386,7 @@ class Link_Checker implements Analyzer_Interface {
 				category:  'functionality',
 				severity:  'info',
 				quick_fix: null,
-				tooltip:   __( 'Mailto links should contain a valid email address.', 'scalyn-qa-assistant' ),
+				tooltip:   __( 'Mailto links should use a valid email format (e.g., mailto:name@example.com). Fix the href attribute in the post editor.', 'scalyn-qa-assistant' ),
 				details:   array(
 					'url'  => $url,
 					'text' => $text,
@@ -425,7 +425,7 @@ class Link_Checker implements Analyzer_Interface {
 				category:  'functionality',
 				severity:  'info',
 				quick_fix: null,
-				tooltip:   __( 'Tel links should contain a valid phone number.', 'scalyn-qa-assistant' ),
+				tooltip:   __( 'Tel links should use a valid phone format (e.g., tel:+1234567890). Fix the href attribute in the post editor.', 'scalyn-qa-assistant' ),
 				details:   array(
 					'url'  => $url,
 					'text' => $text,
@@ -469,7 +469,7 @@ class Link_Checker implements Analyzer_Interface {
 				category:  'functionality',
 				severity:  'warning',
 				quick_fix: null,
-				tooltip:   __( 'Anchor links should point to an existing element ID on the page.', 'scalyn-qa-assistant' ),
+				tooltip:   __( 'Anchor links (e.g., #section) must match an element ID on the page. Either add the matching ID to the target element, or update the link in the post editor.', 'scalyn-qa-assistant' ),
 				details:   array(
 					'url'       => $url,
 					'text'      => $text,
@@ -545,7 +545,7 @@ class Link_Checker implements Analyzer_Interface {
 			category:  'functionality',
 			severity:  $severity,
 			quick_fix: null,
-			tooltip:   __( 'Broken links create a poor user experience and can hurt SEO.', 'scalyn-qa-assistant' ),
+			tooltip:   __( 'Broken links frustrate visitors and hurt SEO rankings. Update or remove the broken URL in the post editor.', 'scalyn-qa-assistant' ),
 			details:   array(
 				'url'         => $url,
 				'text'        => $text,

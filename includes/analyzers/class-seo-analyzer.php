@@ -93,7 +93,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_meta_title( int $post_id ): Check_Item {
-		$tooltip = __( 'A unique meta title helps search engines understand your page. Aim for 50-60 characters.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'The meta title appears in search results and browser tabs. Set it in your SEO plugin (Yoast, Rank Math, or AIOSEO) under the post editor. Aim for 50-60 characters.', 'scalyn-qa-assistant' );
 		$source  = '';
 		$title   = '';
 
@@ -133,12 +133,12 @@ class SEO_Analyzer implements Analyzer_Interface {
 					status:    'warning',
 					message:   sprintf(
 						/* translators: %d: character count */
-						__( 'Using the page title as meta title (%d characters). Consider setting a custom SEO title.', 'scalyn-qa-assistant' ),
+						__( 'Using the page title as meta title (%d characters). Set a custom SEO title in your SEO plugin settings below the post editor.', 'scalyn-qa-assistant' ),
 						$char_count,
 					),
 					category:  'seo',
 					severity:  'warning',
-					quick_fix: 'generate_ai_meta',
+					quick_fix: null,
 					tooltip:   $tooltip,
 					details:   array(
 						'title'       => $post_title,
@@ -152,10 +152,10 @@ class SEO_Analyzer implements Analyzer_Interface {
 				id:        'meta_title_exists',
 				label:     __( 'Meta Title', 'scalyn-qa-assistant' ),
 				status:    'fail',
-				message:   __( 'No meta title found. This page has no title set.', 'scalyn-qa-assistant' ),
+				message:   __( 'No meta title found. Open the post editor and set a title in your SEO plugin panel, or use "Generate with AI" above.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'critical',
-				quick_fix: 'generate_ai_meta',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -174,7 +174,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 			),
 			category:  'seo',
 			severity:  'info',
-			quick_fix: 'generate_ai_meta',
+			quick_fix: 'regenerate_ai_meta',
 			tooltip:   $tooltip,
 			details:   array(
 				'title'      => $title,
@@ -195,7 +195,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_meta_description( int $post_id ): Check_Item {
-		$tooltip     = __( 'A meta description summarizes your page for search results. Aim for 120-160 characters.', 'scalyn-qa-assistant' );
+		$tooltip     = __( 'The meta description appears below the title in search results. Set it in your SEO plugin (Yoast, Rank Math, or AIOSEO) under the post editor. Aim for 120-160 characters.', 'scalyn-qa-assistant' );
 		$source      = '';
 		$description = '';
 
@@ -229,10 +229,10 @@ class SEO_Analyzer implements Analyzer_Interface {
 				id:        'meta_description_exists',
 				label:     __( 'Meta Description', 'scalyn-qa-assistant' ),
 				status:    'fail',
-				message:   __( 'No meta description found. Add a description to improve search result appearance.', 'scalyn-qa-assistant' ),
+				message:   __( 'No meta description found. Open the post editor and add one in your SEO plugin panel, or use "Generate with AI" above.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'critical',
-				quick_fix: 'generate_ai_meta',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -251,7 +251,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 			),
 			category:  'seo',
 			severity:  'info',
-			quick_fix: 'generate_ai_meta',
+			quick_fix: 'regenerate_ai_meta',
 			tooltip:   $tooltip,
 			details:   array(
 				'description' => $description,
@@ -270,7 +270,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_featured_image( int $post_id ): Check_Item {
-		$tooltip = __( 'Featured images improve social sharing and visual search results.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'Featured images appear in social media shares and search results. Set one in the post editor via the "Featured Image" panel in the right sidebar.', 'scalyn-qa-assistant' );
 
 		if ( has_post_thumbnail( $post_id ) ) {
 			return new Check_Item(
@@ -280,7 +280,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 				message:   __( 'Featured image is set.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'info',
-				quick_fix: 'upload_featured_image',
+				quick_fix: null,
 				tooltip:   $tooltip,
 			);
 		}
@@ -289,10 +289,10 @@ class SEO_Analyzer implements Analyzer_Interface {
 			id:        'featured_image_exists',
 			label:     __( 'Featured Image', 'scalyn-qa-assistant' ),
 			status:    'fail',
-			message:   __( 'No featured image set. Add one to improve social sharing and visual appeal.', 'scalyn-qa-assistant' ),
+			message:   __( 'No featured image set. Open the post editor and add one in the "Featured Image" panel on the right sidebar.', 'scalyn-qa-assistant' ),
 			category:  'seo',
 			severity:  'critical',
-			quick_fix: 'upload_featured_image',
+			quick_fix: null,
 			tooltip:   $tooltip,
 		);
 	}
@@ -306,7 +306,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_image_alt_text( HTML_Parser $parser ): Check_Item {
-		$tooltip = __( 'Alt text improves accessibility and helps search engines understand your images.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'Alt text improves accessibility and SEO. Edit each image in the post editor or Media Library and fill in the "Alternative Text" field.', 'scalyn-qa-assistant' );
 		$images  = $parser->get_images();
 
 		if ( 0 === count( $images ) ) {
@@ -314,7 +314,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 				id:        'image_alt_text',
 				label:     __( 'Image Alt Text', 'scalyn-qa-assistant' ),
 				status:    'pass',
-				message:   __( 'No images found in the content.', 'scalyn-qa-assistant' ),
+				message:   __( 'No images found in the content — not applicable.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'info',
 				quick_fix: null,
@@ -363,7 +363,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 				status:    'fail',
 				message:   sprintf(
 					/* translators: %d: number of images */
-					__( 'None of the %d images have alt text.', 'scalyn-qa-assistant' ),
+					__( 'None of the %d images have alt text. Click each image in the post editor and add descriptive alt text in the block settings.', 'scalyn-qa-assistant' ),
 					$total_images,
 				),
 				category:  'seo',
@@ -380,7 +380,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 			status:    'warning',
 			message:   sprintf(
 				/* translators: 1: missing count, 2: total count */
-				__( '%1$d of %2$d images are missing alt text.', 'scalyn-qa-assistant' ),
+				__( '%1$d of %2$d images are missing alt text. Click each image in the post editor and add descriptive alt text in the block settings.', 'scalyn-qa-assistant' ),
 				$missing_count,
 				$total_images,
 			),
@@ -401,7 +401,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_internal_links( HTML_Parser $parser ): Check_Item {
-		$tooltip = __( 'Internal links help search engines discover and rank your other pages.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'Internal links help search engines discover your other pages and keep visitors on your site. Add links to related posts or pages in the post editor.', 'scalyn-qa-assistant' );
 		$links   = $this->categorize_links( $parser );
 
 		$internal_count = count( $links['internal'] );
@@ -433,7 +433,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 			id:        'internal_links_present',
 			label:     __( 'Internal Links', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No internal links found. Consider linking to related content on your site.', 'scalyn-qa-assistant' ),
+			message:   __( 'No internal links found. Add links to related pages or posts in the post editor to improve SEO and user navigation.', 'scalyn-qa-assistant' ),
 			category:  'seo',
 			severity:  'warning',
 			quick_fix: null,
@@ -450,7 +450,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_external_links( HTML_Parser $parser ): Check_Item {
-		$tooltip = __( 'External links to authoritative sources can enhance content credibility.', 'scalyn-qa-assistant' );
+		$tooltip = __( 'External links to authoritative sources build trust and can improve SEO. Add them naturally within your content in the post editor.', 'scalyn-qa-assistant' );
 		$links   = $this->categorize_links( $parser );
 
 		$external_count = count( $links['external'] );

@@ -27,6 +27,12 @@ $button_config = array(
 		'class'    => 'scalyn-btn--ai',
 		'data_key' => 'generate-ai-meta',
 	),
+	'regenerate_ai_meta'   => array(
+		'label'    => __( 'Regenerate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-update',
+		'class'    => 'scalyn-btn--ghost',
+		'data_key' => 'generate-ai-meta',
+	),
 	'upload_featured_image' => array(
 		'label'    => __( 'Upload Image', 'scalyn-qa-assistant' ),
 		'icon'     => 'dashicons-format-image',

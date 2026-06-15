@@ -87,7 +87,7 @@ if ( ! empty( $scanned_at ) ) {
 		$scan_time_display = sprintf(
 			/* translators: %s: Human-readable time difference. */
 			esc_html__( '%s ago', 'scalyn-qa-assistant' ),
-			human_time_diff( $scan_timestamp, current_time( 'timestamp' ) )
+			human_time_diff( $scan_timestamp, time() )
 		);
 	}
 }
@@ -114,6 +114,13 @@ $trend_label = isset( $trend_labels[ $trend ] ) ? $trend_labels[ $trend ] : __( 
 $ai_manager    = new \Scalyn\QA\AI\AI_Manager();
 $ai_configured = $ai_manager->is_enabled() && null !== $ai_manager->get_primary_provider();
 
+// Load saved AI meta drafts (latest).
+$ai_drafts      = get_post_meta( $post_id, '_scalyn_qa_ai_drafts', true );
+$latest_ai_meta = null;
+if ( is_array( $ai_drafts ) && ! empty( $ai_drafts ) ) {
+	$latest_ai_meta = end( $ai_drafts );
+}
+
 // Edit post link.
 $edit_post_url = get_edit_post_link( $post_id, 'raw' );
 $permalink     = get_permalink( $post_id );
@@ -136,6 +143,17 @@ $permalink     = get_permalink( $post_id );
 				<span class="dashicons dashicons-update" aria-hidden="true"></span>
 				<?php esc_html_e( 'Rescan', 'scalyn-qa-assistant' ); ?>
 			</button>
+			<?php if ( $ai_configured ) : ?>
+				<button
+					type="button"
+					id="scalyn-generate-all-ai"
+					class="scalyn-btn scalyn-btn--ai"
+					data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
+				>
+					<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
+					<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
+				</button>
+			<?php endif; ?>
 			<button type="button" id="scalyn-add-note" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
 				<span class="dashicons dashicons-edit" aria-hidden="true"></span>
 				<?php esc_html_e( 'Add Note', 'scalyn-qa-assistant' ); ?>
@@ -431,111 +449,35 @@ $permalink     = get_permalink( $post_id );
 			</div>
 		</div>
 
-		<!-- AI Meta Suggestions Section -->
 		<?php if ( $ai_configured ) : ?>
-			<div class="scalyn-card" id="scalyn-ai-section">
-				<h2 class="scalyn-card-title">
-					<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
-					<?php esc_html_e( 'AI Meta Suggestions', 'scalyn-qa-assistant' ); ?>
-				</h2>
-				<p class="scalyn-card-description">
-					<?php esc_html_e( 'Generate AI-powered meta title and description suggestions based on your page content.', 'scalyn-qa-assistant' ); ?>
-				</p>
-				<div class="scalyn-ai-controls">
-					<button
-						type="button"
-						id="scalyn-generate-ai"
-						class="scalyn-btn"
-						data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
-					>
-						<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
-						<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
-					</button>
-					<span id="scalyn-ai-spinner" class="spinner" style="display:none;"></span>
-				</div>
-
-				<div id="scalyn-ai-results" style="display:none;">
-					<!-- AI Meta Title -->
-					<div class="scalyn-ai-result" id="scalyn-ai-title-result">
-						<h3 class="scalyn-ai-result__label"><?php esc_html_e( 'Suggested Meta Title', 'scalyn-qa-assistant' ); ?></h3>
-						<div class="scalyn-ai-result__content">
-							<p id="scalyn-ai-title-text" class="scalyn-ai-result__text"></p>
-							<span id="scalyn-ai-title-length" class="scalyn-ai-result__meta"></span>
-						</div>
-						<div class="scalyn-ai-result__actions">
-							<button type="button" class="scalyn-btn scalyn-btn--small scalyn-ai-copy" data-target="scalyn-ai-title-text">
-								<span class="dashicons dashicons-clipboard" aria-hidden="true"></span>
-								<?php esc_html_e( 'Copy', 'scalyn-qa-assistant' ); ?>
-							</button>
-							<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-ai-apply" data-field="title" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
-								<span class="dashicons dashicons-yes" aria-hidden="true"></span>
-								<?php esc_html_e( 'Apply', 'scalyn-qa-assistant' ); ?>
-							</button>
-							<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-ai-edit" data-field="title">
-								<span class="dashicons dashicons-edit" aria-hidden="true"></span>
-								<?php esc_html_e( 'Edit', 'scalyn-qa-assistant' ); ?>
-							</button>
-						</div>
-					</div>
-
-					<!-- AI Meta Description -->
-					<div class="scalyn-ai-result" id="scalyn-ai-description-result">
-						<h3 class="scalyn-ai-result__label"><?php esc_html_e( 'Suggested Meta Description', 'scalyn-qa-assistant' ); ?></h3>
-						<div class="scalyn-ai-result__content">
-							<p id="scalyn-ai-description-text" class="scalyn-ai-result__text"></p>
-							<span id="scalyn-ai-description-length" class="scalyn-ai-result__meta"></span>
-						</div>
-						<div class="scalyn-ai-result__actions">
-							<button type="button" class="scalyn-btn scalyn-btn--small scalyn-ai-copy" data-target="scalyn-ai-description-text">
-								<span class="dashicons dashicons-clipboard" aria-hidden="true"></span>
-								<?php esc_html_e( 'Copy', 'scalyn-qa-assistant' ); ?>
-							</button>
-							<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-ai-apply" data-field="description" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
-								<span class="dashicons dashicons-yes" aria-hidden="true"></span>
-								<?php esc_html_e( 'Apply', 'scalyn-qa-assistant' ); ?>
-							</button>
-							<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-ai-edit" data-field="description">
-								<span class="dashicons dashicons-edit" aria-hidden="true"></span>
-								<?php esc_html_e( 'Edit', 'scalyn-qa-assistant' ); ?>
-							</button>
-						</div>
-					</div>
-
-					<!-- Regenerate -->
-					<div class="scalyn-ai-result__footer">
-						<button type="button" id="scalyn-regenerate-ai" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
-							<span class="dashicons dashicons-update" aria-hidden="true"></span>
-							<?php esc_html_e( 'Regenerate', 'scalyn-qa-assistant' ); ?>
-						</button>
-					</div>
-				</div>
-
-				<div id="scalyn-ai-error" class="scalyn-notice scalyn-notice--error" style="display:none;">
-					<p id="scalyn-ai-error-text"></p>
-				</div>
-			</div>
-
 			<!-- AI Content Review Section -->
+			<?php $saved_review = get_post_meta( $post_id, '_scalyn_qa_content_review', true ); ?>
 			<div class="scalyn-card" id="scalyn-ai-review-section">
 				<h2 class="scalyn-card-title">
 					<span class="dashicons dashicons-editor-spellcheck" aria-hidden="true"></span>
 					<?php esc_html_e( 'AI Content Review', 'scalyn-qa-assistant' ); ?>
+					<?php if ( ! empty( $saved_review['reviewed_at'] ) ) : ?>
+						<?php
+						$review_ts = strtotime( $saved_review['reviewed_at'] );
+						if ( false !== $review_ts ) :
+						?>
+							<small style="font-weight:normal;font-size:0.75rem;color:var(--scalyn-text-muted);">
+							<?php
+							printf(
+								esc_html__( 'Last reviewed: %s ago', 'scalyn-qa-assistant' ),
+								esc_html( human_time_diff( $review_ts, time() ) )
+							);
+							?>
+							</small>
+						<?php endif; ?>
+					<?php endif; ?>
 				</h2>
-				<p class="scalyn-card-description">
-					<?php esc_html_e( 'AI-powered review for spelling, grammar, capitalization, punctuation, and readability issues.', 'scalyn-qa-assistant' ); ?>
-				</p>
-				<div class="scalyn-ai-controls">
-					<button
-						type="button"
-						id="scalyn-review-content"
-						class="scalyn-btn"
-						data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
-					>
-						<span class="dashicons dashicons-editor-spellcheck" aria-hidden="true"></span>
-						<?php esc_html_e( 'Review Content', 'scalyn-qa-assistant' ); ?>
-					</button>
-					<span id="scalyn-review-spinner" class="spinner" style="display:none;"></span>
-				</div>
+
+				<?php if ( empty( $saved_review ) ) : ?>
+					<div id="scalyn-review-empty" class="scalyn-empty-state" style="padding:1rem 0;">
+						<p class="scalyn-empty"><?php esc_html_e( 'No AI content review yet. Click "Generate with AI" to check spelling, grammar, and readability.', 'scalyn-qa-assistant' ); ?></p>
+					</div>
+				<?php endif; ?>
 
 				<div id="scalyn-review-results" style="display:none;">
 					<!-- Summary -->
@@ -556,6 +498,7 @@ $permalink     = get_permalink( $post_id );
 									<th><?php esc_html_e( 'Severity', 'scalyn-qa-assistant' ); ?></th>
 									<th><?php esc_html_e( 'Issue', 'scalyn-qa-assistant' ); ?></th>
 									<th><?php esc_html_e( 'Suggestion', 'scalyn-qa-assistant' ); ?></th>
+									<th><?php esc_html_e( 'Actions', 'scalyn-qa-assistant' ); ?></th>
 								</tr>
 							</thead>
 							<tbody id="scalyn-review-issues-body">
@@ -576,7 +519,14 @@ $permalink     = get_permalink( $post_id );
 					<p id="scalyn-review-error-text"></p>
 				</div>
 			</div>
+			<?php if ( is_array( $saved_review ) && ! empty( $saved_review['summary'] ) ) : ?>
+				<script type="application/json" id="scalyn-saved-review-data"><?php echo wp_json_encode( $saved_review ); ?></script>
+			<?php endif; ?>
 		<?php endif; ?>
+
+	<?php if ( null !== $latest_ai_meta ) : ?>
+		<script type="application/json" id="scalyn-saved-ai-meta"><?php echo wp_json_encode( $latest_ai_meta ); ?></script>
+	<?php endif; ?>
 	<?php endif; ?>
 
 	<!-- Notes Section -->
@@ -617,7 +567,7 @@ $permalink     = get_permalink( $post_id );
 						<tr>
 							<th><?php esc_html_e( 'Note', 'scalyn-qa-assistant' ); ?></th>
 							<th style="width:100px;"><?php esc_html_e( 'Author', 'scalyn-qa-assistant' ); ?></th>
-							<th style="width:100px;"><?php esc_html_e( 'Date', 'scalyn-qa-assistant' ); ?></th>
+							<th style="width:130px;white-space:nowrap;"><?php esc_html_e( 'Date', 'scalyn-qa-assistant' ); ?></th>
 							<th style="width:50px;"></th>
 						</tr>
 					</thead>
@@ -630,14 +580,14 @@ $permalink     = get_permalink( $post_id );
 							if ( $note_date ) {
 								$ts = strtotime( $note_date );
 								if ( $ts ) {
-									$note_time = human_time_diff( $ts, current_time( 'timestamp' ) ) . ' ' . __( 'ago', 'scalyn-qa-assistant' );
+									$note_time = human_time_diff( $ts, time() ) . ' ' . __( 'ago', 'scalyn-qa-assistant' );
 								}
 							}
 							?>
 							<tr>
 								<td><?php echo esc_html( $note_content ); ?></td>
 								<td><?php echo esc_html( $note_author ); ?></td>
-								<td title="<?php echo esc_attr( $note_date ); ?>"><?php echo esc_html( $note_time ); ?></td>
+								<td style="white-space:nowrap;" title="<?php echo esc_attr( $note_date ); ?>"><?php echo esc_html( $note_time ); ?></td>
 								<td>
 									<button
 										type="button"
@@ -672,7 +622,7 @@ $permalink     = get_permalink( $post_id );
 
 		<?php if ( empty( $snapshots ) ) : ?>
 			<p class="scalyn-empty">
-				<?php esc_html_e( 'No snapshots saved yet. Save a snapshot to track score changes over time.', 'scalyn-qa-assistant' ); ?>
+				<?php esc_html_e( 'No snapshots yet. Snapshots are created automatically each time you scan.', 'scalyn-qa-assistant' ); ?>
 			</p>
 		<?php else : ?>
 			<table class="scalyn-table scalyn-table--compact">
@@ -705,7 +655,7 @@ $permalink     = get_permalink( $post_id );
 								$snap_time_display = sprintf(
 									/* translators: %s: Human-readable time difference. */
 									esc_html__( '%s ago', 'scalyn-qa-assistant' ),
-									human_time_diff( $snap_timestamp, current_time( 'timestamp' ) )
+									human_time_diff( $snap_timestamp, time() )
 								);
 							}
 						}
@@ -749,18 +699,6 @@ $permalink     = get_permalink( $post_id );
 			</table>
 		<?php endif; ?>
 
-		<div class="scalyn-card__footer">
-			<button
-				type="button"
-				id="scalyn-create-snapshot"
-				class="scalyn-btn scalyn-btn--secondary"
-				data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
-				<?php disabled( ! $has_scan ); ?>
-			>
-				<span class="dashicons dashicons-camera" aria-hidden="true"></span>
-				<?php esc_html_e( 'Save Snapshot', 'scalyn-qa-assistant' ); ?>
-			</button>
-		</div>
 	</div>
 
 	<!-- Ignored Rules Summary -->

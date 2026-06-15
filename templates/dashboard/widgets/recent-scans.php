@@ -48,7 +48,7 @@ $scans = isset( $scans ) && is_array( $scans ) ? $scans : array();
 							$time_diff = sprintf(
 								/* translators: %s: Human-readable time difference. */
 								esc_html__( '%s ago', 'scalyn-qa-assistant' ),
-								human_time_diff( $scan_timestamp, current_time( 'timestamp' ) )
+								human_time_diff( $scan_timestamp, time() )
 							);
 						}
 					}

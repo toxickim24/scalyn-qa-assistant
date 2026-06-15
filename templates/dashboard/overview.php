@@ -146,7 +146,7 @@ $overall_label  = match ( $overall_status ) {
 						<span class="scalyn-kpi__value"><?php
 						if ( null !== $launch_last_scan ) {
 							$ts = is_numeric( $launch_last_scan ) ? (int) $launch_last_scan : strtotime( $launch_last_scan );
-							echo esc_html( human_time_diff( $ts, current_time( 'timestamp' ) ) . ' ' . __( 'ago', 'scalyn-qa-assistant' ) );
+							echo esc_html( human_time_diff( $ts, time() ) . ' ' . __( 'ago', 'scalyn-qa-assistant' ) );
 						} else {
 							esc_html_e( 'Never', 'scalyn-qa-assistant' );
 						}
