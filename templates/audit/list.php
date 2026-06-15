@@ -82,12 +82,14 @@ $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=sc
 
 	<!-- Progress bar (hidden by default, shown during scan all) -->
 	<div id="scalyn-scan-progress" class="scalyn-card" style="display:none;">
-		<div class="scalyn-progress">
+		<div class="scalyn-progress scalyn-progress--large">
 			<div class="scalyn-progress__bar" style="width: 0%;"></div>
 		</div>
 		<p class="scalyn-progress__text">
 			<?php esc_html_e( 'Scanning...', 'scalyn-qa-assistant' ); ?>
 			<span id="scalyn-scan-count">0</span> / <span id="scalyn-scan-total">0</span>
+			<?php esc_html_e( 'pages', 'scalyn-qa-assistant' ); ?>
+			(<span id="scalyn-scan-percent">0</span>%)
 		</p>
 	</div>
 

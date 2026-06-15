@@ -32,7 +32,7 @@ class Settings_Page {
 	private const TABS = array(
 		'general'      => 'General',
 		'ai-providers' => 'AI Providers',
-		'templates'    => 'Templates',
+		'page-audits'  => 'Page Audits',
 		'launch'       => 'Launch Checklist',
 		'wizard'       => 'Setup Wizard',
 		'advanced'     => 'Advanced',
@@ -111,10 +111,10 @@ class Settings_Page {
 			}
 		}
 
-		// Merge templates into settings for template tab access.
-		$templates = get_option( 'scalyn_qa_templates', array() );
-		if ( is_array( $templates ) && ! empty( $templates ) ) {
-			$settings['templates'] = $templates;
+		// Merge page audit settings.
+		$page_audit_settings = get_option( 'scalyn_qa_page_audit_settings', array() );
+		if ( is_array( $page_audit_settings ) ) {
+			$settings['page_audit_settings'] = $page_audit_settings;
 		}
 
 		// Merge launch checklist settings.
@@ -146,7 +146,7 @@ class Settings_Page {
 	private function get_tab_template( string $tab ): string {
 		return match ( $tab ) {
 			'ai-providers' => 'settings/ai-providers.php',
-			'templates'    => 'settings/templates.php',
+			'page-audits'  => 'settings/page-audits.php',
 			'launch'       => 'settings/launch.php',
 			'wizard'       => 'settings/wizard.php',
 			'advanced'     => 'settings/advanced.php',

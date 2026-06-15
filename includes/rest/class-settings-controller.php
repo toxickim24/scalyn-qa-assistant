@@ -21,7 +21,7 @@ use Scalyn\QA\Updates\GitHub_Updater;
 /**
  * Class Settings_Controller
  *
- * Provides endpoints for managing plugin settings, scan templates,
+ * Provides endpoints for managing plugin settings, page audit checks,
  * and the setup wizard.
  *
  * @since 1.0.0
@@ -34,13 +34,6 @@ class Settings_Controller extends REST_Controller {
 	 * @var string
 	 */
 	private const SETTINGS_OPTION = 'scalyn_qa_settings';
-
-	/**
-	 * Option key for scan templates.
-	 *
-	 * @var string
-	 */
-	private const TEMPLATES_OPTION = 'scalyn_qa_templates';
 
 	/**
 	 * Option key for wizard dismissed state.
@@ -91,46 +84,6 @@ class Settings_Controller extends REST_Controller {
 					'callback'            => array( $this, 'save_settings' ),
 					'permission_callback' => array( $this, 'check_manage_permission' ),
 				),
-			)
-		);
-
-		// POST /settings/templates.
-		register_rest_route(
-			$this->namespace,
-			'/settings/templates',
-			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'create_template' ),
-				'permission_callback' => array( $this, 'check_manage_permission' ),
-			)
-		);
-
-		// PUT & DELETE /settings/templates/{id}.
-		register_rest_route(
-			$this->namespace,
-			'/settings/templates/(?P<template_id>[\\w-]+)',
-			array(
-				array(
-					'methods'             => \WP_REST_Server::EDITABLE,
-					'callback'            => array( $this, 'update_template' ),
-					'permission_callback' => array( $this, 'check_manage_permission' ),
-				),
-				array(
-					'methods'             => \WP_REST_Server::DELETABLE,
-					'callback'            => array( $this, 'delete_template' ),
-					'permission_callback' => array( $this, 'check_manage_permission' ),
-				),
-			)
-		);
-
-		// POST /settings/templates/{id}/duplicate.
-		register_rest_route(
-			$this->namespace,
-			'/settings/templates/(?P<template_id>[\\w-]+)/duplicate',
-			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'duplicate_template' ),
-				'permission_callback' => array( $this, 'check_manage_permission' ),
 			)
 		);
 
@@ -366,8 +319,14 @@ class Settings_Controller extends REST_Controller {
 			$settings['link_cache_hours'] = max( 1, min( 168, (int) $params['link_cache_hours'] ) );
 		}
 
-		if ( array_key_exists( 'active_template', $params ) ) {
-			$settings['active_template'] = sanitize_text_field( (string) $params['active_template'] );
+		if ( array_key_exists( 'page_audit_settings', $params ) && is_array( $params['page_audit_settings'] ) ) {
+			$pa = $params['page_audit_settings'];
+			$page_audit_data = array(
+				'enabled_checks' => isset( $pa['enabled_checks'] ) && is_array( $pa['enabled_checks'] )
+					? array_map( 'sanitize_key', $pa['enabled_checks'] )
+					: array(),
+			);
+			update_option( 'scalyn_qa_page_audit_settings', $page_audit_data, false );
 		}
 
 		if ( array_key_exists( 'delete_data_on_uninstall', $params ) ) {
@@ -394,6 +353,7 @@ class Settings_Controller extends REST_Controller {
 			$ls = $params['launch_settings'];
 			$launch_data = array(
 				'thresholds' => array(
+					'php_version'        => sanitize_text_field( $ls['thresholds']['php_version'] ?? '8.3.14' ),
 					'memory_limit'       => max( 64, (int) ( $ls['thresholds']['memory_limit'] ?? 512 ) ),
 					'max_execution_time' => max( 30, (int) ( $ls['thresholds']['max_execution_time'] ?? 90 ) ),
 					'max_input_time'     => max( 30, (int) ( $ls['thresholds']['max_input_time'] ?? 90 ) ),
@@ -418,132 +378,6 @@ class Settings_Controller extends REST_Controller {
 		}
 
 		return $this->success( $settings );
-	}
-
-	// ------------------------------------------------------------------
-	// Template endpoints
-	// ------------------------------------------------------------------
-
-	/**
-	 * POST /settings/templates — create a new template.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param \WP_REST_Request $request The request object.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public function create_template( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$params = $request->get_json_params();
-
-		if ( empty( $params['name'] ) || ! is_string( $params['name'] ) ) {
-			return $this->error( 'missing_name', __( 'Template name is required.', 'scalyn-qa-assistant' ), 400 );
-		}
-
-		if ( ! isset( $params['checks'] ) || ! is_array( $params['checks'] ) ) {
-			return $this->error( 'missing_checks', __( 'Template checks array is required.', 'scalyn-qa-assistant' ), 400 );
-		}
-
-		$template = array(
-			'id'         => wp_generate_uuid4(),
-			'name'       => sanitize_text_field( $params['name'] ),
-			'checks'     => array_map( 'sanitize_key', $params['checks'] ),
-			'created_at' => gmdate( 'c' ),
-		);
-
-		$templates   = $this->get_templates();
-		$templates[] = $template;
-
-		update_option( self::TEMPLATES_OPTION, $templates, false );
-
-		return $this->success( $template, 201 );
-	}
-
-	/**
-	 * PUT /settings/templates/{id} — update a template.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param \WP_REST_Request $request The request object.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public function update_template( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$template_id = sanitize_text_field( $request->get_param( 'template_id' ) );
-		$params      = $request->get_json_params();
-		$templates   = $this->get_templates();
-		$index       = $this->find_template_index( $templates, $template_id );
-
-		if ( null === $index ) {
-			return $this->error( 'not_found', __( 'Template not found.', 'scalyn-qa-assistant' ), 404 );
-		}
-
-		if ( isset( $params['name'] ) && is_string( $params['name'] ) ) {
-			$templates[ $index ]['name'] = sanitize_text_field( $params['name'] );
-		}
-
-		if ( isset( $params['checks'] ) && is_array( $params['checks'] ) ) {
-			$templates[ $index ]['checks'] = array_map( 'sanitize_key', $params['checks'] );
-		}
-
-		update_option( self::TEMPLATES_OPTION, $templates, false );
-
-		return $this->success( $templates[ $index ] );
-	}
-
-	/**
-	 * POST /settings/templates/{id}/duplicate — duplicate a template.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param \WP_REST_Request $request The request object.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public function duplicate_template( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$template_id = sanitize_text_field( $request->get_param( 'template_id' ) );
-		$templates   = $this->get_templates();
-		$index       = $this->find_template_index( $templates, $template_id );
-
-		if ( null === $index ) {
-			return $this->error( 'not_found', __( 'Template not found.', 'scalyn-qa-assistant' ), 404 );
-		}
-
-		$source = $templates[ $index ];
-
-		$duplicate = array(
-			'id'         => wp_generate_uuid4(),
-			'name'       => sanitize_text_field( $source['name'] ) . ' (Copy)',
-			'checks'     => $source['checks'],
-			'created_at' => gmdate( 'c' ),
-		);
-
-		$templates[] = $duplicate;
-
-		update_option( self::TEMPLATES_OPTION, $templates, false );
-
-		return $this->success( $duplicate, 201 );
-	}
-
-	/**
-	 * DELETE /settings/templates/{id} — delete a template.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param \WP_REST_Request $request The request object.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public function delete_template( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$template_id = sanitize_text_field( $request->get_param( 'template_id' ) );
-		$templates   = $this->get_templates();
-		$index       = $this->find_template_index( $templates, $template_id );
-
-		if ( null === $index ) {
-			return $this->error( 'not_found', __( 'Template not found.', 'scalyn-qa-assistant' ), 404 );
-		}
-
-		array_splice( $templates, $index, 1 );
-
-		update_option( self::TEMPLATES_OPTION, $templates, false );
-
-		return $this->success( array( 'deleted' => true ) );
 	}
 
 	// ------------------------------------------------------------------
@@ -755,16 +589,16 @@ class Settings_Controller extends REST_Controller {
 			}
 		}
 
-		$templates      = get_option( self::TEMPLATES_OPTION, array() );
-		$global_ignores = get_option( self::GLOBAL_IGNORES_OPTION, array() );
+		$page_audit_settings = get_option( 'scalyn_qa_page_audit_settings', array() );
+		$global_ignores      = get_option( self::GLOBAL_IGNORES_OPTION, array() );
 
 		$export = array(
-			'plugin_version' => defined( 'SCALYN_QA_VERSION' ) ? SCALYN_QA_VERSION : '1.0.0',
-			'export_date'    => gmdate( 'c' ),
-			'settings'       => $settings,
-			'ai_config'      => $ai_config,
-			'templates'      => is_array( $templates ) ? $templates : array(),
-			'global_ignores' => is_array( $global_ignores ) ? $global_ignores : array(),
+			'plugin_version'      => defined( 'SCALYN_QA_VERSION' ) ? SCALYN_QA_VERSION : '1.0.0',
+			'export_date'         => gmdate( 'c' ),
+			'settings'            => $settings,
+			'ai_config'           => $ai_config,
+			'page_audit_settings' => is_array( $page_audit_settings ) ? $page_audit_settings : array(),
+			'global_ignores'      => is_array( $global_ignores ) ? $global_ignores : array(),
 		);
 
 		return $this->success( $export );
@@ -788,7 +622,7 @@ class Settings_Controller extends REST_Controller {
 		}
 
 		// Validate structure — must have at least one importable key.
-		$valid_keys = array( 'settings', 'ai_config', 'templates', 'global_ignores' );
+		$valid_keys = array( 'settings', 'ai_config', 'page_audit_settings', 'global_ignores' );
 		$has_data   = false;
 
 		foreach ( $valid_keys as $key ) {
@@ -809,10 +643,10 @@ class Settings_Controller extends REST_Controller {
 		// Create backup before import.
 		$current_user = wp_get_current_user();
 		$backup       = array(
-			'settings'       => get_option( self::SETTINGS_OPTION, array() ),
-			'ai_config'      => get_option( self::AI_CONFIG_OPTION, array() ),
-			'templates'      => get_option( self::TEMPLATES_OPTION, array() ),
-			'global_ignores' => get_option( self::GLOBAL_IGNORES_OPTION, array() ),
+			'settings'            => get_option( self::SETTINGS_OPTION, array() ),
+			'ai_config'           => get_option( self::AI_CONFIG_OPTION, array() ),
+			'page_audit_settings' => get_option( 'scalyn_qa_page_audit_settings', array() ),
+			'global_ignores'      => get_option( self::GLOBAL_IGNORES_OPTION, array() ),
 			'created_at'     => gmdate( 'c' ),
 			'created_by'     => $current_user->display_name,
 			'reason'         => 'Pre-import backup',
@@ -835,10 +669,10 @@ class Settings_Controller extends REST_Controller {
 			$imported[] = 'settings';
 		}
 
-		// Import templates.
-		if ( isset( $params['templates'] ) && is_array( $params['templates'] ) ) {
-			update_option( self::TEMPLATES_OPTION, $params['templates'], false );
-			$imported[] = 'templates';
+		// Import page audit settings.
+		if ( isset( $params['page_audit_settings'] ) && is_array( $params['page_audit_settings'] ) ) {
+			update_option( 'scalyn_qa_page_audit_settings', $params['page_audit_settings'], false );
+			$imported[] = 'page_audit_settings';
 		}
 
 		// Import global ignores.
@@ -948,10 +782,10 @@ class Settings_Controller extends REST_Controller {
 			$restored[] = 'ai_config';
 		}
 
-		// Restore templates.
-		if ( isset( $backup['templates'] ) && is_array( $backup['templates'] ) ) {
-			update_option( self::TEMPLATES_OPTION, $backup['templates'], false );
-			$restored[] = 'templates';
+		// Restore page audit settings.
+		if ( isset( $backup['page_audit_settings'] ) && is_array( $backup['page_audit_settings'] ) ) {
+			update_option( 'scalyn_qa_page_audit_settings', $backup['page_audit_settings'], false );
+			$restored[] = 'page_audit_settings';
 		}
 
 		// Restore global ignores.
@@ -1084,60 +918,6 @@ class Settings_Controller extends REST_Controller {
 	 */
 	private function sanitize_score( int $score ): int {
 		return max( 0, min( 100, $score ) );
-	}
-
-	/**
-	 * Get all templates from options.
-	 *
-	 * @return array
-	 */
-	private function get_templates(): array {
-		$templates = get_option( self::TEMPLATES_OPTION, array() );
-
-		if ( ! is_array( $templates ) ) {
-			$templates = array();
-		}
-
-		// Seed default template if none exist.
-		if ( empty( $templates ) ) {
-			$templates = array(
-				array(
-					'id'         => 'default',
-					'name'       => 'Default Template',
-					'checks'     => array(
-						'meta_title_exists',
-						'meta_description_exists',
-						'heading_structure',
-						'image_alt_text',
-						'internal_links',
-						'content_length',
-						'broken_links',
-						'featured_image',
-					),
-					'created_at' => gmdate( 'c' ),
-				),
-			);
-			update_option( self::TEMPLATES_OPTION, $templates, false );
-		}
-
-		return $templates;
-	}
-
-	/**
-	 * Find a template index by ID.
-	 *
-	 * @param array  $templates All templates.
-	 * @param string $id        The template ID to find.
-	 * @return int|null The index or null if not found.
-	 */
-	private function find_template_index( array $templates, string $id ): ?int {
-		foreach ( $templates as $index => $template ) {
-			if ( isset( $template['id'] ) && $template['id'] === $id ) {
-				return $index;
-			}
-		}
-
-		return null;
 	}
 
 	/**

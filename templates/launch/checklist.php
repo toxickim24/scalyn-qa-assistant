@@ -15,10 +15,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$results   = isset( $results ) ? $results : array();
-$counts    = isset( $counts ) ? $counts : array( 'pass' => 0, 'fail' => 0, 'warning' => 0, 'total' => 0 );
-$last_scan = isset( $last_scan ) ? $last_scan : null;
-$score     = isset( $score ) ? (int) $score : 0;
+$results          = isset( $results ) ? $results : array();
+$counts           = isset( $counts ) ? $counts : array( 'pass' => 0, 'fail' => 0, 'warning' => 0, 'total' => 0 );
+$last_scan        = isset( $last_scan ) ? $last_scan : null;
+$score            = isset( $score ) ? (int) $score : 0;
+$overall_score    = $score;
+$category_scores  = isset( $category_scores ) && is_array( $category_scores ) ? $category_scores : array();
 
 // Determine alert status.
 if ( $score >= 80 ) {
@@ -42,6 +44,7 @@ $category_map = array(
 	'gtm_configured'       => 'analytics',
 	'ssl_enabled'          => 'technical',
 	'favicon_exists'       => 'technical',
+	'php_version'          => 'technical',
 	'contact_page_exists'  => 'content',
 	'privacy_policy_exists' => 'content',
 	'plugin_conflicts'     => 'plugin_health',
@@ -62,16 +65,14 @@ $category_labels = array(
 	'plugin_health' => __( 'Plugin Health', 'scalyn-qa-assistant' ),
 );
 
-// Load global ignore rules.
-$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
+// Load launch-scoped ignore rules.
+$launch_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'launch' );
 $ignored_ids    = array();
-foreach ( $global_ignores as $rule ) {
-	if ( 'global' === $rule->type || 0 === $rule->post_id ) {
-		$ignored_ids[ $rule->check_id ] = $rule;
-	}
+foreach ( $launch_ignores as $rule ) {
+	$ignored_ids[ $rule->check_id ] = $rule;
 }
 
-// Sort results into categories, separating ignored checks.
+// Sort results into categories.
 $grouped = array(
 	'seo'           => array(),
 	'analytics'     => array(),
@@ -80,14 +81,20 @@ $grouped = array(
 	'plugin_health' => array(),
 );
 
-$ignored_checks = array();
+$grouped_ignored = array(
+	'seo'           => array(),
+	'analytics'     => array(),
+	'technical'     => array(),
+	'content'       => array(),
+	'plugin_health' => array(),
+);
 
 foreach ( $results as $check ) {
 	$check_id = $check->id;
 	$group    = isset( $category_map[ $check_id ] ) ? $category_map[ $check_id ] : 'technical';
 
 	if ( isset( $ignored_ids[ $check_id ] ) ) {
-		$ignored_checks[] = $check;
+		$grouped_ignored[ $group ][] = $check;
 	} else {
 		$grouped[ $group ][] = $check;
 	}
@@ -106,40 +113,63 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 
 	<!-- Header -->
 	<div class="scalyn-page-header">
-		<div class="scalyn-page-header__intro">
-			<h1><?php esc_html_e( 'Website Launch Checklist', 'scalyn-qa-assistant' ); ?></h1>
-			<p class="scalyn-page-header__description"><?php esc_html_e( 'Verify SEO, analytics, security, and content requirements before going live.', 'scalyn-qa-assistant' ); ?></p>
-		</div>
-		<span class="scalyn-page-header__meta-inline">
-			<?php
-			/* translators: %s: Last scan time (e.g. "5 minutes ago" or "Never"). */
-			printf( esc_html__( 'Last checked: %s', 'scalyn-qa-assistant' ), esc_html( $last_scan_text ) );
-			?>
-		</span>
+		<h1><?php esc_html_e( 'Website Launch Checklist', 'scalyn-qa-assistant' ); ?></h1>
 		<div class="scalyn-page-header__actions">
 			<button type="button" id="scalyn-launch-scan" class="scalyn-btn scalyn-btn--small">
 				<span class="dashicons dashicons-update" aria-hidden="true"></span>
 				<?php esc_html_e( 'Run Check', 'scalyn-qa-assistant' ); ?>
 			</button>
 		</div>
-	</div>
-
-	<!-- Status Banner -->
-	<?php if ( $counts['total'] > 0 ) : ?>
-		<div class="scalyn-alert <?php echo esc_attr( $alert_class ); ?>">
-			<span class="scalyn-alert__label">
-				<?php echo esc_html( $alert_label ); ?>
-			</span>
-			<span class="scalyn-alert__detail">
+		<p class="scalyn-page-header__meta">
+			<?php
+			printf( esc_html__( 'Last checked: %s', 'scalyn-qa-assistant' ), esc_html( $last_scan_text ) );
+			?>
+			<?php if ( $counts['total'] > 0 ) : ?>
+				<span class="scalyn-meta__sep">|</span>
+				<?php esc_html_e( 'Score:', 'scalyn-qa-assistant' ); ?>
+				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $overall_score ) ); ?>">
+					<?php echo esc_html( (string) $overall_score ); ?>
+				</span>
+				<span class="scalyn-meta__sep">|</span>
+				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( str_replace( 'scalyn-alert--', '', $alert_class ) ); ?>">
+					<?php echo esc_html( $alert_label ); ?>
+				</span>
+				<span class="scalyn-meta__sep">|</span>
 				<?php
 				printf(
-					/* translators: 1: Number of passed checks, 2: Total number of checks. */
 					esc_html__( '%1$d/%2$d checks passed', 'scalyn-qa-assistant' ),
 					(int) $counts['pass'],
 					(int) $counts['total'],
 				);
 				?>
-			</span>
+			<?php endif; ?>
+		</p>
+	</div>
+
+	<?php if ( $counts['total'] > 0 ) : ?>
+		<!-- Score Summary -->
+		<div class="scalyn-grid scalyn-grid--3">
+			<?php
+			$score_cards = array(
+				'seo'           => __( 'SEO Configuration', 'scalyn-qa-assistant' ),
+				'analytics'     => __( 'Analytics', 'scalyn-qa-assistant' ),
+				'technical'     => __( 'Technical', 'scalyn-qa-assistant' ),
+				'content'       => __( 'Content', 'scalyn-qa-assistant' ),
+				'plugin_health' => __( 'Plugin Health', 'scalyn-qa-assistant' ),
+			);
+
+			foreach ( $score_cards as $cat_key => $cat_label ) :
+				$label  = $cat_label;
+				$score  = $category_scores[ $cat_key ] ?? 0;
+				$status = \Scalyn\QA\Models\Score::calculate_status( $score );
+				include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/score-summary.php';
+			endforeach;
+
+			$label  = __( 'Overall Score', 'scalyn-qa-assistant' );
+			$score  = $overall_score;
+			$status = \Scalyn\QA\Models\Score::calculate_status( $score );
+			include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/score-summary.php';
+			?>
 		</div>
 	<?php else : ?>
 		<div class="scalyn-alert scalyn-alert--neutral">
@@ -158,18 +188,21 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 			<?php continue; ?>
 		<?php endif; ?>
 		<div class="scalyn-card" id="scalyn-launch-<?php echo esc_attr( $group_key ); ?>">
-			<div class="scalyn-card__header">
-				<h2 class="scalyn-card__title">
-					<?php echo esc_html( $category_labels[ $group_key ] ); ?>
-				</h2>
-			</div>
+			<h2 class="scalyn-card-title">
+				<?php echo esc_html( $category_labels[ $group_key ] ); ?>
+				<?php if ( isset( $category_scores[ $group_key ] ) ) : ?>
+					<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $category_scores[ $group_key ] ) ); ?>">
+						<?php echo esc_html( (string) $category_scores[ $group_key ] ); ?>
+					</span>
+				<?php endif; ?>
+			</h2>
 
-			<?php if ( empty( $group_checks ) ) : ?>
-				<p class="scalyn-card__empty">
-					<?php esc_html_e( 'No checks in this category yet. Run a scan to populate results.', 'scalyn-qa-assistant' ); ?>
-				</p>
-			<?php else : ?>
-				<div class="scalyn-check-list scalyn-check-list--compact">
+			<div class="scalyn-check-list">
+				<?php if ( empty( $group_checks ) && empty( $grouped_ignored[ $group_key ] ) ) : ?>
+					<p class="scalyn-card__empty">
+						<?php esc_html_e( 'No checks in this category yet. Run a scan to populate results.', 'scalyn-qa-assistant' ); ?>
+					</p>
+				<?php else : ?>
 					<?php foreach ( $group_checks as $check ) : ?>
 						<?php
 						$item    = $check->to_array();
@@ -230,50 +263,103 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 							</div>
 						</div>
 					<?php endforeach; ?>
-				</div>
-			<?php endif; ?>
+
+					<?php
+					$cat_ignored = $grouped_ignored[ $group_key ] ?? array();
+					if ( ! empty( $cat_ignored ) ) :
+					?>
+						<details class="scalyn-ignored-section">
+							<summary class="scalyn-ignored-section__toggle">
+								<?php
+								printf(
+									esc_html( _n(
+										'%d ignored check',
+										'%d ignored checks',
+										count( $cat_ignored ),
+										'scalyn-qa-assistant'
+									) ),
+									count( $cat_ignored )
+								);
+								?>
+							</summary>
+							<div class="scalyn-ignored-section__list">
+								<?php foreach ( $cat_ignored as $check ) :
+									$rule = $ignored_ids[ $check->id ] ?? null;
+								?>
+									<div class="scalyn-check-item scalyn-check-item--ignored" style="opacity:0.6;">
+										<span class="scalyn-check-icon" aria-hidden="true"><span class="dashicons dashicons-hidden"></span></span>
+										<div class="scalyn-check-content">
+											<strong class="scalyn-check-label"><?php echo esc_html( $check->label ); ?></strong>
+											<?php if ( $rule && ! empty( $rule->reason ) ) : ?>
+												<span class="scalyn-check-message"><?php echo esc_html( $rule->reason ); ?></span>
+											<?php endif; ?>
+										</div>
+										<div class="scalyn-check-actions">
+											<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-remove-ignore" data-rule-id="<?php echo esc_attr( $rule ? $rule->id : '' ); ?>" title="<?php esc_attr_e( 'Restore', 'scalyn-qa-assistant' ); ?>">
+												<span class="dashicons dashicons-visibility" aria-hidden="true"></span> <?php esc_html_e( 'Restore', 'scalyn-qa-assistant' ); ?>
+											</button>
+										</div>
+									</div>
+								<?php endforeach; ?>
+							</div>
+						</details>
+					<?php endif; ?>
+				<?php endif; ?>
+			</div>
 		</div>
 	<?php endforeach; ?>
 
-	<?php if ( ! empty( $ignored_checks ) ) : ?>
+	<?php
+	// Collect all ignored checks across categories.
+	$all_ignored = array();
+	foreach ( $grouped_ignored as $cat_ignored_items ) {
+		$all_ignored = array_merge( $all_ignored, $cat_ignored_items );
+	}
+	?>
+	<?php if ( ! empty( $all_ignored ) ) : ?>
 	<!-- Ignored Checks Section -->
 	<div class="scalyn-card" id="scalyn-launch-ignored">
-		<details>
-			<summary class="scalyn-card__title" style="cursor:pointer;">
-				<?php esc_html_e( 'Ignored Checks', 'scalyn-qa-assistant' ); ?>
-				<span class="scalyn-badge scalyn-badge--gray"><?php echo esc_html( (string) count( $ignored_checks ) ); ?></span>
-			</summary>
-			<div class="scalyn-check-list scalyn-check-list--compact" style="margin-top:0.75rem;">
-				<?php foreach ( $ignored_checks as $check ) :
-					$item     = $check->to_array();
-					$check_id = $item['id'] ?? '';
-					$rule     = $ignored_ids[ $check_id ] ?? null;
+		<h2 class="scalyn-card-title">
+			<?php esc_html_e( 'Ignored Checks', 'scalyn-qa-assistant' ); ?>
+			<span class="scalyn-badge scalyn-badge--neutral"><?php echo esc_html( (string) count( $all_ignored ) ); ?></span>
+		</h2>
+		<table class="scalyn-table scalyn-table--compact">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Check', 'scalyn-qa-assistant' ); ?></th>
+					<th><?php esc_html_e( 'Type', 'scalyn-qa-assistant' ); ?></th>
+					<th><?php esc_html_e( 'Reason', 'scalyn-qa-assistant' ); ?></th>
+					<th><?php esc_html_e( 'Created By', 'scalyn-qa-assistant' ); ?></th>
+					<th><?php esc_html_e( 'Actions', 'scalyn-qa-assistant' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $all_ignored as $check ) :
+					$rule = $ignored_ids[ $check->id ] ?? null;
 				?>
-					<div class="scalyn-check-item scalyn-check-item--ignored" style="opacity:0.6;">
-						<span class="scalyn-check-icon" aria-hidden="true">
-							<span class="dashicons dashicons-hidden"></span>
-						</span>
-						<div class="scalyn-check-content">
-							<strong class="scalyn-check-label"><?php echo esc_html( $item['label'] ?? '' ); ?></strong>
-							<?php if ( $rule && ! empty( $rule->reason ) ) : ?>
-								<span class="scalyn-check-message"><?php echo esc_html( $rule->reason ); ?></span>
-							<?php endif; ?>
-						</div>
-						<div class="scalyn-check-actions">
+					<tr data-rule-id="<?php echo esc_attr( $rule ? $rule->id : '' ); ?>">
+						<td><code><?php echo esc_html( $check->id ); ?></code></td>
+						<td>
+							<span class="scalyn-badge scalyn-badge--neutral">
+								<?php echo esc_html( $rule ? ucfirst( $rule->type ) : 'Global' ); ?>
+							</span>
+						</td>
+						<td><?php echo esc_html( $rule ? $rule->reason : '' ); ?></td>
+						<td><?php echo esc_html( $rule ? $rule->created_by : '' ); ?></td>
+						<td>
 							<button
 								type="button"
 								class="scalyn-btn scalyn-btn--small scalyn-btn--ghost scalyn-remove-ignore"
 								data-rule-id="<?php echo esc_attr( $rule ? $rule->id : '' ); ?>"
-								title="<?php esc_attr_e( 'Restore this check', 'scalyn-qa-assistant' ); ?>"
+								title="<?php esc_attr_e( 'Remove ignore rule', 'scalyn-qa-assistant' ); ?>"
 							>
-								<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
-								<?php esc_html_e( 'Restore', 'scalyn-qa-assistant' ); ?>
+								<span class="dashicons dashicons-no-alt" aria-hidden="true"></span>
 							</button>
-						</div>
-					</div>
+						</td>
+					</tr>
 				<?php endforeach; ?>
-			</div>
-		</details>
+			</tbody>
+		</table>
 	</div>
 	<?php endif; ?>
 

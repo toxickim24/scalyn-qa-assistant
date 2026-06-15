@@ -64,8 +64,8 @@ class Scoring_Engine {
 				$ignored_ids[ $rule->check_id ] = true;
 			}
 		}
-		$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
-		foreach ( $global_ignores as $rule ) {
+		$audit_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'audit' );
+		foreach ( $audit_ignores as $rule ) {
 			if ( 'global' === $rule->type || 0 === $rule->post_id ) {
 				$ignored_ids[ $rule->check_id ] = true;
 			}
@@ -163,43 +163,47 @@ class Scoring_Engine {
 		$launch_ready = 0;
 
 		if ( is_array( $launch_data ) && ! empty( $launch_data ) ) {
-			// Build ignored check IDs set.
+			// Build ignored check IDs set (launch-scoped).
 			$ignored_ids = array();
-			$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
-			foreach ( $global_ignores as $rule ) {
-				if ( 'global' === $rule->type || 0 === $rule->post_id ) {
-					$ignored_ids[ $rule->check_id ] = true;
-				}
+			$launch_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'launch' );
+			foreach ( $launch_ignores as $rule ) {
+				$ignored_ids[ $rule->check_id ] = true;
 			}
 
 			if ( isset( $launch_data['score'] ) ) {
 				// REST response format — recalculate excluding ignored.
-				$checks = $launch_data['checks'] ?? array();
-				$total  = 0;
-				$pass   = 0;
+				$checks  = $launch_data['checks'] ?? array();
+				$total   = 0;
+				$earned  = 0;
 				foreach ( $checks as $item ) {
 					if ( is_array( $item ) && ! isset( $ignored_ids[ $item['id'] ?? '' ] ) ) {
 						++$total;
-						if ( ( $item['status'] ?? '' ) === 'pass' ) {
-							++$pass;
+						$s = $item['status'] ?? '';
+						if ( 'pass' === $s ) {
+							++$earned;
+						} elseif ( 'warning' === $s ) {
+							$earned += 0.5;
 						}
 					}
 				}
-				$launch_ready = $total > 0 ? (int) round( ( $pass / $total ) * 100 ) : 0;
+				$launch_ready = $total > 0 ? (int) round( ( $earned / $total ) * 100 ) : 0;
 			} else {
 				// Flat array of check items.
-				$total = 0;
-				$pass  = 0;
+				$total  = 0;
+				$earned = 0;
 				foreach ( $launch_data as $item ) {
 					if ( is_array( $item ) && ! isset( $ignored_ids[ $item['id'] ?? '' ] ) ) {
 						++$total;
-						if ( ( $item['status'] ?? '' ) === 'pass' ) {
-							++$pass;
+						$s = $item['status'] ?? '';
+						if ( 'pass' === $s ) {
+							++$earned;
+						} elseif ( 'warning' === $s ) {
+							$earned += 0.5;
 						}
 					}
 				}
 				if ( $total > 0 ) {
-					$launch_ready = (int) round( ( $pass / $total ) * 100 );
+					$launch_ready = (int) round( ( $earned / $total ) * 100 );
 				}
 			}
 		}

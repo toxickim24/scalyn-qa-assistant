@@ -489,155 +489,34 @@
     }
 
     // -------------------------------------------------------------------------
-    // Templates Tab
+    // Page Audits Tab
     // -------------------------------------------------------------------------
 
-    /**
-     * Initialize the templates tab.
-     */
-    function initTemplatesTab() {
-        // Create New Template — uses #scalyn-template-create button
-        var createBtn = document.getElementById('scalyn-template-create');
-        if (createBtn) {
-            createBtn.addEventListener('click', function () {
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        title: 'Create New Template',
-                        input: 'text',
-                        inputPlaceholder: 'Template name',
-                        showCancelButton: true,
-                        confirmButtonText: 'Create',
-                        confirmButtonColor: '#4F46E5',
-                        inputValidator: function (value) {
-                            if (!value || !value.trim()) return 'Template name is required.';
-                        },
-                    }).then(function (result) {
-                        if (!result.isConfirmed || !result.value) return;
-                        fetchApi('settings/templates', {
-                            method: 'POST',
-                            body: JSON.stringify({ name: result.value.trim(), checks: [] }),
-                        }).then(function () {
-                            ScalynAlert && ScalynAlert.toast('Template created');
-                            window.location.reload();
-                        }).catch(function (err) {
-                            ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to create template.');
-                        });
-                    });
-                } else {
-                    // Fallback: use the hidden dialog
-                    var dialog = document.getElementById('scalyn-template-dialog');
-                    if (dialog) dialog.style.display = 'flex';
-                }
+    function initPageAuditsTab() {
+        var form = document.getElementById('scalyn-page-audit-settings-form');
+        if (!form) return;
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            var enabledChecks = [];
+            form.querySelectorAll('input[name="enabled_checks[]"]:checked').forEach(function (cb) {
+                enabledChecks.push(cb.value);
             });
-        }
 
-        // Dialog confirm (fallback if no SweetAlert)
-        var dialogConfirm = document.getElementById('scalyn-dialog-confirm');
-        if (dialogConfirm) {
-            dialogConfirm.addEventListener('click', function () {
-                var nameInput = document.getElementById('scalyn-new-template-name');
-                var name = nameInput ? nameInput.value.trim() : '';
-                if (!name) return;
-                fetchApi('settings/templates', {
-                    method: 'POST',
-                    body: JSON.stringify({ name: name, checks: [] }),
-                }).then(function () {
-                    window.location.reload();
-                });
+            fetchApi('settings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    page_audit_settings: {
+                        enabled_checks: enabledChecks,
+                    },
+                }),
+            }).then(function () {
+                ScalynAlert && ScalynAlert.toast('Page audit settings saved');
+            }).catch(function (err) {
+                ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to save page audit settings.');
             });
-        }
-
-        // Dialog cancel
-        var dialogCancel = document.getElementById('scalyn-dialog-cancel');
-        if (dialogCancel) {
-            dialogCancel.addEventListener('click', function () {
-                var dialog = document.getElementById('scalyn-template-dialog');
-                if (dialog) dialog.style.display = 'none';
-            });
-        }
-
-        // Save Template — uses #scalyn-template-form submit and #scalyn-save-template
-        var templateForm = document.getElementById('scalyn-template-form');
-        if (templateForm) {
-            templateForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                var templateId = templateForm.getAttribute('data-template');
-                var nameInput = document.getElementById('scalyn-template-name');
-                var name = nameInput ? nameInput.value.trim() : '';
-                var checks = [];
-                templateForm.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
-                    var checkName = cb.name.replace('checks[', '').replace(']', '');
-                    checks.push(checkName);
-                });
-
-                fetchApi('settings/templates/' + templateId + '?_method=PUT', {
-                    method: 'POST',
-                    body: JSON.stringify({ name: name, checks: checks }),
-                }).then(function () {
-                    ScalynAlert && ScalynAlert.toast('Template saved');
-                }).catch(function (err) {
-                    ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to save template.');
-                });
-            });
-        }
-
-        // Duplicate Template — uses #scalyn-template-duplicate
-        var dupBtn = document.getElementById('scalyn-template-duplicate');
-        if (dupBtn) {
-            dupBtn.addEventListener('click', function () {
-                var select = document.getElementById('scalyn-active-template');
-                var templateId = select ? select.value : '';
-                if (!templateId) return;
-
-                fetchApi('settings/templates/' + templateId + '/duplicate', {
-                    method: 'POST',
-                }).then(function () {
-                    ScalynAlert && ScalynAlert.toast('Template duplicated');
-                    window.location.reload();
-                }).catch(function (err) {
-                    ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to duplicate template.');
-                });
-            });
-        }
-
-        // Delete Template — uses #scalyn-template-delete
-        var delBtn = document.getElementById('scalyn-template-delete');
-        if (delBtn) {
-            delBtn.addEventListener('click', function () {
-                var select = document.getElementById('scalyn-active-template');
-                var templateId = select ? select.value : '';
-                if (!templateId || templateId === 'default') return;
-
-                if (typeof ScalynAlert !== 'undefined') {
-                    ScalynAlert.confirm('Delete Template', 'This cannot be undone.', 'Delete').then(function (result) {
-                        if (!result.isConfirmed) return;
-                        fetchApi('settings/templates/' + templateId, { method: 'DELETE' }).then(function () {
-                            ScalynAlert.toast('Template deleted');
-                            window.location.reload();
-                        }).catch(function (err) {
-                            ScalynAlert.error('Error', err.message || 'Failed to delete template.');
-                        });
-                    });
-                }
-            });
-        }
-
-        // Active Template selector — uses #scalyn-active-template change
-        var activeSelect = document.getElementById('scalyn-active-template');
-        if (activeSelect) {
-            activeSelect.addEventListener('change', function () {
-                var templateId = activeSelect.value;
-                fetchApi('settings', {
-                    method: 'POST',
-                    body: JSON.stringify({ active_template: templateId }),
-                }).then(function () {
-                    ScalynAlert && ScalynAlert.toast('Active template updated');
-                    window.location.reload();
-                }).catch(function (err) {
-                    ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to update active template.');
-                });
-            });
-        }
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -659,6 +538,7 @@
             e.preventDefault();
 
             var thresholds = {
+                php_version: (form.querySelector('[name="php_version"]').value || '8.3.14').trim(),
                 memory_limit: parseInt(form.querySelector('[name="memory_limit"]').value, 10) || 512,
                 max_execution_time: parseInt(form.querySelector('[name="max_execution_time"]').value, 10) || 90,
                 max_input_time: parseInt(form.querySelector('[name="max_input_time"]').value, 10) || 90,
@@ -1579,8 +1459,8 @@
             case 'ai-providers':
                 initAiProvidersTab();
                 break;
-            case 'templates':
-                initTemplatesTab();
+            case 'page-audits':
+                initPageAuditsTab();
                 break;
             case 'launch':
                 initLaunchSettingsTab();

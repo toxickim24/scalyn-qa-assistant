@@ -200,13 +200,11 @@ class Dashboard_Page {
 			return $summary;
 		}
 
-		// Build ignored check IDs (global ignores).
+		// Build ignored check IDs (launch-scoped ignores).
 		$ignored_ids = array();
-		$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
-		foreach ( $global_ignores as $rule ) {
-			if ( 'global' === $rule->type || null === $rule->post_id || 0 === $rule->post_id ) {
-				$ignored_ids[ $rule->check_id ] = true;
-			}
+		$launch_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'launch' );
+		foreach ( $launch_ignores as $rule ) {
+			$ignored_ids[ $rule->check_id ] = true;
 		}
 
 		foreach ( $results as $item ) {

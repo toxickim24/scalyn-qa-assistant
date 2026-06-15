@@ -16,6 +16,7 @@ $launch = isset( $settings['launch_settings'] ) && is_array( $settings['launch_s
 
 // PHP requirement defaults.
 $thresholds = $launch['thresholds'] ?? array();
+$php_version      = $thresholds['php_version'] ?? '8.3.14';
 $memory_limit     = (int) ( $thresholds['memory_limit'] ?? 512 );
 $max_execution    = (int) ( $thresholds['max_execution_time'] ?? 90 );
 $max_input        = (int) ( $thresholds['max_input_time'] ?? 90 );
@@ -24,25 +25,52 @@ $upload_max       = (int) ( $thresholds['upload_max_size'] ?? 64 );
 
 // Enabled checks — all enabled by default.
 $enabled_checks = $launch['enabled_checks'] ?? array();
-$all_checks = array(
-	'search_engine_visibility' => __( 'Search Engine Visibility', 'scalyn-qa-assistant' ),
-	'seo_plugin_installed'     => __( 'SEO Plugin Installed', 'scalyn-qa-assistant' ),
-	'sitemap_exists'           => __( 'Sitemap Exists', 'scalyn-qa-assistant' ),
-	'llms_txt'                 => __( 'llms.txt', 'scalyn-qa-assistant' ),
-	'ga4_configured'           => __( 'Google Analytics (GA4)', 'scalyn-qa-assistant' ),
-	'gtm_configured'           => __( 'Google Tag Manager', 'scalyn-qa-assistant' ),
-	'ssl_enabled'              => __( 'SSL Enabled', 'scalyn-qa-assistant' ),
-	'favicon_exists'           => __( 'Favicon', 'scalyn-qa-assistant' ),
-	'contact_page_exists'      => __( 'Contact Page', 'scalyn-qa-assistant' ),
-	'privacy_policy_exists'    => __( 'Privacy Policy', 'scalyn-qa-assistant' ),
-	'plugin_conflicts'         => __( 'Plugin Conflicts', 'scalyn-qa-assistant' ),
-	'php_memory_limit'         => __( 'PHP Memory Limit', 'scalyn-qa-assistant' ),
-	'php_max_execution_time'   => __( 'PHP Max Execution Time', 'scalyn-qa-assistant' ),
-	'php_max_input_time'       => __( 'PHP Max Input Time', 'scalyn-qa-assistant' ),
-	'php_post_max_size'        => __( 'PHP Post Max Size', 'scalyn-qa-assistant' ),
-	'php_upload_max_size'      => __( 'PHP Upload Max Size', 'scalyn-qa-assistant' ),
-	'security_plugin'          => __( 'Security Plugin', 'scalyn-qa-assistant' ),
-	'cache_plugin'             => __( 'Cache Plugin', 'scalyn-qa-assistant' ),
+
+$check_categories = array(
+	'seo' => array(
+		'label'  => __( 'SEO Configuration', 'scalyn-qa-assistant' ),
+		'checks' => array(
+			'search_engine_visibility' => __( 'Search Engine Visibility', 'scalyn-qa-assistant' ),
+			'seo_plugin_installed'     => __( 'SEO Plugin Installed', 'scalyn-qa-assistant' ),
+			'sitemap_exists'           => __( 'Sitemap Exists', 'scalyn-qa-assistant' ),
+			'llms_txt'                 => __( 'llms.txt', 'scalyn-qa-assistant' ),
+		),
+	),
+	'analytics' => array(
+		'label'  => __( 'Analytics', 'scalyn-qa-assistant' ),
+		'checks' => array(
+			'ga4_configured' => __( 'Google Analytics (GA4)', 'scalyn-qa-assistant' ),
+			'gtm_configured' => __( 'Google Tag Manager', 'scalyn-qa-assistant' ),
+		),
+	),
+	'technical' => array(
+		'label'  => __( 'Technical', 'scalyn-qa-assistant' ),
+		'checks' => array(
+			'ssl_enabled'            => __( 'SSL Enabled', 'scalyn-qa-assistant' ),
+			'favicon_exists'         => __( 'Favicon', 'scalyn-qa-assistant' ),
+			'php_version'            => __( 'PHP Version', 'scalyn-qa-assistant' ),
+			'php_memory_limit'       => __( 'PHP Memory Limit', 'scalyn-qa-assistant' ),
+			'php_max_execution_time' => __( 'PHP Max Execution Time', 'scalyn-qa-assistant' ),
+			'php_max_input_time'     => __( 'PHP Max Input Time', 'scalyn-qa-assistant' ),
+			'php_post_max_size'      => __( 'PHP Post Max Size', 'scalyn-qa-assistant' ),
+			'php_upload_max_size'    => __( 'PHP Upload Max Size', 'scalyn-qa-assistant' ),
+		),
+	),
+	'content' => array(
+		'label'  => __( 'Content', 'scalyn-qa-assistant' ),
+		'checks' => array(
+			'contact_page_exists'  => __( 'Contact Page', 'scalyn-qa-assistant' ),
+			'privacy_policy_exists' => __( 'Privacy Policy', 'scalyn-qa-assistant' ),
+		),
+	),
+	'plugin_health' => array(
+		'label'  => __( 'Plugin Health', 'scalyn-qa-assistant' ),
+		'checks' => array(
+			'plugin_conflicts' => __( 'Plugin Conflicts', 'scalyn-qa-assistant' ),
+			'security_plugin'  => __( 'Security Plugin', 'scalyn-qa-assistant' ),
+			'cache_plugin'     => __( 'Cache Plugin', 'scalyn-qa-assistant' ),
+		),
+	),
 );
 
 // If no settings saved yet, all checks are enabled.
@@ -79,6 +107,13 @@ $has_saved = ! empty( $enabled_checks );
 			<p class="scalyn-card__subtitle"><?php esc_html_e( 'Set minimum PHP thresholds for the launch checklist. Checks will show a warning if the server value is below these.', 'scalyn-qa-assistant' ); ?></p>
 
 			<table class="scalyn-form-table">
+				<tr>
+					<th scope="row"><label for="scalyn-threshold-php-version"><?php esc_html_e( 'PHP Version', 'scalyn-qa-assistant' ); ?></label></th>
+					<td>
+						<input type="text" id="scalyn-threshold-php-version" name="php_version" value="<?php echo esc_attr( $php_version ); ?>" class="scalyn-input" style="width:120px;" placeholder="8.3.14">
+						<p class="scalyn-field-description"><?php printf( esc_html__( 'Current: %s', 'scalyn-qa-assistant' ), esc_html( PHP_VERSION ) ); ?></p>
+					</td>
+				</tr>
 				<tr>
 					<th scope="row"><label for="scalyn-threshold-memory"><?php esc_html_e( 'Memory Limit', 'scalyn-qa-assistant' ); ?></label></th>
 					<td>
@@ -123,26 +158,27 @@ $has_saved = ! empty( $enabled_checks );
 		</div>
 
 		<!-- Enabled Checks -->
-		<div class="scalyn-card">
-			<h2 class="scalyn-card-title"><?php esc_html_e( 'Enabled Checks', 'scalyn-qa-assistant' ); ?></h2>
-			<p class="scalyn-card__subtitle"><?php esc_html_e( 'Choose which checks to include in the launch checklist. Disabled checks will be skipped.', 'scalyn-qa-assistant' ); ?></p>
+		<?php foreach ( $check_categories as $cat_key => $category ) : ?>
+			<div class="scalyn-card">
+				<h2 class="scalyn-card-title"><?php echo esc_html( $category['label'] ); ?></h2>
 
-			<div class="scalyn-checks-grid">
-				<?php foreach ( $all_checks as $check_id => $check_label ) :
-					$is_enabled = $has_saved ? in_array( $check_id, $enabled_checks, true ) : true;
-				?>
-					<label class="scalyn-checkbox-label">
-						<input
-							type="checkbox"
-							name="enabled_checks[]"
-							value="<?php echo esc_attr( $check_id ); ?>"
-							<?php checked( $is_enabled ); ?>
-						>
-						<?php echo esc_html( $check_label ); ?>
-					</label>
-				<?php endforeach; ?>
+				<div class="scalyn-checks-grid">
+					<?php foreach ( $category['checks'] as $check_id => $check_label ) :
+						$is_enabled = $has_saved ? in_array( $check_id, $enabled_checks, true ) : true;
+					?>
+						<label class="scalyn-checkbox-label">
+							<input
+								type="checkbox"
+								name="enabled_checks[]"
+								value="<?php echo esc_attr( $check_id ); ?>"
+								<?php checked( $is_enabled ); ?>
+							>
+							<?php echo esc_html( $check_label ); ?>
+						</label>
+					<?php endforeach; ?>
+				</div>
 			</div>
-		</div>
+		<?php endforeach; ?>
 
 		<div class="scalyn-form-actions">
 			<button type="submit" class="scalyn-btn" id="scalyn-save-launch-settings">

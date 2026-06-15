@@ -141,6 +141,10 @@ class Ignore_Controller extends REST_Controller {
 		$check_id = sanitize_key( $request->get_param( 'check_id' ) );
 		$post_id  = $request->get_param( 'post_id' );
 		$reason   = sanitize_text_field( $request->get_param( 'reason' ) ?? '' );
+		$context  = sanitize_key( $request->get_param( 'context' ) ?? 'audit' );
+		if ( ! in_array( $context, array( 'audit', 'launch' ), true ) ) {
+			$context = 'audit';
+		}
 
 		// Validate type-specific requirements.
 		if ( 'page' === $type && ( null === $post_id || 0 === absint( $post_id ) ) ) {
@@ -173,6 +177,7 @@ class Ignore_Controller extends REST_Controller {
 			reason:     $reason,
 			created_by: $current_user->display_name ?: $current_user->user_login,
 			created_at: gmdate( 'c' ),
+			context:    $context,
 		);
 
 		Ignore_Rule::add( $rule );

@@ -143,6 +143,25 @@ class Link_Checker implements Analyzer_Interface {
 			++$total_checked;
 		}
 
+		// Add a pass result when no broken links were found.
+		if ( 0 === $broken_count && 0 === $warning_count ) {
+			$results[] = new Check_Item(
+				id:        'broken_links',
+				label:     __( 'Broken Link Check', 'scalyn-qa-assistant' ),
+				status:    'pass',
+				message:   0 === $total_checked
+					? __( 'No links found to check.', 'scalyn-qa-assistant' )
+					: sprintf(
+						_n( '%d link checked — no broken links found.', '%d links checked — no broken links found.', $total_checked, 'scalyn-qa-assistant' ),
+						$total_checked,
+					),
+				category:  'functionality',
+				severity:  'info',
+				quick_fix: null,
+				tooltip:   __( 'All links on this page are working correctly.', 'scalyn-qa-assistant' ),
+			);
+		}
+
 		// Add summary check item.
 		$results[] = $this->create_summary( $total_checked, $broken_count, $warning_count, count( $links ) );
 

@@ -442,60 +442,61 @@
         var progressBar = progressContainer ? progressContainer.querySelector('.scalyn-progress__bar') : null;
         var countEl = document.getElementById('scalyn-scan-count');
         var totalEl = document.getElementById('scalyn-scan-total');
-
-        if (progressContainer) {
-            progressContainer.style.display = '';
-            if (totalEl) totalEl.textContent = postIds.length;
-            if (countEl) countEl.textContent = '0';
-            if (progressBar) progressBar.style.width = '0%';
-        }
-
-        var batchSize = 20;
-        var batches = [];
-        for (var i = 0; i < postIds.length; i += batchSize) {
-            batches.push(postIds.slice(i, i + batchSize));
-        }
+        var percentEl = document.getElementById('scalyn-scan-percent');
 
         var completed = 0;
         var total = postIds.length;
 
-        function processBatch(index) {
-            if (index >= batches.length) {
-                if (progressContainer) {
-                    progressContainer.style.display = 'none';
-                }
-                if (typeof ScalynAlert !== 'undefined') {
-                    ScalynAlert.success('Scan Complete', 'Successfully scanned ' + total + ' page(s).');
-                }
+        if (progressContainer) {
+            progressContainer.style.display = '';
+            if (totalEl) totalEl.textContent = total;
+            if (countEl) countEl.textContent = '0';
+            if (percentEl) percentEl.textContent = '0';
+            if (progressBar) progressBar.style.width = '0%';
+        }
+
+        function updateProgress() {
+            var percent = Math.round((completed / total) * 100);
+            if (progressBar) progressBar.style.width = percent + '%';
+            if (countEl) countEl.textContent = completed;
+            if (percentEl) percentEl.textContent = percent;
+        }
+
+        // Scan one page at a time for visible progress.
+        function scanNext(index) {
+            if (index >= postIds.length) {
+                // Show 100% briefly before the success alert.
+                updateProgress();
+                setTimeout(function () {
+                    if (progressContainer) progressContainer.style.display = 'none';
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.success('Scan Complete', 'Successfully scanned ' + total + ' page(s).');
+                    }
+                }, 500);
                 return;
             }
 
-            fetchApi('scan/batch', {
+            fetchApi('scan', {
                 method: 'POST',
-                body: JSON.stringify({ post_ids: batches[index] }),
+                body: JSON.stringify({ post_id: postIds[index] }),
             })
                 .then(function (response) {
-                    if (response.success && response.data && response.data.results) {
-                        response.data.results.forEach(function (result) {
-                            updateTableRow(result.post_id, result);
-                        });
+                    if (response.success && response.data) {
+                        updateTableRow(postIds[index], response.data);
                     }
-
-                    completed += batches[index].length;
-                    var percent = Math.round((completed / total) * 100);
-                    if (progressBar) progressBar.style.width = percent + '%';
-                    if (countEl) countEl.textContent = completed;
-
-                    processBatch(index + 1);
+                    completed++;
+                    updateProgress();
+                    scanNext(index + 1);
                 })
                 .catch(function (err) {
-                    console.error('Scalyn QA: Batch scan error.', err);
-                    completed += batches[index].length;
-                    processBatch(index + 1);
+                    console.error('Scalyn QA: Scan error for post ' + postIds[index], err);
+                    completed++;
+                    updateProgress();
+                    scanNext(index + 1);
                 });
         }
 
-        processBatch(0);
+        scanNext(0);
     }
 
     // -------------------------------------------------------------------------
@@ -1021,6 +1022,7 @@
                         check_id: checkId,
                         post_id: postId ? parseInt(postId, 10) : null,
                         reason: reason,
+                        context: 'audit',
                     }),
                 })
                     .then(function (response) {

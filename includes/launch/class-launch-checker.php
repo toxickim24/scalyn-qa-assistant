@@ -92,6 +92,7 @@ class Launch_Checker {
 			'contact_page_exists'      => $this->check_contact_page_exists(),
 			'privacy_policy_exists'    => $this->check_privacy_policy_exists(),
 			'plugin_conflicts'         => $this->check_plugin_conflicts(),
+			'php_version'              => $this->check_php_version(),
 			'php_memory_limit'         => $this->check_php_memory_limit(),
 			'php_max_execution_time'   => $this->check_php_max_execution_time(),
 			'php_max_input_time'       => $this->check_php_max_input_time(),
@@ -767,6 +768,29 @@ class Launch_Checker {
 	/**
 	 * Check PHP memory limit (minimum 512MB).
 	 */
+	/**
+	 * Check PHP version meets minimum requirement.
+	 */
+	private function check_php_version(): Check_Item {
+		$current   = PHP_VERSION;
+		$settings  = $this->get_launch_settings();
+		$threshold = $settings['thresholds']['php_version'] ?? '8.3.14';
+		$pass      = version_compare( $current, $threshold, '>=' );
+
+		return new Check_Item(
+			id:        'php_version',
+			label:     __( 'PHP Version', 'scalyn-qa-assistant' ),
+			status:    $pass ? 'pass' : 'warning',
+			message:   $pass
+				? sprintf( __( 'PHP version is %s.', 'scalyn-qa-assistant' ), esc_html( $current ) )
+				: sprintf( __( 'PHP version is %s. Recommended: %s or higher.', 'scalyn-qa-assistant' ), esc_html( $current ), esc_html( $threshold ) ),
+			category:  'functionality',
+			severity:  'warning',
+			quick_fix: null,
+			tooltip:   __( 'Running an up-to-date PHP version ensures better performance, security, and compatibility with modern plugins.', 'scalyn-qa-assistant' ),
+		);
+	}
+
 	private function check_php_memory_limit(): Check_Item {
 		$raw       = ini_get( 'memory_limit' );
 		$mb        = $this->parse_size_mb( $raw ?: '0' );

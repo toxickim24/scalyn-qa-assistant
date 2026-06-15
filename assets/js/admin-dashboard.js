@@ -510,6 +510,7 @@
                 }).then(function (result) {
                     if (!result.isConfirmed) return;
 
+                    var isLaunch = !!document.getElementById('scalyn-launch-scan');
                     fetchApi('ignore', {
                         method: 'POST',
                         body: JSON.stringify({
@@ -517,6 +518,7 @@
                             check_id: checkId,
                             post_id: parseInt(postId, 10) > 0 ? parseInt(postId, 10) : null,
                             reason: result.value || '',
+                            context: isLaunch ? 'launch' : 'audit',
                         }),
                     }).then(function (response) {
                         if (response.success) {

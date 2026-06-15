@@ -71,9 +71,9 @@ $ignored_check_ids = array();
 foreach ( $ignore_rules as $rule ) {
 	$ignored_check_ids[ $rule->check_id ] = $rule;
 }
-// Also include global ignores.
-$global_ignores = \Scalyn\QA\Models\Ignore_Rule::get_all();
-foreach ( $global_ignores as $rule ) {
+// Also include audit-scoped global ignores.
+$audit_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'audit' );
+foreach ( $audit_ignores as $rule ) {
 	if ( 'global' === $rule->type || ( null === $rule->post_id || 0 === $rule->post_id ) ) {
 		$ignored_check_ids[ $rule->check_id ] = $rule;
 	}

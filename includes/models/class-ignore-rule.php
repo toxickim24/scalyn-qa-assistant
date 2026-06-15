@@ -45,6 +45,42 @@ class Ignore_Rule {
 	private const VALID_TYPES = array( 'check', 'page', 'global' );
 
 	/**
+	 * Valid contexts for scoping ignore rules.
+	 *
+	 * @var string[]
+	 */
+	private const VALID_CONTEXTS = array( 'audit', 'launch' );
+
+	/**
+	 * Check IDs that belong to the launch checklist.
+	 *
+	 * Used to infer context for legacy rules that were stored without a context field.
+	 *
+	 * @var string[]
+	 */
+	private const LAUNCH_CHECK_IDS = array(
+		'search_engine_visibility',
+		'seo_plugin_installed',
+		'sitemap_exists',
+		'llms_txt',
+		'ga4_configured',
+		'gtm_configured',
+		'ssl_enabled',
+		'favicon_exists',
+		'contact_page_exists',
+		'privacy_policy_exists',
+		'plugin_conflicts',
+		'php_version',
+		'php_memory_limit',
+		'php_max_execution_time',
+		'php_max_input_time',
+		'php_post_max_size',
+		'php_upload_max_size',
+		'security_plugin',
+		'cache_plugin',
+	);
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 1.0.0
@@ -56,6 +92,7 @@ class Ignore_Rule {
 	 * @param string  $reason     User-provided reason for ignoring.
 	 * @param string  $created_by Username of the user who created the rule.
 	 * @param string  $created_at ISO 8601 datetime of when the rule was created.
+	 * @param string  $context    Context scope: 'audit' or 'launch'.
 	 */
 	public function __construct(
 		public readonly string $id,
@@ -65,6 +102,7 @@ class Ignore_Rule {
 		public readonly string $reason,
 		public readonly string $created_by,
 		public readonly string $created_at,
+		public readonly string $context = 'audit',
 	) {
 	}
 
@@ -83,6 +121,14 @@ class Ignore_Rule {
 			$type = 'check';
 		}
 
+		if ( isset( $data['context'] ) && in_array( $data['context'], self::VALID_CONTEXTS, true ) ) {
+			$context = $data['context'];
+		} else {
+			// Infer context from check ID for legacy rules without context.
+			$check_id = sanitize_key( $data['check_id'] ?? '' );
+			$context  = in_array( $check_id, self::LAUNCH_CHECK_IDS, true ) ? 'launch' : 'audit';
+		}
+
 		return new self(
 			id:         sanitize_key( $data['id'] ?? wp_generate_uuid4() ),
 			type:       $type,
@@ -91,6 +137,7 @@ class Ignore_Rule {
 			reason:     sanitize_text_field( $data['reason'] ?? '' ),
 			created_by: sanitize_text_field( $data['created_by'] ?? '' ),
 			created_at: sanitize_text_field( $data['created_at'] ?? '' ),
+			context:    $context,
 		);
 	}
 
@@ -110,6 +157,7 @@ class Ignore_Rule {
 			'reason'     => $this->reason,
 			'created_by' => $this->created_by,
 			'created_at' => $this->created_at,
+			'context'    => $this->context,
 		);
 	}
 
@@ -160,6 +208,25 @@ class Ignore_Rule {
 	}
 
 	/**
+	 * Retrieves all global ignore rules filtered by context.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param string $context The context to filter by ('audit' or 'launch').
+	 * @return self[]
+	 */
+	public static function get_by_context( string $context ): array {
+		$all = self::get_all();
+
+		return array_values(
+			array_filter(
+				$all,
+				static fn( self $rule ): bool => $rule->context === $context,
+			),
+		);
+	}
+
+	/**
 	 * Retrieves all ignore rules that apply to a specific post.
 	 *
 	 * This includes both global rules and post-specific rules.
@@ -172,13 +239,16 @@ class Ignore_Rule {
 	public static function get_for_post( int $post_id ): array {
 		$rules = array();
 
-		// Load global rules.
+		// Load audit-scoped global rules only (launch rules don't apply to posts).
 		$global_data = get_option( self::OPTION_GLOBAL, array() );
 
 		if ( is_array( $global_data ) ) {
 			foreach ( $global_data as $rule_data ) {
 				if ( is_array( $rule_data ) ) {
-					$rules[] = self::from_array( $rule_data );
+					$rule = self::from_array( $rule_data );
+					if ( 'audit' === $rule->context ) {
+						$rules[] = $rule;
+					}
 				}
 			}
 		}

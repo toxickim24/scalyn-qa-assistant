@@ -62,19 +62,35 @@ $overall_label  = match ( $overall_status ) {
 			<div class="scalyn-dashboard-hero__meta">
 				<span class="scalyn-dashboard-hero__label"><?php esc_html_e( 'Overall Score', 'scalyn-qa-assistant' ); ?></span>
 				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( $overall_status ); ?>"><?php echo esc_html( $overall_label ); ?></span>
+				<span class="scalyn-dashboard-hero__formula"><?php esc_html_e( 'SEO 35% + QA 35% + Launch 30%', 'scalyn-qa-assistant' ); ?></span>
 			</div>
 		</div>
 		<div class="scalyn-dashboard-hero__categories">
 			<?php
 			$categories = array(
-				array( 'label' => __( 'SEO', 'scalyn-qa-assistant' ), 'score' => $seo_ready, 'icon' => 'dashicons-search' ),
-				array( 'label' => __( 'QA', 'scalyn-qa-assistant' ), 'score' => $qa_ready, 'icon' => 'dashicons-yes-alt' ),
-				array( 'label' => __( 'Launch', 'scalyn-qa-assistant' ), 'score' => $launch_ready, 'icon' => 'dashicons-migrate' ),
+				array(
+					'label' => __( 'SEO', 'scalyn-qa-assistant' ),
+					'score' => $seo_ready,
+					'icon'  => 'dashicons-search',
+					'desc'  => __( 'Average SEO score across all scanned pages', 'scalyn-qa-assistant' ),
+				),
+				array(
+					'label' => __( 'QA', 'scalyn-qa-assistant' ),
+					'score' => $qa_ready,
+					'icon'  => 'dashicons-yes-alt',
+					'desc'  => __( 'Average content & functionality score across all scanned pages', 'scalyn-qa-assistant' ),
+				),
+				array(
+					'label' => __( 'Launch', 'scalyn-qa-assistant' ),
+					'score' => $launch_ready,
+					'icon'  => 'dashicons-migrate',
+					'desc'  => __( 'Launch checklist readiness score', 'scalyn-qa-assistant' ),
+				),
 			);
 			foreach ( $categories as $cat ) :
 				$cat_status = \Scalyn\QA\Models\Score::calculate_status( $cat['score'] );
 			?>
-				<div class="scalyn-category-score">
+				<div class="scalyn-category-score" title="<?php echo esc_attr( $cat['desc'] ); ?>">
 					<div class="scalyn-category-score__header">
 						<span class="dashicons <?php echo esc_attr( $cat['icon'] ); ?>" aria-hidden="true"></span>
 						<span class="scalyn-category-score__label"><?php echo esc_html( $cat['label'] ); ?></span>
@@ -83,6 +99,7 @@ $overall_label  = match ( $overall_status ) {
 						<div class="scalyn-category-score__fill scalyn-category-score__fill--<?php echo esc_attr( $cat_status ); ?>" style="width:<?php echo esc_attr( (string) $cat['score'] ); ?>%"></div>
 					</div>
 					<span class="scalyn-category-score__value"><?php echo esc_html( (string) $cat['score'] ); ?>%</span>
+					<span class="scalyn-category-score__desc"><?php echo esc_html( $cat['desc'] ); ?></span>
 				</div>
 			<?php endforeach; ?>
 		</div>

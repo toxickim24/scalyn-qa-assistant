@@ -86,16 +86,47 @@ class Analyzer_Registry {
 			'functionality' => array(),
 		);
 
+		$enabled_checks = $this->get_enabled_checks();
+
 		foreach ( $this->analyzers as $analyzer ) {
 			$category = $analyzer->get_category();
 			$items    = $analyzer->analyze( $post_id );
 
+			// Filter out disabled checks.
+			if ( null !== $enabled_checks ) {
+				$items = array_filter(
+					$items,
+					static fn( Check_Item $item ): bool =>
+						in_array( $item->id, $enabled_checks, true )
+						|| ( str_starts_with( $item->id, 'link_' ) && in_array( 'broken_links', $enabled_checks, true ) ),
+				);
+			}
+
 			if ( isset( $results[ $category ] ) ) {
-				$results[ $category ] = array_merge( $results[ $category ], $items );
+				$results[ $category ] = array_merge( $results[ $category ], array_values( $items ) );
 			}
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Get the list of enabled check IDs from page audit settings.
+	 *
+	 * Returns null if no settings have been saved (all checks enabled by default).
+	 *
+	 * @return string[]|null
+	 */
+	private function get_enabled_checks(): ?array {
+		$settings = get_option( 'scalyn_qa_page_audit_settings', array() );
+
+		if ( ! is_array( $settings ) || ! isset( $settings['enabled_checks'] ) ) {
+			return null;
+		}
+
+		$checks = $settings['enabled_checks'];
+
+		return is_array( $checks ) && ! empty( $checks ) ? $checks : null;
 	}
 
 	/**

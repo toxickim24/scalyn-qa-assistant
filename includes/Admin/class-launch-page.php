@@ -35,13 +35,11 @@ class Launch_Page {
 		$results   = $this->get_launch_results();
 		$last_scan = get_option( 'scalyn_qa_launch_last_scan', null );
 
-		// Filter out ignored checks for count/score calculation.
-		$global_ignores = Ignore_Rule::get_all();
+		// Filter out launch-scoped ignored checks for count/score calculation.
+		$launch_ignores = Ignore_Rule::get_by_context( 'launch' );
 		$ignored_ids    = array();
-		foreach ( $global_ignores as $rule ) {
-			if ( 'global' === $rule->type || 0 === $rule->post_id ) {
-				$ignored_ids[ $rule->check_id ] = true;
-			}
+		foreach ( $launch_ignores as $rule ) {
+			$ignored_ids[ $rule->check_id ] = true;
 		}
 
 		$active_results = array_filter(
@@ -51,11 +49,55 @@ class Launch_Page {
 
 		$counts = $this->calculate_counts( $active_results );
 
+		// Calculate per-category scores.
+		$category_map = array(
+			'search_engine_visibility' => 'seo',
+			'seo_plugin_installed'     => 'seo',
+			'sitemap_exists'           => 'seo',
+			'llms_txt'                 => 'seo',
+			'ga4_configured'           => 'analytics',
+			'gtm_configured'           => 'analytics',
+			'ssl_enabled'              => 'technical',
+			'favicon_exists'           => 'technical',
+			'contact_page_exists'      => 'content',
+			'privacy_policy_exists'    => 'content',
+			'plugin_conflicts'         => 'plugin_health',
+			'php_version'              => 'technical',
+			'php_memory_limit'         => 'technical',
+			'php_max_execution_time'   => 'technical',
+			'php_max_input_time'       => 'technical',
+			'php_post_max_size'        => 'technical',
+			'php_upload_max_size'      => 'technical',
+			'security_plugin'          => 'plugin_health',
+			'cache_plugin'             => 'plugin_health',
+		);
+
+		$category_counts = array();
+		foreach ( $active_results as $item ) {
+			$cat = $category_map[ $item->id ] ?? 'technical';
+			if ( ! isset( $category_counts[ $cat ] ) ) {
+				$category_counts[ $cat ] = array( 'pass' => 0, 'fail' => 0, 'warning' => 0, 'total' => 0 );
+			}
+			++$category_counts[ $cat ]['total'];
+			match ( $item->status ) {
+				'pass'    => ++$category_counts[ $cat ]['pass'],
+				'fail'    => ++$category_counts[ $cat ]['fail'],
+				'warning' => ++$category_counts[ $cat ]['warning'],
+				default   => null,
+			};
+		}
+
+		$category_scores = array();
+		foreach ( $category_counts as $cat => $cc ) {
+			$category_scores[ $cat ] = $this->calculate_score( $cc );
+		}
+
 		$data = array(
-			'results'   => $results,
-			'counts'    => $counts,
-			'last_scan' => $last_scan ? (int) $last_scan : null,
-			'score'     => $this->calculate_score( $counts ),
+			'results'         => $results,
+			'counts'          => $counts,
+			'last_scan'       => $last_scan ? (int) $last_scan : null,
+			'score'           => $this->calculate_score( $counts ),
+			'category_scores' => $category_scores,
 		);
 
 		$this->load_template( 'launch/checklist.php', $data );

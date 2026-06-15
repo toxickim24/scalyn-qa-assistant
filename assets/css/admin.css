@@ -906,6 +906,19 @@ a.scalyn-btn--ghost:visited {
   text-align: right;
 }
 
+.scalyn-category-score__desc {
+  font-size: 0.6875rem;
+  color: var(--scalyn-text-muted);
+  grid-column: 1 / -1;
+  margin-top: -2px;
+}
+
+.scalyn-dashboard-hero__formula {
+  font-size: 0.6875rem;
+  color: var(--scalyn-text-muted);
+  margin-top: 2px;
+}
+
 /* Score circle large variant (dashboard hero) */
 .scalyn-score-circle--large {
   width: 100px;
@@ -2052,6 +2065,7 @@ a.scalyn-btn--ghost:visited {
 .scalyn-progress__bar {
   height: 100%;
   border-radius: var(--scalyn-radius-full);
+  background-color: var(--scalyn-primary);
   transition: width 0.5s ease;
 }
 
