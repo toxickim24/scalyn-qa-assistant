@@ -354,40 +354,47 @@ class AI_Controller extends REST_Controller {
 			);
 		}
 
+		// Save to attachment meta (Media Library).
 		if ( $attachment_id > 0 ) {
 			update_post_meta( $attachment_id, '_wp_attachment_image_alt', $alt_text );
-
-			return $this->success( array(
-				'applied'       => true,
-				'attachment_id' => $attachment_id,
-				'alt_text'      => $alt_text,
-			) );
 		}
 
-		// Fallback: update alt text directly in post content.
+		// Also update the alt attribute directly in the post content
+		// (Gutenberg stores alt in the block HTML, not just attachment meta).
 		$post    = get_post( $post_id );
 		$content = $post->post_content ?? '';
 
 		if ( ! empty( $content ) ) {
-			// Find the img tag and add/update alt attribute.
 			$escaped_src = preg_quote( $src, '/' );
-			$content = preg_replace(
-				'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)(\s*\/?>)/i',
-				'$1 alt="' . esc_attr( $alt_text ) . '"$2',
+
+			// First, try to replace existing alt attribute.
+			$updated = preg_replace(
+				'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)alt=["\'][^"\']*["\']([^>]*?>)/i',
+				'$1alt="' . esc_attr( $alt_text ) . '"$2',
 				$content,
 			);
 
-			wp_update_post( array(
-				'ID'           => $post_id,
-				'post_content' => $content,
-			) );
+			if ( $updated === $content ) {
+				// No existing alt found — add one before the closing >.
+				$updated = preg_replace(
+					'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)(\s*\/?>)/i',
+					'$1 alt="' . esc_attr( $alt_text ) . '"$2',
+					$content,
+				);
+			}
+
+			if ( $updated !== $content ) {
+				wp_update_post( array(
+					'ID'           => $post_id,
+					'post_content' => $updated,
+				) );
+			}
 		}
 
 		return $this->success( array(
 			'applied'       => true,
-			'attachment_id' => 0,
+			'attachment_id' => $attachment_id,
 			'alt_text'      => $alt_text,
-			'method'        => 'content_update',
 		) );
 	}
 
