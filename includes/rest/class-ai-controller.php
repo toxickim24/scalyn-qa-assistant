@@ -359,27 +359,44 @@ class AI_Controller extends REST_Controller {
 			update_post_meta( $attachment_id, '_wp_attachment_image_alt', $alt_text );
 		}
 
-		// Also update the alt attribute directly in the post content
-		// (Gutenberg stores alt in the block HTML, not just attachment meta).
+		// Also update alt attribute in post content HTML + Gutenberg block JSON.
 		$post    = get_post( $post_id );
 		$content = $post->post_content ?? '';
 
 		if ( ! empty( $content ) ) {
-			$escaped_src = preg_quote( $src, '/' );
+			$escaped_src  = preg_quote( $src, '/' );
+			$safe_alt     = esc_attr( $alt_text );
+			$updated      = $content;
 
-			// First, try to replace existing alt attribute.
+			// 1. Update alt="" in the <img> tag.
 			$updated = preg_replace(
 				'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)alt=["\'][^"\']*["\']([^>]*?>)/i',
-				'$1alt="' . esc_attr( $alt_text ) . '"$2',
-				$content,
+				'$1alt="' . $safe_alt . '"$2',
+				$updated,
 			);
 
 			if ( $updated === $content ) {
-				// No existing alt found — add one before the closing >.
+				// No existing alt — add one.
 				$updated = preg_replace(
 					'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)(\s*\/?>)/i',
-					'$1 alt="' . esc_attr( $alt_text ) . '"$2',
-					$content,
+					'$1 alt="' . $safe_alt . '"$2',
+					$updated,
+				);
+			}
+
+			// 2. Update Gutenberg block comment JSON to include alt.
+			if ( $attachment_id > 0 ) {
+				$updated = preg_replace_callback(
+					'/(<!-- wp:image \{[^}]*"id":' . $attachment_id . '[^}]*)(}\s*-->)/i',
+					function ( $matches ) use ( $alt_text ) {
+						$json_part = $matches[1];
+						// Remove existing alt key if present.
+						$json_part = preg_replace( '/"alt":"[^"]*",?/', '', $json_part );
+						// Add alt before closing brace.
+						$json_part = rtrim( $json_part, ',' ) . ',"alt":"' . esc_attr( $alt_text ) . '"';
+						return $json_part . $matches[2];
+					},
+					$updated,
 				);
 			}
 
