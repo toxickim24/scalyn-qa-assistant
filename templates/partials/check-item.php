@@ -98,4 +98,10 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 		</div>
 	</div>
 	<?php endif; ?>
+
+	<?php if ( 'image_alt_text' === $item_id && 'pass' !== $status ) : ?>
+	<!-- Inline AI alt text results (hidden until generated) -->
+	<div class="scalyn-ai-alt-results" data-check-id="image_alt_text" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>" style="display:none;">
+	</div>
+	<?php endif; ?>
 </div>

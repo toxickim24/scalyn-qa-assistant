@@ -512,6 +512,7 @@
         initDeleteNote();
         initCreateSnapshot();
         initInlineAiActions();
+        initAiAltText();
         initGenerateAllAi();
         initAiContentReview();
         initIgnoreCheck();
@@ -995,6 +996,103 @@
     /**
      * Initialize the main "Generate with AI" button that runs meta generation + content review.
      */
+    /**
+     * Initialize AI alt text generation and apply.
+     */
+    function initAiAltText() {
+        // Load saved alt text data if available.
+        var savedEl = document.getElementById('scalyn-saved-ai-alt-texts');
+        if (savedEl) {
+            try {
+                var saved = JSON.parse(savedEl.textContent);
+                if (saved && saved.results && saved.results.length > 0) {
+                    displayAltTextResults(saved.results);
+                }
+            } catch (e) {}
+        }
+
+        // Apply alt text button.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-alt-apply');
+            if (!btn) return;
+
+            var src = btn.getAttribute('data-src');
+            var altText = btn.getAttribute('data-alt');
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl();
+            if (!src || !altText || !postId) return;
+
+            btn.disabled = true;
+            fetchApi('ai/apply-alt/' + postId, {
+                method: 'POST',
+                body: JSON.stringify({ src: src, alt_text: altText }),
+            })
+                .then(function (response) {
+                    if (response.success) {
+                        if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Alt text applied — rescanning...');
+                        return fetchApi('scan/' + postId, { method: 'POST' });
+                    }
+                })
+                .then(function () { window.location.reload(); })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.error('Apply Failed', err.message || 'Failed to apply alt text.');
+                    btn.disabled = false;
+                });
+        });
+
+        // Copy alt text button.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-alt-copy');
+            if (!btn) return;
+            var altText = btn.getAttribute('data-alt');
+            if (altText) {
+                navigator.clipboard.writeText(altText).then(function () {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Alt text copied');
+                });
+            }
+        });
+    }
+
+    /**
+     * Display AI-generated alt text results below the image_alt_text check.
+     */
+    function displayAltTextResults(results) {
+        var container = document.querySelector('.scalyn-ai-alt-results[data-check-id="image_alt_text"]');
+        if (!container || !results || results.length === 0) return;
+
+        var postId = container.getAttribute('data-post-id') || getPostIdFromUrl() || '';
+        var html = '';
+
+        results.forEach(function (item) {
+            if (item.error) {
+                html += '<div class="scalyn-ai-inline-result" style="margin-bottom:0.5rem;">' +
+                    '<div class="scalyn-ai-inline-result__content">' +
+                    '<span class="scalyn-ai-inline-result__label">Image: ' + escHtml(item.src.length > 60 ? item.src.substring(0, 60) + '...' : item.src) + '</span>' +
+                    '<p class="scalyn-ai-inline-result__text" style="color:var(--scalyn-danger);">Error: ' + escHtml(item.error) + '</p>' +
+                    '</div></div>';
+                return;
+            }
+
+            html += '<div class="scalyn-ai-inline-result" style="margin-bottom:0.5rem;">' +
+                '<div class="scalyn-ai-inline-result__content">' +
+                '<span class="scalyn-ai-inline-result__label">Image: ' + escHtml(item.src.length > 60 ? item.src.substring(0, 60) + '...' : item.src) + '</span>' +
+                '<p class="scalyn-ai-inline-result__text">' + escHtml(item.alt_text) + '</p>' +
+                '</div>' +
+                '<div class="scalyn-ai-inline-result__actions">' +
+                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-alt-copy" data-alt="' + escAttr(item.alt_text) + '" title="Copy">' +
+                '<span class="dashicons dashicons-clipboard" aria-hidden="true"></span> Copy</button>' +
+                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-alt-apply" data-src="' + escAttr(item.src) + '" data-alt="' + escAttr(item.alt_text) + '" data-post-id="' + escAttr(postId) + '" title="Apply">' +
+                '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>' +
+                '</div></div>';
+        });
+
+        container.innerHTML = html;
+        container.style.display = '';
+    }
+
+    function escAttr(str) {
+        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     function initGenerateAllAi() {
         var btn = document.getElementById('scalyn-generate-all-ai');
         if (!btn) return;
@@ -1008,16 +1106,23 @@
                 ScalynAlert.loading('Running AI analysis — generating meta suggestions and reviewing content...');
             }
 
-            // Run both in parallel.
-            Promise.all([
+            // Build API calls — always run meta + review, add alt text if images are missing.
+            var apiCalls = [
                 fetchApi('ai/generate/' + postId, { method: 'POST' }),
                 fetchApi('ai/review/' + postId, { method: 'POST' }),
-            ])
+            ];
+            var hasAltCheck = !!document.querySelector('.scalyn-ai-alt-results[data-check-id="image_alt_text"]');
+            if (hasAltCheck) {
+                apiCalls.push(fetchApi('ai/generate-alt/' + postId, { method: 'POST' }));
+            }
+
+            Promise.all(apiCalls)
                 .then(function (responses) {
                     if (typeof ScalynAlert !== 'undefined') ScalynAlert.close();
 
                     var metaResponse = responses[0];
                     var reviewResponse = responses[1];
+                    var altResponse = responses[2];
 
                     if (metaResponse.success && metaResponse.data) {
                         displayAiResults(metaResponse.data);
@@ -1025,6 +1130,10 @@
 
                     if (reviewResponse.success && reviewResponse.data) {
                         displayReviewResults(reviewResponse.data);
+                    }
+
+                    if (altResponse && altResponse.success && altResponse.data && altResponse.data.results) {
+                        displayAltTextResults(altResponse.data.results);
                     }
 
                     if (typeof ScalynAlert !== 'undefined') {

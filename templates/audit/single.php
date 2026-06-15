@@ -527,6 +527,13 @@ $permalink     = get_permalink( $post_id );
 	<?php if ( null !== $latest_ai_meta ) : ?>
 		<script type="application/json" id="scalyn-saved-ai-meta"><?php echo wp_json_encode( $latest_ai_meta ); ?></script>
 	<?php endif; ?>
+
+	<?php
+	$saved_alt_texts = get_post_meta( $post_id, '_scalyn_qa_ai_alt_texts', true );
+	if ( is_array( $saved_alt_texts ) && ! empty( $saved_alt_texts['results'] ) ) :
+	?>
+		<script type="application/json" id="scalyn-saved-ai-alt-texts"><?php echo wp_json_encode( $saved_alt_texts ); ?></script>
+	<?php endif; ?>
 	<?php endif; ?>
 
 	<!-- Notes Section -->

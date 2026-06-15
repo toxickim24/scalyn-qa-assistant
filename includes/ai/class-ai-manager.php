@@ -325,6 +325,103 @@ class AI_Manager {
 	}
 
 	/**
+	 * Generate alt text for images missing it in a post.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param int $post_id The post ID.
+	 * @return array{results: array, provider: string}
+	 */
+	public function generate_alt_texts( int $post_id ): array {
+		if ( ! $this->is_enabled() ) {
+			throw new \RuntimeException( __( 'AI features are not enabled.', 'scalyn-qa-assistant' ) );
+		}
+
+		if ( ! $this->check_rate_limit() ) {
+			throw new \RuntimeException( __( 'Daily AI request limit reached.', 'scalyn-qa-assistant' ) );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			throw new \RuntimeException( __( 'Post not found.', 'scalyn-qa-assistant' ) );
+		}
+
+		// Get rendered content and find images missing alt text.
+		$content = (string) apply_filters( 'the_content', $post->post_content );
+		$parser  = new \Scalyn\QA\Analyzers\HTML_Parser( $content );
+		$images  = $parser->get_images();
+
+		$missing = array();
+		foreach ( $images as $image ) {
+			if ( ! $image['has_alt'] && ! empty( $image['src'] ) ) {
+				$missing[] = $image['src'];
+			}
+		}
+
+		if ( empty( $missing ) ) {
+			return array( 'results' => array(), 'provider' => '' );
+		}
+
+		// Find a provider that supports vision (OpenAI).
+		$chain       = $this->get_priority_chain();
+		$provider    = null;
+		$provider_key = '';
+
+		foreach ( $chain as $key ) {
+			$p = $this->build_provider_by_key( $key );
+			if ( $p instanceof \Scalyn\QA\AI\OpenAI_Provider ) {
+				$provider     = $p;
+				$provider_key = $key;
+				break;
+			}
+		}
+
+		if ( null === $provider ) {
+			throw new \RuntimeException( __( 'AI image analysis requires an OpenAI provider. Configure one in Settings → AI Providers.', 'scalyn-qa-assistant' ) );
+		}
+
+		$results = array();
+		$site_url = home_url();
+
+		foreach ( $missing as $src ) {
+			// Make relative URLs absolute.
+			$image_url = $src;
+			if ( ! str_starts_with( $src, 'http' ) ) {
+				$image_url = $site_url . '/' . ltrim( $src, '/' );
+			}
+
+			try {
+				$alt_text = $provider->generate_alt_text( $image_url );
+				$this->log_request( $post_id, $provider_key, 'gpt-4o-mini', true, strlen( $image_url ) );
+				AI_Health_Monitor::record_success( $provider_key, 0 );
+
+				$results[] = array(
+					'src'      => $src,
+					'alt_text' => $alt_text,
+				);
+			} catch ( \Throwable $e ) {
+				AI_Health_Monitor::record_failure( $provider_key, $e->getMessage() );
+				$results[] = array(
+					'src'   => $src,
+					'error' => $e->getMessage(),
+				);
+			}
+		}
+
+		// Save results to post meta for persistence.
+		update_post_meta( $post_id, '_scalyn_qa_ai_alt_texts', array(
+			'results'      => $results,
+			'provider'     => $provider->get_name(),
+			'generated_at' => gmdate( 'c' ),
+		) );
+
+		return array(
+			'results'  => $results,
+			'provider' => $provider->get_name(),
+		);
+	}
+
+	/**
 	 * Test a provider connection by its key.
 	 *
 	 * @since 1.0.0

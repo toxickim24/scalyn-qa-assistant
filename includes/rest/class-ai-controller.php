@@ -178,6 +178,44 @@ class AI_Controller extends REST_Controller {
 			),
 		);
 
+		// POST /ai/generate-alt/{post_id} — generate alt text for images.
+		register_rest_route(
+			$this->namespace,
+			'/ai/generate-alt/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_alt_texts' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
+		// POST /ai/apply-alt/{post_id} — apply alt text to an image.
+		register_rest_route(
+			$this->namespace,
+			'/ai/apply-alt/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'apply_alt_text' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
 		// POST /ai/review/{post_id}/update — update review issue statuses.
 		register_rest_route(
 			$this->namespace,
@@ -244,6 +282,113 @@ class AI_Controller extends REST_Controller {
 		}
 
 		return $this->success( $result );
+	}
+
+	/**
+	 * Generate AI alt text for images missing it.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function generate_alt_texts( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission to edit this post.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$ai_manager = new AI_Manager();
+
+		if ( ! $ai_manager->is_enabled() ) {
+			return $this->error( 'ai_not_enabled', __( 'AI features are not enabled.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		try {
+			$result = $ai_manager->generate_alt_texts( $post_id );
+		} catch ( \Throwable $e ) {
+			return $this->error( 'alt_text_failed', $e->getMessage(), 500 );
+		}
+
+		return $this->success( $result );
+	}
+
+	/**
+	 * Apply AI-generated alt text to an image attachment.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function apply_alt_text( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id  = absint( $request->get_param( 'post_id' ) );
+		$params   = $request->get_json_params();
+		$src      = $params['src'] ?? '';
+		$alt_text = sanitize_text_field( $params['alt_text'] ?? '' );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		if ( empty( $src ) || empty( $alt_text ) ) {
+			return $this->error( 'missing_params', __( 'Image src and alt_text are required.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		// Find the attachment ID by URL.
+		$attachment_id = attachment_url_to_postid( $src );
+
+		if ( 0 === $attachment_id ) {
+			// Try with the upload dir stripped — handle relative or resized URLs.
+			$upload_dir = wp_get_upload_dir();
+			$relative   = str_replace( $upload_dir['baseurl'] . '/', '', $src );
+			// Try finding by partial match in guid.
+			global $wpdb;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$attachment_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND guid LIKE %s LIMIT 1",
+					'%' . $wpdb->esc_like( $relative ) . '%',
+				),
+			);
+		}
+
+		if ( $attachment_id > 0 ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', $alt_text );
+
+			return $this->success( array(
+				'applied'       => true,
+				'attachment_id' => $attachment_id,
+				'alt_text'      => $alt_text,
+			) );
+		}
+
+		// Fallback: update alt text directly in post content.
+		$post    = get_post( $post_id );
+		$content = $post->post_content ?? '';
+
+		if ( ! empty( $content ) ) {
+			// Find the img tag and add/update alt attribute.
+			$escaped_src = preg_quote( $src, '/' );
+			$content = preg_replace(
+				'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)(\s*\/?>)/i',
+				'$1 alt="' . esc_attr( $alt_text ) . '"$2',
+				$content,
+			);
+
+			wp_update_post( array(
+				'ID'           => $post_id,
+				'post_content' => $content,
+			) );
+		}
+
+		return $this->success( array(
+			'applied'       => true,
+			'attachment_id' => 0,
+			'alt_text'      => $alt_text,
+			'method'        => 'content_update',
+		) );
 	}
 
 	/**

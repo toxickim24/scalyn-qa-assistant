@@ -123,6 +123,81 @@ class OpenAI_Provider extends AI_Provider {
 	}
 
 	/**
+	 * Generate alt text for an image using GPT-4o vision.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param string $image_url The public URL of the image.
+	 * @return string The generated alt text.
+	 */
+	public function generate_alt_text( string $image_url ): string {
+		// GPT-4o vision requires a vision-capable model.
+		$model = 'gpt-4o-mini';
+
+		$body = wp_json_encode(
+			array(
+				'model'       => $model,
+				'messages'    => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							array(
+								'type' => 'text',
+								'text' => 'Generate a concise, descriptive alt text for this image. The alt text should be 1-2 sentences, describe what is visually shown, and be useful for accessibility and SEO. Respond with ONLY the alt text, nothing else.',
+							),
+							array(
+								'type'      => 'image_url',
+								'image_url' => array(
+									'url'    => $image_url,
+									'detail' => 'low',
+								),
+							),
+						),
+					),
+				),
+				'max_tokens' => 100,
+			)
+		);
+
+		if ( false === $body ) {
+			throw new \RuntimeException( 'Failed to encode request body for OpenAI vision.' );
+		}
+
+		$response = wp_remote_post(
+			self::API_URL,
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $this->api_key,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => $body,
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			throw new \RuntimeException( 'OpenAI vision request failed: ' . $response->get_error_message() );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		$raw    = wp_remote_retrieve_body( $response );
+		$data   = json_decode( $raw, true );
+
+		if ( $status < 200 || $status >= 300 ) {
+			$error_message = $data['error']['message'] ?? 'Unknown error';
+			throw new \RuntimeException( sprintf( 'OpenAI API error (%d): %s', $status, $error_message ) );
+		}
+
+		$content = $data['choices'][0]['message']['content'] ?? '';
+
+		if ( ! is_string( $content ) || '' === $content ) {
+			throw new \RuntimeException( 'OpenAI returned an empty alt text response.' );
+		}
+
+		return trim( $content );
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	public function test(): array {
