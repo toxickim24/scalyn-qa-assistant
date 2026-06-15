@@ -39,9 +39,13 @@ $check_categories = array(
 	'content' => array(
 		'label'  => __( 'Content Checks', 'scalyn-qa-assistant' ),
 		'checks' => array(
-			'h1_exists'         => __( 'H1 Heading Exists', 'scalyn-qa-assistant' ),
-			'heading_hierarchy' => __( 'Heading Hierarchy', 'scalyn-qa-assistant' ),
-			'empty_headings'    => __( 'Empty Headings', 'scalyn-qa-assistant' ),
+			'h1_exists'               => __( 'H1 Heading Exists', 'scalyn-qa-assistant' ),
+			'heading_hierarchy'       => __( 'Heading Hierarchy', 'scalyn-qa-assistant' ),
+			'empty_headings'          => __( 'Empty Headings', 'scalyn-qa-assistant' ),
+			'content_length'          => __( 'Content Length', 'scalyn-qa-assistant' ),
+			'heading_capitalization'  => __( 'Heading Capitalization', 'scalyn-qa-assistant' ),
+			'paragraph_punctuation'   => __( 'Paragraph Punctuation', 'scalyn-qa-assistant' ),
+			'short_paragraphs'        => __( 'Paragraph Quality', 'scalyn-qa-assistant' ),
 		),
 	),
 	'functionality' => array(

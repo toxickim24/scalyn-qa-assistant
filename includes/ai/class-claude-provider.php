@@ -64,13 +64,13 @@ class Claude_Provider extends AI_Provider {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function generate( string $prompt ): string {
+	public function generate( string $prompt, int $max_tokens = 300 ): string {
 		$model = $this->model ?: 'claude-sonnet-4-6-20250514';
 
 		$body = wp_json_encode(
 			array(
 				'model'      => $model,
-				'max_tokens' => 300,
+				'max_tokens' => $max_tokens,
 				'messages'   => array(
 					array(
 						'role'    => 'user',

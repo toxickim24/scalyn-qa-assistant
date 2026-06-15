@@ -158,6 +158,73 @@ class AI_Controller extends REST_Controller {
 				'permission_callback' => array( $this, 'can_manage' ),
 			),
 		);
+
+		// POST /ai/review/{post_id} — AI content review.
+		register_rest_route(
+			$this->namespace,
+			'/ai/review/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'review_content' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Review content for spelling, grammar, and readability using AI.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function review_content( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission to edit this post.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$post = get_post( $post_id );
+
+		if ( ! $post ) {
+			return $this->error( 'post_not_found', __( 'Post not found.', 'scalyn-qa-assistant' ), 404 );
+		}
+
+		$ai_manager = new AI_Manager();
+
+		if ( ! $ai_manager->is_enabled() ) {
+			return $this->error(
+				'ai_not_enabled',
+				__( 'AI features are not enabled. Configure an AI provider in Settings.', 'scalyn-qa-assistant' ),
+				400,
+			);
+		}
+
+		try {
+			$result = $ai_manager->review_content( $post_id );
+		} catch ( \Throwable $e ) {
+			return $this->error( 'review_failed', $e->getMessage(), 500 );
+		}
+
+		if ( empty( $result['summary'] ) && empty( $result['issues'] ) ) {
+			return $this->error(
+				'review_empty',
+				__( 'AI content review returned no results. Try again or check your AI provider settings.', 'scalyn-qa-assistant' ),
+				500,
+			);
+		}
+
+		return $this->success( $result );
 	}
 
 	/**

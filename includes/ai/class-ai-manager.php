@@ -217,6 +217,108 @@ class AI_Manager {
 	}
 
 	/**
+	 * Review content for spelling, grammar, capitalization, punctuation, and readability.
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param int $post_id The post ID to review.
+	 * @return array{summary: string, score: int, issues: array, provider: string, model: string}
+	 */
+	public function review_content( int $post_id ): array {
+		$empty_result = array(
+			'summary'  => '',
+			'score'    => 0,
+			'issues'   => array(),
+			'provider' => '',
+			'model'    => '',
+		);
+
+		if ( ! $this->is_enabled() ) {
+			return $empty_result;
+		}
+
+		if ( ! $this->check_rate_limit() ) {
+			throw new \RuntimeException(
+				__( 'Daily AI request limit reached. Please try again tomorrow or increase the limit in Advanced settings.', 'scalyn-qa-assistant' )
+			);
+		}
+
+		$post = get_post( $post_id );
+
+		if ( ! $post ) {
+			return $empty_result;
+		}
+
+		$title   = get_the_title( $post );
+		$content = wp_strip_all_tags( $post->post_content );
+
+		// Limit to ~2,000 words.
+		$words          = explode( ' ', $content );
+		$content        = implode( ' ', array_slice( $words, 0, 2000 ) );
+		$content_length = strlen( $content );
+
+		$chain     = $this->get_priority_chain();
+		$last_error = '';
+
+		foreach ( $chain as $provider_key ) {
+			$provider = $this->build_provider_by_key( $provider_key );
+
+			if ( null === $provider ) {
+				$last_error = sprintf( 'Provider "%s" could not be built.', $provider_key );
+				continue;
+			}
+
+			try {
+				$prompt   = $provider->build_content_review_prompt( $title, $content );
+				$start    = microtime( true );
+				$response = $provider->generate( $prompt, 2000 );
+				$elapsed  = ( microtime( true ) - $start ) * 1000;
+
+				// Strip markdown code fences if present.
+				$response = trim( $response );
+				$response = preg_replace( '/^```(?:json)?\s*/i', '', $response );
+				$response = preg_replace( '/\s*```$/', '', $response );
+
+				// Try to extract JSON from the response if it contains extra text.
+				$json_start = strpos( $response, '{' );
+				$json_end   = strrpos( $response, '}' );
+				if ( false !== $json_start && false !== $json_end ) {
+					$response = substr( $response, $json_start, $json_end - $json_start + 1 );
+				}
+
+				$data = json_decode( $response, true );
+
+				if ( ! is_array( $data ) ) {
+					$last_error = 'AI returned invalid JSON. Raw: ' . mb_substr( $response, 0, 200 );
+					AI_Health_Monitor::record_failure( $provider_key, 'Invalid JSON response for content review.' );
+					continue;
+				}
+
+				$this->log_request( $post_id, $provider_key, $provider->get_slug(), true, $content_length );
+				AI_Health_Monitor::record_success( $provider_key, $elapsed );
+
+				return array(
+					'summary'  => $data['summary'] ?? '',
+					'score'    => max( 0, min( 100, (int) ( $data['score'] ?? 0 ) ) ),
+					'issues'   => $data['issues'] ?? array(),
+					'provider' => $provider->get_name(),
+					'model'    => $provider->get_slug(),
+				);
+			} catch ( \Throwable $e ) {
+				$last_error = $e->getMessage();
+				AI_Health_Monitor::record_failure( $provider_key, $e->getMessage() );
+				continue;
+			}
+		}
+
+		if ( ! empty( $last_error ) ) {
+			throw new \RuntimeException( $last_error );
+		}
+
+		return $empty_result;
+	}
+
+	/**
 	 * Test a provider connection by its key.
 	 *
 	 * @since 1.0.0

@@ -68,7 +68,7 @@ class OpenRouter_Provider extends AI_Provider {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function generate( string $prompt ): string {
+	public function generate( string $prompt, int $max_tokens = 300 ): string {
 		$model = $this->model ?: 'anthropic/claude-sonnet-4';
 
 		$body = wp_json_encode(
@@ -77,7 +77,7 @@ class OpenRouter_Provider extends AI_Provider {
 				'messages'    => array(
 					array(
 						'role'    => 'system',
-						'content' => 'You are an expert SEO copywriter. Follow the instructions precisely and respond only with the requested output.',
+						'content' => 'You are an expert SEO copywriter and editor. Follow the instructions precisely and respond only with the requested output.',
 					),
 					array(
 						'role'    => 'user',
@@ -85,7 +85,7 @@ class OpenRouter_Provider extends AI_Provider {
 					),
 				),
 				'temperature' => 0.7,
-				'max_tokens'  => 300,
+				'max_tokens'  => $max_tokens,
 			)
 		);
 

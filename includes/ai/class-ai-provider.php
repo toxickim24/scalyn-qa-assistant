@@ -108,12 +108,13 @@ abstract class AI_Provider {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $prompt The prompt to send.
+	 * @param string $prompt     The prompt to send.
+	 * @param int    $max_tokens Maximum tokens for the response.
 	 * @return string The generated text.
 	 *
 	 * @throws \RuntimeException On API failure.
 	 */
-	abstract public function generate( string $prompt ): string;
+	abstract public function generate( string $prompt, int $max_tokens = 300 ): string;
 
 	/**
 	 * Test the provider connection and API key validity.
@@ -183,5 +184,48 @@ abstract class AI_Provider {
 		}
 
 		return $instructions;
+	}
+
+	/**
+	 * Build a prompt for AI content review (spelling, grammar, tone, readability).
+	 *
+	 * @since 1.0.7
+	 *
+	 * @param string $title   The page title.
+	 * @param string $content The page content (plain text).
+	 * @return string The prompt string.
+	 */
+	public function build_content_review_prompt( string $title, string $content ): string {
+		$prompt  = "You are a professional editor and proofreader. Review the following web page content for quality issues.\n\n";
+		$prompt .= "Page Title: {$title}\n\n";
+		$prompt .= "Content:\n{$content}\n\n";
+		$prompt .= "Check for the following:\n";
+		$prompt .= "1. **Spelling errors** — misspelled words\n";
+		$prompt .= "2. **Grammar issues** — subject-verb agreement, tense consistency, sentence fragments\n";
+		$prompt .= "3. **Capitalization** — incorrect capitalization in headings, sentences, or proper nouns\n";
+		$prompt .= "4. **Punctuation** — missing periods, commas, or other punctuation issues\n";
+		$prompt .= "5. **Readability** — overly complex sentences, passive voice overuse, jargon\n\n";
+		$prompt .= "Respond with valid JSON only, using this exact format:\n";
+		$prompt .= "{\n";
+		$prompt .= '  "summary": "Brief overall assessment (1-2 sentences)",' . "\n";
+		$prompt .= '  "score": 85,' . "\n";
+		$prompt .= '  "issues": [' . "\n";
+		$prompt .= '    {' . "\n";
+		$prompt .= '      "type": "spelling|grammar|capitalization|punctuation|readability",' . "\n";
+		$prompt .= '      "severity": "error|warning|suggestion",' . "\n";
+		$prompt .= '      "text": "the problematic text",' . "\n";
+		$prompt .= '      "suggestion": "the corrected text or advice",' . "\n";
+		$prompt .= '      "context": "the sentence containing the issue"' . "\n";
+		$prompt .= '    }' . "\n";
+		$prompt .= '  ]' . "\n";
+		$prompt .= "}\n\n";
+		$prompt .= "Rules:\n";
+		$prompt .= "- score is 0-100 (100 = perfect)\n";
+		$prompt .= "- Only report real issues, not stylistic preferences\n";
+		$prompt .= "- If no issues found, return an empty issues array with score 100\n";
+		$prompt .= "- Limit to 20 most important issues maximum\n";
+		$prompt .= "- Respond with ONLY the JSON, no markdown fences or extra text";
+
+		return $prompt;
 	}
 }

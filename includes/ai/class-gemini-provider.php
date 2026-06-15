@@ -57,7 +57,7 @@ class Gemini_Provider extends AI_Provider {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function generate( string $prompt ): string {
+	public function generate( string $prompt, int $max_tokens = 300 ): string {
 		$model = $this->model ?: 'gemini-2.0-flash';
 		$url   = self::API_BASE . rawurlencode( $model ) . ':generateContent';
 

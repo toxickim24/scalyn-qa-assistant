@@ -516,6 +516,7 @@
         initApplyAiMeta();
         initEditAiMeta();
         initRegenerateAi();
+        initAiContentReview();
         initIgnoreCheck();
         initRemoveIgnore();
         initQuickFixes();
@@ -786,18 +787,24 @@
      * @param {Object} data - AI response data.
      */
     function displayAiResults(data) {
-        var container = document.querySelector('.scalyn-ai-section, .scalyn-ai-container');
-        if (!container) {
-            // Try to find a suitable place to inject.
-            container = document.querySelector('.scalyn-audit-actions');
+        var resultsEl = document.getElementById('scalyn-ai-results');
+        if (!resultsEl) return;
+
+        var titleText = document.getElementById('scalyn-ai-title-text');
+        var titleLength = document.getElementById('scalyn-ai-title-length');
+        var descText = document.getElementById('scalyn-ai-description-text');
+        var descLength = document.getElementById('scalyn-ai-description-length');
+
+        if (titleText) {
+            titleText.textContent = data.title || '';
+            if (titleLength) titleLength.textContent = (data.title || '').length + ' characters';
         }
-        if (!container) return;
+        if (descText) {
+            descText.textContent = data.description || '';
+            if (descLength) descLength.textContent = (data.description || '').length + ' characters';
+        }
 
-        // Remove existing results.
-        var existing = container.querySelector('.scalyn-ai-results');
-        if (existing) existing.remove();
-
-        container.insertAdjacentHTML('beforeend', renderAiResults(data));
+        resultsEl.style.display = '';
     }
 
     /**
@@ -985,6 +992,109 @@
                     btn.disabled = false;
                 });
         });
+    }
+
+    /**
+     * Initialize AI Content Review button and regenerate.
+     */
+    function initAiContentReview() {
+        function runReview(btn) {
+            var postId = btn.getAttribute('data-post-id') || scalynQA.currentPostId;
+            if (!postId) return;
+
+            var spinner = document.getElementById('scalyn-review-spinner');
+            var resultsEl = document.getElementById('scalyn-review-results');
+            var errorEl = document.getElementById('scalyn-review-error');
+
+            btn.disabled = true;
+            if (spinner) spinner.style.display = '';
+            if (resultsEl) resultsEl.style.display = 'none';
+            if (errorEl) errorEl.style.display = 'none';
+
+            fetchApi('ai/review/' + postId, { method: 'POST' })
+                .then(function (response) {
+                    if (response.success && response.data) {
+                        displayReviewResults(response.data);
+                    }
+                })
+                .catch(function (err) {
+                    if (errorEl) {
+                        var errorText = document.getElementById('scalyn-review-error-text');
+                        if (errorText) errorText.textContent = err.message || 'Content review failed.';
+                        errorEl.style.display = '';
+                    }
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    if (spinner) spinner.style.display = 'none';
+                });
+        }
+
+        var reviewBtn = document.getElementById('scalyn-review-content');
+        if (reviewBtn) {
+            reviewBtn.addEventListener('click', function () { runReview(reviewBtn); });
+        }
+
+        var regenBtn = document.getElementById('scalyn-review-regenerate');
+        if (regenBtn) {
+            regenBtn.addEventListener('click', function () { runReview(regenBtn); });
+        }
+    }
+
+    /**
+     * Display AI content review results.
+     */
+    function displayReviewResults(data) {
+        var resultsEl = document.getElementById('scalyn-review-results');
+        var summaryText = document.getElementById('scalyn-review-summary-text');
+        var scoreBadge = document.getElementById('scalyn-review-score-badge');
+        var issuesWrap = document.getElementById('scalyn-review-issues-wrap');
+        var issuesBody = document.getElementById('scalyn-review-issues-body');
+
+        if (!resultsEl) return;
+
+        if (summaryText) summaryText.textContent = data.summary || 'No summary available.';
+
+        if (scoreBadge) {
+            var score = data.score || 0;
+            var status = score >= 80 ? 'green' : (score >= 50 ? 'yellow' : 'red');
+            scoreBadge.className = 'scalyn-badge scalyn-badge--' + status;
+            scoreBadge.textContent = score + '/100';
+        }
+
+        if (issuesBody) {
+            issuesBody.innerHTML = '';
+
+            var issues = data.issues || [];
+            if (issues.length > 0 && issuesWrap) {
+                issuesWrap.style.display = '';
+
+                var severityBadge = { error: 'red', warning: 'yellow', suggestion: 'neutral' };
+
+                issues.forEach(function (issue) {
+                    var row = document.createElement('tr');
+                    row.innerHTML =
+                        '<td><span class="scalyn-badge scalyn-badge--neutral">' + escHtml(issue.type || '') + '</span></td>' +
+                        '<td><span class="scalyn-badge scalyn-badge--' + (severityBadge[issue.severity] || 'neutral') + '">' + escHtml(issue.severity || '') + '</span></td>' +
+                        '<td>' +
+                            '<strong>' + escHtml(issue.text || '') + '</strong>' +
+                            (issue.context ? '<br><small style="color:var(--scalyn-text-muted)">' + escHtml(issue.context) + '</small>' : '') +
+                        '</td>' +
+                        '<td>' + escHtml(issue.suggestion || '') + '</td>';
+                    issuesBody.appendChild(row);
+                });
+            } else if (issuesWrap) {
+                issuesWrap.style.display = 'none';
+            }
+        }
+
+        resultsEl.style.display = '';
+    }
+
+    function escHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
     }
 
     /**

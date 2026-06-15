@@ -111,8 +111,8 @@ $trend_icon  = isset( $trend_icons[ $trend ] ) ? $trend_icons[ $trend ] : 'dashi
 $trend_label = isset( $trend_labels[ $trend ] ) ? $trend_labels[ $trend ] : __( 'Stable', 'scalyn-qa-assistant' );
 
 // Check if AI is configured.
-$settings      = get_option( 'scalyn_qa_settings', array() );
-$ai_configured = ! empty( $settings['ai_provider'] ) && ! empty( $settings['ai_api_key'] );
+$ai_manager    = new \Scalyn\QA\AI\AI_Manager();
+$ai_configured = $ai_manager->is_enabled() && null !== $ai_manager->get_primary_provider();
 
 // Edit post link.
 $edit_post_url = get_edit_post_link( $post_id, 'raw' );
@@ -512,6 +512,68 @@ $permalink     = get_permalink( $post_id );
 
 				<div id="scalyn-ai-error" class="scalyn-notice scalyn-notice--error" style="display:none;">
 					<p id="scalyn-ai-error-text"></p>
+				</div>
+			</div>
+
+			<!-- AI Content Review Section -->
+			<div class="scalyn-card" id="scalyn-ai-review-section">
+				<h2 class="scalyn-card-title">
+					<span class="dashicons dashicons-editor-spellcheck" aria-hidden="true"></span>
+					<?php esc_html_e( 'AI Content Review', 'scalyn-qa-assistant' ); ?>
+				</h2>
+				<p class="scalyn-card-description">
+					<?php esc_html_e( 'AI-powered review for spelling, grammar, capitalization, punctuation, and readability issues.', 'scalyn-qa-assistant' ); ?>
+				</p>
+				<div class="scalyn-ai-controls">
+					<button
+						type="button"
+						id="scalyn-review-content"
+						class="scalyn-btn"
+						data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
+					>
+						<span class="dashicons dashicons-editor-spellcheck" aria-hidden="true"></span>
+						<?php esc_html_e( 'Review Content', 'scalyn-qa-assistant' ); ?>
+					</button>
+					<span id="scalyn-review-spinner" class="spinner" style="display:none;"></span>
+				</div>
+
+				<div id="scalyn-review-results" style="display:none;">
+					<!-- Summary -->
+					<div class="scalyn-ai-result" id="scalyn-review-summary">
+						<div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+							<h3 class="scalyn-ai-result__label" style="margin:0;"><?php esc_html_e( 'Writing Quality', 'scalyn-qa-assistant' ); ?></h3>
+							<span id="scalyn-review-score-badge" class="scalyn-badge"></span>
+						</div>
+						<p id="scalyn-review-summary-text" class="scalyn-ai-result__text"></p>
+					</div>
+
+					<!-- Issues Table -->
+					<div id="scalyn-review-issues-wrap" style="display:none;">
+						<table class="scalyn-table scalyn-table--compact">
+							<thead>
+								<tr>
+									<th><?php esc_html_e( 'Type', 'scalyn-qa-assistant' ); ?></th>
+									<th><?php esc_html_e( 'Severity', 'scalyn-qa-assistant' ); ?></th>
+									<th><?php esc_html_e( 'Issue', 'scalyn-qa-assistant' ); ?></th>
+									<th><?php esc_html_e( 'Suggestion', 'scalyn-qa-assistant' ); ?></th>
+								</tr>
+							</thead>
+							<tbody id="scalyn-review-issues-body">
+							</tbody>
+						</table>
+					</div>
+
+					<!-- Regenerate -->
+					<div class="scalyn-ai-result__footer" style="margin-top:0.75rem;">
+						<button type="button" id="scalyn-review-regenerate" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
+							<span class="dashicons dashicons-update" aria-hidden="true"></span>
+							<?php esc_html_e( 'Review Again', 'scalyn-qa-assistant' ); ?>
+						</button>
+					</div>
+				</div>
+
+				<div id="scalyn-review-error" class="scalyn-notice scalyn-notice--error" style="display:none;">
+					<p id="scalyn-review-error-text"></p>
 				</div>
 			</div>
 		<?php endif; ?>
