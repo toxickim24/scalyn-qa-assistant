@@ -131,8 +131,10 @@ class OpenAI_Provider extends AI_Provider {
 	 * @return string The generated alt text.
 	 */
 	public function generate_alt_text( string $image_url ): string {
-		// GPT-4o vision requires a vision-capable model.
 		$model = 'gpt-4o-mini';
+
+		// Convert local image to base64 since OpenAI can't access localhost.
+		$image_data_url = $this->resolve_image_to_data_url( $image_url );
 
 		$body = wp_json_encode(
 			array(
@@ -148,7 +150,7 @@ class OpenAI_Provider extends AI_Provider {
 							array(
 								'type'      => 'image_url',
 								'image_url' => array(
-									'url'    => $image_url,
+									'url'    => $image_data_url,
 									'detail' => 'low',
 								),
 							),
@@ -195,6 +197,53 @@ class OpenAI_Provider extends AI_Provider {
 		}
 
 		return trim( $content );
+	}
+
+	/**
+	 * Resolve an image URL to a base64 data URL for the OpenAI vision API.
+	 *
+	 * Reads the file from the local filesystem if possible, otherwise downloads it.
+	 *
+	 * @param string $image_url The image URL.
+	 * @return string A data:image/... URL or the original URL if public.
+	 */
+	private function resolve_image_to_data_url( string $image_url ): string {
+		// Try to convert the URL to a local file path.
+		$local_path = $this->url_to_local_path( $image_url );
+
+		if ( null !== $local_path && file_exists( $local_path ) ) {
+			$mime     = wp_check_filetype( $local_path )['type'] ?: 'image/jpeg';
+			$contents = file_get_contents( $local_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			if ( false !== $contents ) {
+				return 'data:' . $mime . ';base64,' . base64_encode( $contents ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			}
+		}
+
+		// If not local, return the URL as-is (works for public URLs).
+		return $image_url;
+	}
+
+	/**
+	 * Convert a WordPress URL to a local file path.
+	 *
+	 * @param string $url The URL to convert.
+	 * @return string|null The local path, or null if not resolvable.
+	 */
+	private function url_to_local_path( string $url ): ?string {
+		$upload_dir = wp_get_upload_dir();
+
+		// Check if URL is within the uploads directory.
+		if ( str_starts_with( $url, $upload_dir['baseurl'] ) ) {
+			return str_replace( $upload_dir['baseurl'], $upload_dir['basedir'], $url );
+		}
+
+		// Check if URL is within the site URL.
+		$site_url = site_url();
+		if ( str_starts_with( $url, $site_url ) ) {
+			return str_replace( $site_url, ABSPATH, $url );
+		}
+
+		return null;
 	}
 
 	/**
