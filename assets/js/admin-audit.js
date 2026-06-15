@@ -1011,6 +1011,34 @@
             } catch (e) {}
         }
 
+        // Apply alt text button.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-alt-apply');
+            if (!btn) return;
+
+            var src = btn.getAttribute('data-src');
+            var altText = btn.getAttribute('data-alt');
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl();
+            if (!src || !altText || !postId) return;
+
+            btn.disabled = true;
+            fetchApi('ai/apply-alt/' + postId, {
+                method: 'POST',
+                body: JSON.stringify({ src: src, alt_text: altText }),
+            })
+                .then(function (response) {
+                    if (response.success) {
+                        if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Alt text applied — rescanning...');
+                        return fetchApi('scan/' + postId, { method: 'POST' });
+                    }
+                })
+                .then(function () { window.location.reload(); })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.error('Apply Failed', err.message || 'Failed to apply alt text.');
+                    btn.disabled = false;
+                });
+        });
+
         // Copy alt text button.
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('.scalyn-alt-copy');
@@ -1048,11 +1076,12 @@
                 '<div class="scalyn-ai-inline-result__content">' +
                 '<span class="scalyn-ai-inline-result__label">Image: ' + escHtml(item.src.length > 60 ? item.src.substring(0, 60) + '...' : item.src) + '</span>' +
                 '<p class="scalyn-ai-inline-result__text">' + escHtml(item.alt_text) + '</p>' +
-                '<small style="color:var(--scalyn-text-muted);">Copy and paste into the image\'s "Alternative Text" field in the block editor.</small>' +
                 '</div>' +
                 '<div class="scalyn-ai-inline-result__actions">' +
                 '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-alt-copy" data-alt="' + escAttr(item.alt_text) + '" title="Copy">' +
                 '<span class="dashicons dashicons-clipboard" aria-hidden="true"></span> Copy</button>' +
+                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-alt-apply" data-src="' + escAttr(item.src) + '" data-alt="' + escAttr(item.alt_text) + '" data-post-id="' + escAttr(postId) + '" title="Apply">' +
+                '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>' +
                 '</div></div>';
         });
 
