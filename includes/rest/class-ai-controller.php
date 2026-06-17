@@ -216,6 +216,25 @@ class AI_Controller extends REST_Controller {
 			),
 		);
 
+		// POST /ai/review/{post_id}/recheck — check if existing issues are fixed.
+		register_rest_route(
+			$this->namespace,
+			'/ai/review/(?P<post_id>\d+)/recheck',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'recheck_review_issues' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
 		// POST /ai/review/{post_id}/update — update review issue statuses.
 		register_rest_route(
 			$this->namespace,
@@ -234,6 +253,271 @@ class AI_Controller extends REST_Controller {
 				),
 			),
 		);
+
+		// POST /ai/generate-keywords/{post_id} — AI focus keyword suggestions.
+		register_rest_route(
+			$this->namespace,
+			'/ai/generate-keywords/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_keywords' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
+		// POST /ai/apply-keyword/{post_id} — write focus keyword to SEO plugin.
+		register_rest_route(
+			$this->namespace,
+			'/ai/apply-keyword/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'apply_keyword' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Generate AI focus keyword suggestions for a post.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function generate_keywords( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission to edit this post.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return $this->error( 'post_not_found', __( 'Post not found.', 'scalyn-qa-assistant' ), 404 );
+		}
+
+		$ai_manager = new AI_Manager();
+		if ( ! $ai_manager->is_enabled() ) {
+			return $this->error( 'ai_not_enabled', __( 'AI features are not enabled.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		// Detect if pro SEO plugin is active.
+		$has_pro = defined( 'RANK_MATH_PRO_VERSION' )
+			|| defined( 'WPSEO_PREMIUM_FILE' )
+			|| defined( 'AIOSEO_PRO_VERSION' )
+			|| defined( 'SEOPRESS_PRO_VERSION' );
+
+		$title   = get_the_title( $post );
+		$url     = get_permalink( $post_id );
+		$slug    = get_post_field( 'post_name', $post_id );
+		$content = wp_strip_all_tags( $post->post_content );
+		$words   = explode( ' ', $content );
+		$content = implode( ' ', array_slice( $words, 0, 1500 ) );
+
+		// Get meta title and description from SEO plugins.
+		$meta_title = get_post_meta( $post_id, 'rank_math_title', true )
+			?: get_post_meta( $post_id, '_yoast_wpseo_title', true )
+			?: get_post_meta( $post_id, '_aioseo_title', true )
+			?: $title;
+
+		$meta_desc = get_post_meta( $post_id, 'rank_math_description', true )
+			?: get_post_meta( $post_id, '_yoast_wpseo_metadesc', true )
+			?: get_post_meta( $post_id, '_aioseo_description', true )
+			?: '';
+
+		// Get H1 from content, fall back to post title (most themes render it as H1).
+		$h1_text = '';
+		if ( preg_match( '/<h1[^>]*>(.*?)<\/h1>/si', $post->post_content, $h1_match ) ) {
+			$h1_text = wp_strip_all_tags( $h1_match[1] );
+		}
+		if ( '' === $h1_text ) {
+			$h1_text = $title; // Theme likely renders post title as H1.
+		}
+
+		// Get first paragraph text.
+		$first_para = '';
+		if ( preg_match( '/<p[^>]*>(.*?)<\/p>/si', $post->post_content, $p_match ) ) {
+			$first_para = wp_strip_all_tags( $p_match[1] );
+		}
+
+		$count = $has_pro ? 5 : 3;
+		$count_label = $has_pro ? 'a PRIMARY focus keyword plus 4 secondary keywords (5 total)' : '3 focus keyword options';
+
+		$prompt = <<<PROMPT
+You are an SEO keyword expert. Analyze this page and discover the best focus keyword phrases that ALREADY EXIST in the content.
+
+Page title: {$title}
+Meta title: {$meta_title}
+Meta description: {$meta_desc}
+H1 heading: {$h1_text}
+URL slug: {$slug}
+First paragraph: {$first_para}
+Content excerpt:
+{$content}
+
+CRITICAL RULES:
+- Every keyword you suggest MUST be a phrase that already appears verbatim in at least one of the fields above (title, meta title, meta description, H1, first paragraph, URL slug, or content)
+- Do NOT invent new keywords — only discover phrases that are already written in the page
+- Prioritize phrases that appear in MULTIPLE locations (e.g. in both the title AND the content)
+- Keywords should be 2-5 words long
+- Rank by: how many locations contain the phrase, then by search relevance
+
+Suggest {$count_label}.
+
+PROMPT;
+
+		if ( $has_pro ) {
+			$prompt .= 'Return ONLY a JSON object: {"primary":"...","secondary":["...","...","...","..."]}';
+		} else {
+			$prompt .= 'Return ONLY a JSON object: {"keywords":["best keyword","second option","third option"]}';
+		}
+
+		try {
+			$result = $ai_manager->generate_text( $prompt, 300 );
+		} catch ( \RuntimeException $e ) {
+			return $this->error( 'ai_rate_limit', $e->getMessage(), 429 );
+		}
+
+		if ( '' === $result['text'] ) {
+			return $this->error( 'ai_failed', __( 'AI generation failed.', 'scalyn-qa-assistant' ), 500 );
+		}
+
+		$parsed = json_decode( $result['text'], true );
+		if ( ! is_array( $parsed ) ) {
+			if ( preg_match( '/```(?:json)?\s*(\{[\s\S]*\})\s*```/', $result['text'], $m ) ) {
+				$parsed = json_decode( $m[1], true );
+			}
+		}
+
+		if ( ! is_array( $parsed ) ) {
+			return $this->error( 'ai_parse_failed', __( 'Could not parse AI response.', 'scalyn-qa-assistant' ), 500 );
+		}
+
+		$response_data = array(
+			'has_pro'   => $has_pro,
+			'primary'   => $parsed['primary'] ?? ( $parsed['keywords'][0] ?? '' ),
+			'secondary' => $parsed['secondary'] ?? array(),
+			'keywords'  => $parsed['keywords'] ?? array(),
+			'provider'  => $result['provider'],
+			'model'     => $result['model'],
+		);
+
+		// Persist to post meta so it survives page reloads.
+		update_post_meta( $post_id, '_scalyn_qa_ai_keywords', $response_data );
+
+		return $this->success( $response_data );
+	}
+
+	/**
+	 * Apply a focus keyword to the active SEO plugin.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function apply_keyword( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+		$params  = $request->get_json_params();
+		$primary = sanitize_text_field( $params['primary'] ?? '' );
+		$secondary = array_map( 'sanitize_text_field', (array) ( $params['secondary'] ?? array() ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		if ( '' === $primary ) {
+			return $this->error( 'missing_keyword', __( 'Primary keyword is required.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		$applied_to = '';
+
+		// Rank Math.
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$has_pro = defined( 'RANK_MATH_PRO_VERSION' );
+			if ( $has_pro && ! empty( $secondary ) ) {
+				// Pro: comma-separated (primary + up to 4 secondary).
+				$all = array_merge( array( $primary ), array_slice( $secondary, 0, 4 ) );
+				update_post_meta( $post_id, 'rank_math_focus_keyword', implode( ',', $all ) );
+			} else {
+				update_post_meta( $post_id, 'rank_math_focus_keyword', $primary );
+			}
+			$applied_to = 'Rank Math';
+		}
+
+		// Yoast.
+		elseif ( defined( 'WPSEO_VERSION' ) ) {
+			update_post_meta( $post_id, '_yoast_wpseo_focuskw', $primary );
+			$has_pro = defined( 'WPSEO_PREMIUM_FILE' );
+			if ( $has_pro && ! empty( $secondary ) ) {
+				// Premium: JSON array of additional keyphrases.
+				$additional = array_map( static fn( string $kw ): array => array( 'keyword' => $kw, 'score' => 0 ), array_slice( $secondary, 0, 4 ) );
+				update_post_meta( $post_id, '_yoast_wpseo_focuskeywords', wp_json_encode( $additional ) );
+			}
+			$applied_to = 'Yoast SEO';
+		}
+
+		// AIOSEO.
+		elseif ( defined( 'AIOSEO_VERSION' ) ) {
+			$has_pro   = defined( 'AIOSEO_PRO_VERSION' );
+			$keyphrases = array( 'focus' => array( 'keyphrase' => $primary, 'score' => 0, 'analysis' => array() ) );
+			if ( $has_pro && ! empty( $secondary ) ) {
+				$keyphrases['additional'] = array_map(
+					static fn( string $kw ): array => array( 'keyphrase' => $kw, 'score' => 0, 'analysis' => array() ),
+					array_slice( $secondary, 0, 4 ),
+				);
+			}
+			update_post_meta( $post_id, '_aioseo_keyphrases', wp_json_encode( $keyphrases ) );
+			$applied_to = 'AIOSEO';
+		}
+
+		// SEOPress.
+		elseif ( defined( 'SEOPRESS_VERSION' ) ) {
+			$has_pro = defined( 'SEOPRESS_PRO_VERSION' );
+			if ( $has_pro && ! empty( $secondary ) ) {
+				$all = array_merge( array( $primary ), array_slice( $secondary, 0, 4 ) );
+				update_post_meta( $post_id, '_seopress_analysis_target_kw', implode( ',', $all ) );
+			} else {
+				update_post_meta( $post_id, '_seopress_analysis_target_kw', $primary );
+			}
+			$applied_to = 'SEOPress';
+		}
+
+		if ( '' === $applied_to ) {
+			return $this->error( 'no_seo_plugin', __( 'No supported SEO plugin detected.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		$count = 1 + count( $secondary );
+
+		return $this->success( array(
+			'applied'    => true,
+			'plugin'     => $applied_to,
+			'primary'    => $primary,
+			'secondary'  => $secondary,
+			'message'    => sprintf(
+				/* translators: 1: keyword count, 2: SEO plugin name */
+				__( '%1$d keyword(s) applied to %2$s.', 'scalyn-qa-assistant' ),
+				$count,
+				$applied_to,
+			),
+		) );
 	}
 
 	/**
@@ -423,6 +707,115 @@ class AI_Controller extends REST_Controller {
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
+	/**
+	 * Recheck existing review issues against the current post content.
+	 *
+	 * Auto-resolves issues where the problematic text has been fixed.
+	 *
+	 * @since 1.3.0
+	 */
+	public function recheck_review_issues( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$saved = get_post_meta( $post_id, '_scalyn_qa_content_review', true );
+
+		if ( ! is_array( $saved ) || empty( $saved['issues'] ) ) {
+			return $this->error( 'no_review', __( 'No review data found. Run "Regenerate with AI" first.', 'scalyn-qa-assistant' ), 404 );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return $this->error( 'post_not_found', __( 'Post not found.', 'scalyn-qa-assistant' ), 404 );
+		}
+
+		// Get current content + meta for checking.
+		$content   = wp_strip_all_tags( $post->post_content );
+		$title     = get_the_title( $post_id );
+		$meta_desc = get_post_meta( $post_id, 'rank_math_description', true )
+			?: get_post_meta( $post_id, '_yoast_wpseo_metadesc', true )
+			?: get_post_meta( $post_id, '_aioseo_description', true )
+			?: '';
+
+		$full_text    = mb_strtolower( $title . ' ' . $content . ' ' . $meta_desc );
+		$resolved     = 0;
+		$still_active = 0;
+
+		foreach ( $saved['issues'] as &$issue ) {
+			// Skip already resolved/ignored issues.
+			if ( isset( $issue['status'] ) && in_array( $issue['status'], array( 'resolved', 'ignored' ), true ) ) {
+				continue;
+			}
+
+			$is_fixed = false;
+
+			// Check if the problematic text still exists in the content.
+			$problem_text = mb_strtolower( trim( $issue['text'] ?? '' ) );
+
+			if ( '' !== $problem_text && ! str_contains( $full_text, $problem_text ) ) {
+				// The problematic text is gone — likely fixed.
+				$is_fixed = true;
+			}
+
+			// Also check if the suggestion was applied (the suggested text now exists).
+			if ( ! $is_fixed && ! empty( $issue['suggestion'] ) ) {
+				$suggestion = mb_strtolower( trim( $issue['suggestion'] ) );
+				if ( '' !== $suggestion && str_contains( $full_text, $suggestion ) ) {
+					$is_fixed = true;
+				}
+			}
+
+			if ( $is_fixed ) {
+				$issue['status'] = 'resolved';
+				++$resolved;
+			} else {
+				++$still_active;
+			}
+		}
+		unset( $issue );
+
+		// Recalculate score based on resolved issues.
+		$total_issues = count( $saved['issues'] );
+		$resolved_and_ignored = 0;
+		foreach ( $saved['issues'] as $iss ) {
+			if ( isset( $iss['status'] ) && in_array( $iss['status'], array( 'resolved', 'ignored' ), true ) ) {
+				++$resolved_and_ignored;
+			}
+		}
+		$new_score = $total_issues > 0
+			? min( 100, (int) round( ( $resolved_and_ignored / $total_issues ) * 100 ) )
+			: 100;
+
+		// If all issues resolved, score is 100. Otherwise scale between original and 100.
+		if ( $still_active > 0 ) {
+			$original_score = (int) ( $saved['score'] ?? 0 );
+			$fix_ratio      = $total_issues > 0 ? $resolved_and_ignored / $total_issues : 0;
+			$new_score      = min( 100, (int) round( $original_score + ( ( 100 - $original_score ) * $fix_ratio ) ) );
+		}
+
+		$saved['score'] = $new_score;
+
+		// Update summary to reflect current state.
+		if ( $still_active === 0 ) {
+			$saved['summary'] = __( 'All issues have been resolved. Content quality is excellent.', 'scalyn-qa-assistant' );
+		}
+
+		// Save updated issues and score.
+		update_post_meta( $post_id, '_scalyn_qa_content_review', $saved );
+
+		return $this->success( array(
+			'resolved'     => $resolved,
+			'still_active' => $still_active,
+			'total'        => $total_issues,
+			'issues'       => $saved['issues'],
+			'summary'      => $saved['summary'],
+			'score'        => $new_score,
+		) );
+	}
+
 	public function update_review_issues( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$post_id = absint( $request->get_param( 'post_id' ) );
 

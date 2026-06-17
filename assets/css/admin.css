@@ -1008,6 +1008,12 @@ a.scalyn-btn--ghost:visited {
   transition: background-color 0.15s ease;
 }
 
+.scalyn-ai-inline-result,
+.scalyn-ai-keyword-results,
+.scalyn-ai-alt-results {
+  width: 100%;
+}
+
 .scalyn-ai-inline-result {
   width: 100%;
   background: var(--scalyn-bg-subtle, #f8f9fa);
@@ -1153,6 +1159,94 @@ a.scalyn-btn--ghost:visited {
 
 .scalyn-check-item--fail .scalyn-check-item__title {
   color: var(--scalyn-danger-text);
+}
+
+/* Check item details list (expandable) */
+.scalyn-check-details {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding-left: 2rem;
+}
+
+.scalyn-check-details__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0.125rem 0;
+  font-size: 0.75rem;
+  color: var(--scalyn-text-muted, #6b7280);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.scalyn-check-details__toggle:hover {
+  color: var(--scalyn-text-strong, #1f2937);
+}
+
+.scalyn-check-details__toggle .dashicons {
+  font-size: 0.875rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  transition: transform 0.15s ease;
+}
+
+.scalyn-check-details__toggle--open .dashicons {
+  transform: rotate(90deg);
+}
+
+.scalyn-check-details__list {
+  list-style: none;
+  margin: 0.375rem 0 0;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--scalyn-text-faint, #9ca3af);
+  line-height: 1.5;
+}
+
+.scalyn-check-details__list li {
+  padding: 0.125rem 0;
+  word-break: break-all;
+}
+
+.scalyn-check-details__list li::before {
+  content: "\2022";
+  margin-right: 0.375rem;
+  color: var(--scalyn-text-faint, #9ca3af);
+}
+
+/* Trend indicators (Improving / Stable / Declining) */
+.scalyn-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+.scalyn-trend .dashicons {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+}
+
+.scalyn-trend--improving {
+  color: var(--scalyn-success, #10b981);
+  background: var(--scalyn-success-light, #ecfdf5);
+}
+
+.scalyn-trend--stable {
+  color: var(--scalyn-text-muted, #6b7280);
+  background: var(--scalyn-surface-subtle, #f3f4f6);
+}
+
+.scalyn-trend--declining {
+  color: var(--scalyn-danger, #ef4444);
+  background: var(--scalyn-danger-light, #fef2f2);
 }
 
 /* ==========================================================================

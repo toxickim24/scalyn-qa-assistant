@@ -86,6 +86,7 @@ final class Plugin {
 				// Note: Heading_Analyzer is NOT registered separately — Content_Analyzer delegates to it.
 				$registry->register( new Analyzers\Link_Checker() );
 				$registry->register( new Analyzers\Form_Button_Analyzer() );
+				$registry->register( new Analyzers\Image_Optimization_Analyzer() );
 
 				/**
 				 * Fires when Scalyn QA analyzers should be registered.
@@ -132,6 +133,11 @@ final class Plugin {
 	 */
 	private function register_hooks(): void {
 		add_action( 'init', [ $this, 'load_textdomain' ] );
+
+		// Output Local Business JSON-LD if configured via Launch Checklist auto-fix.
+		if ( get_option( 'scalyn_qa_local_business_jsonld' ) ) {
+			add_action( 'wp_head', [ Launch\Launch_Checker::class, 'output_local_business_jsonld' ] );
+		}
 	}
 
 	/**

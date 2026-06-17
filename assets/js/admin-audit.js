@@ -179,7 +179,58 @@
             + ' title="Ignore this check">';
         html += '<span class="dashicons dashicons-hidden" aria-hidden="true"></span>';
         html += '</button>';
-        html += '</div></div>';
+        html += '</div>';
+
+        // Render expandable details list if available.
+        html += renderCheckDetails(item);
+
+        html += '</div>';
+
+        return html;
+    }
+
+    /**
+     * Extract a displayable array from a check item's details object.
+     *
+     * Returns the first array-valued property found in details.
+     *
+     * @param {Object} item - Check item data.
+     * @returns {string} HTML string (empty if no details list).
+     */
+    function renderCheckDetails(item) {
+        if (!item.details || typeof item.details !== 'object') {
+            return '';
+        }
+
+        // Find the first array property in details.
+        var listItems = null;
+        var keys = Object.keys(item.details);
+        for (var i = 0; i < keys.length; i++) {
+            var val = item.details[keys[i]];
+            if (Array.isArray(val) && val.length > 0) {
+                listItems = val;
+                break;
+            }
+        }
+
+        if (!listItems || listItems.length === 0) {
+            return '';
+        }
+
+        var uid = 'details-' + escapeHtml(item.id) + '-' + Math.random().toString(36).substr(2, 6);
+
+        var html = '<div class="scalyn-check-details">';
+        html += '<button type="button" class="scalyn-check-details__toggle" data-target="' + uid + '">';
+        html += '<span class="dashicons dashicons-arrow-right-alt2"></span> ';
+        html += 'Show ' + listItems.length + ' affected item' + (listItems.length !== 1 ? 's' : '');
+        html += '</button>';
+        html += '<ul class="scalyn-check-details__list" id="' + uid + '" style="display:none;">';
+
+        for (var j = 0; j < listItems.length; j++) {
+            html += '<li>' + escapeHtml(String(listItems[j])) + '</li>';
+        }
+
+        html += '</ul></div>';
 
         return html;
     }
@@ -506,6 +557,192 @@
     /**
      * Initialize single audit page.
      */
+    /**
+     * Display AI-generated keyword suggestions in the inline panel.
+     */
+    function displayKeywordResults(data) {
+        var container = document.querySelector('.scalyn-ai-keyword-results[data-check-id="focus_keyword"]');
+
+        // If container doesn't exist, create it after the focus_keyword check item.
+        if (!container) {
+            var checkItem = document.querySelector('.scalyn-check-item[data-check-id="focus_keyword"]');
+            if (!checkItem) return;
+            container = document.createElement('div');
+            container.className = 'scalyn-ai-keyword-results';
+            container.setAttribute('data-check-id', 'focus_keyword');
+            container.setAttribute('data-post-id', scalynQA.currentPostId || '0');
+            // Insert after the check-item (as sibling, same as meta title/description panels).
+            checkItem.parentNode.insertBefore(container, checkItem.nextSibling);
+        }
+
+        var postId = container.getAttribute('data-post-id') || scalynQA.currentPostId || 0;
+        var hasPro   = data.has_pro;
+        var provider = data.provider || '';
+        var model    = data.model || '';
+        var meta     = provider ? provider + (model ? ' / ' + model : '') : '';
+
+        var html = '<div class="scalyn-ai-inline-result">';
+        html += '<div class="scalyn-ai-inline-result__content">';
+        html += '<span class="scalyn-ai-inline-result__label">AI Suggestion:' + (meta ? ' ' + escapeHtml(meta) : '') + '</span>';
+
+        if (hasPro && data.primary) {
+            // Pro mode: checkboxes — primary pre-checked + secondary.
+            html += '<label style="display:block;padding:6px 12px;margin:4px 0;border:1px solid var(--scalyn-success);border-radius:6px;font-size:0.8125rem;background:var(--scalyn-success-light);">';
+            html += '<input type="checkbox" name="scalyn-ai-keyword[]" value="' + escapeHtml(data.primary) + '" checked style="margin-right:8px;">';
+            html += escapeHtml(data.primary) + ' <span style="color:var(--scalyn-success);font-size:0.6875rem;">(primary)</span>';
+            html += '</label>';
+
+            var secondary = data.secondary || [];
+            for (var i = 0; i < secondary.length; i++) {
+                html += '<label style="display:block;padding:6px 12px;margin:4px 0;border:1px solid var(--scalyn-border-light);border-radius:6px;cursor:pointer;font-size:0.8125rem;">';
+                html += '<input type="checkbox" name="scalyn-ai-keyword[]" value="' + escapeHtml(secondary[i]) + '" style="margin-right:8px;">';
+                html += escapeHtml(secondary[i]) + ' <span style="color:var(--scalyn-text-muted);font-size:0.6875rem;">(secondary)</span>';
+                html += '</label>';
+            }
+        } else {
+            // Free mode: radio buttons — pick 1 of 3.
+            var keywords = (data.keywords && data.keywords.length) ? data.keywords : [];
+            if (!keywords.length && data.primary) {
+                keywords = [data.primary];
+            }
+
+            for (var j = 0; j < keywords.length; j++) {
+                html += '<label style="display:block;padding:6px 12px;margin:4px 0;border:1px solid var(--scalyn-border-light);border-radius:6px;cursor:pointer;font-size:0.8125rem;">';
+                html += '<input type="radio" name="scalyn-ai-keyword" value="' + escapeHtml(keywords[j]) + '" ' + (j === 0 ? 'checked' : '') + ' style="margin-right:8px;">';
+                html += escapeHtml(keywords[j]);
+                html += '</label>';
+            }
+        }
+
+        html += '<span class="scalyn-ai-inline-result__meta">' + (hasPro ? 'PRO: Check keywords to apply (primary + secondary)' : 'Select a keyword and click Apply') + '</span>';
+        html += '</div>';
+
+        // Actions — Copy first, then Apply (same order as meta title/description).
+        html += '<div class="scalyn-ai-inline-result__actions">';
+        html += '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-keyword-copy" title="Copy">';
+        html += '<span class="dashicons dashicons-clipboard" aria-hidden="true"></span> Copy</button>';
+        html += '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-keyword-apply-selected" data-post-id="' + postId + '" data-is-pro="' + (hasPro ? '1' : '0') + '" title="Apply">';
+        html += '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>';
+        html += '</div></div>';
+
+        container.innerHTML = html;
+        container.style.display = '';
+    }
+
+    /**
+     * Initialize keyword AI actions — Apply Selected, Apply All, Copy.
+     */
+    function initKeywordAiActions() {
+        // Apply keywords — handles both radio (free) and checkbox (pro) modes.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-keyword-apply-selected');
+            if (!btn) return;
+
+            var postId = btn.getAttribute('data-post-id');
+            var isPro  = btn.getAttribute('data-is-pro') === '1';
+            if (!postId) return;
+
+            var primary = '';
+            var secondary = [];
+
+            if (isPro) {
+                // Checkbox mode: collect all checked values. First checked = primary, rest = secondary.
+                var checked = document.querySelectorAll('input[name="scalyn-ai-keyword[]"]:checked');
+                if (!checked.length) {
+                    ScalynAlert && ScalynAlert.error('Error', 'Select at least one keyword.');
+                    return;
+                }
+                checked.forEach(function (cb, i) {
+                    if (i === 0) {
+                        primary = cb.value;
+                    } else {
+                        secondary.push(cb.value);
+                    }
+                });
+            } else {
+                // Radio mode: single selected value.
+                var selected = document.querySelector('input[name="scalyn-ai-keyword"]:checked');
+                if (!selected) return;
+                primary = selected.value;
+            }
+
+            if (!primary) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Applying...';
+
+            fetchApi('ai/apply-keyword/' + postId, {
+                method: 'POST',
+                body: JSON.stringify({ primary: primary, secondary: secondary }),
+            }).then(function (res) {
+                if (res.success) {
+                    var count = 1 + secondary.length;
+                    ScalynAlert && ScalynAlert.toast(count + ' keyword(s) applied — rescanning...');
+                    return fetchApi('scan/' + postId, { method: 'POST' });
+                }
+            }).then(function () {
+                window.location.reload();
+            }).catch(function (err) {
+                btn.disabled = false;
+                btn.textContent = 'Apply';
+                ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to apply keyword.');
+            });
+        });
+
+        // Copy keyword(s) — handles radio (free) and checkbox (pro).
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-keyword-copy');
+            if (!btn) return;
+
+            // Try checkboxes first (pro), then radio (free).
+            var checked = document.querySelectorAll('input[name="scalyn-ai-keyword[]"]:checked');
+            var text = '';
+            if (checked.length) {
+                var values = [];
+                checked.forEach(function (cb) { values.push(cb.value); });
+                text = values.join(', ');
+            } else {
+                var radio = document.querySelector('input[name="scalyn-ai-keyword"]:checked');
+                text = radio ? radio.value : '';
+            }
+
+            if (text && navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(function () {
+                    ScalynAlert && ScalynAlert.toast('Copied to clipboard');
+                });
+            }
+        });
+
+        // Standalone "Generate with AI" / "Regenerate with AI" keyword button.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-quick-fix[data-action="generate-ai-keyword"]');
+            if (!btn) return;
+
+            var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl() || scalynQA.currentPostId;
+            if (!postId) return;
+
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="dashicons dashicons-update spin"></span> Generating...';
+
+            fetchApi('ai/generate-keywords/' + postId, { method: 'POST' })
+                .then(function (response) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    if (response.success && response.data) {
+                        displayKeywordResults(response.data);
+                    } else {
+                        ScalynAlert && ScalynAlert.error('AI Failed', 'No keywords generated.');
+                    }
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    ScalynAlert && ScalynAlert.error('Error', err.message || 'Keyword generation failed.');
+                });
+        });
+    }
+
     function initSinglePage() {
         initSingleRescan();
         initAddNote();
@@ -518,6 +755,7 @@
         initIgnoreCheck();
         initRemoveIgnore();
         initQuickFixes();
+        initKeywordAiActions();
     }
 
     /**
@@ -1102,27 +1340,44 @@
             if (!postId) return;
 
             btn.disabled = true;
-            if (typeof ScalynAlert !== 'undefined') {
-                ScalynAlert.loading('Running AI analysis — generating meta suggestions and reviewing content...');
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Generating with AI',
+                    text: 'Analyzing content, generating meta suggestions, and reviewing...',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showConfirmButton: false,
+                    didOpen: function () { Swal.showLoading(); },
+                    customClass: { popup: 'scalyn-swal-popup' },
+                });
             }
 
-            // Build API calls — always run meta + review, add alt text if images are missing.
+            // Build API calls — always run meta + review, add optional checks.
             var apiCalls = [
                 fetchApi('ai/generate/' + postId, { method: 'POST' }),
                 fetchApi('ai/review/' + postId, { method: 'POST' }),
             ];
+            var callMap = { meta: 0, review: 1 };
+            var nextIdx = 2;
+
             var hasAltCheck = !!document.querySelector('.scalyn-ai-alt-results[data-check-id="image_alt_text"]');
             if (hasAltCheck) {
                 apiCalls.push(fetchApi('ai/generate-alt/' + postId, { method: 'POST' }));
+                callMap.alt = nextIdx++;
+            }
+
+            var hasKeywordCheck = !!document.querySelector('.scalyn-ai-keyword-results[data-check-id="focus_keyword"]');
+            if (hasKeywordCheck) {
+                apiCalls.push(fetchApi('ai/generate-keywords/' + postId, { method: 'POST' }));
+                callMap.keywords = nextIdx++;
             }
 
             Promise.all(apiCalls)
                 .then(function (responses) {
                     if (typeof ScalynAlert !== 'undefined') ScalynAlert.close();
 
-                    var metaResponse = responses[0];
-                    var reviewResponse = responses[1];
-                    var altResponse = responses[2];
+                    var metaResponse = responses[callMap.meta];
+                    var reviewResponse = responses[callMap.review];
 
                     if (metaResponse.success && metaResponse.data) {
                         displayAiResults(metaResponse.data);
@@ -1132,8 +1387,18 @@
                         displayReviewResults(reviewResponse.data);
                     }
 
-                    if (altResponse && altResponse.success && altResponse.data && altResponse.data.results) {
-                        displayAltTextResults(altResponse.data.results);
+                    if (callMap.alt !== undefined) {
+                        var altResponse = responses[callMap.alt];
+                        if (altResponse && altResponse.success && altResponse.data && altResponse.data.results) {
+                            displayAltTextResults(altResponse.data.results);
+                        }
+                    }
+
+                    if (callMap.keywords !== undefined) {
+                        var kwResponse = responses[callMap.keywords];
+                        if (kwResponse && kwResponse.success && kwResponse.data) {
+                            displayKeywordResults(kwResponse.data);
+                        }
                     }
 
                     if (typeof ScalynAlert !== 'undefined') {
@@ -1237,31 +1502,47 @@
             var postId = btn.getAttribute('data-post-id') || scalynQA.currentPostId;
             if (!postId) return;
 
-            var spinner = document.getElementById('scalyn-review-spinner');
             var resultsEl = document.getElementById('scalyn-review-results');
             var errorEl = document.getElementById('scalyn-review-error');
 
             btn.disabled = true;
-            if (spinner) spinner.style.display = '';
+            var origHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="dashicons dashicons-update spin"></span> Reviewing...';
             if (resultsEl) resultsEl.style.display = 'none';
             if (errorEl) errorEl.style.display = 'none';
 
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Reviewing Content',
+                    text: 'Checking spelling, grammar, and readability...',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showConfirmButton: false,
+                    didOpen: function () { Swal.showLoading(); },
+                    customClass: { popup: 'scalyn-swal-popup' },
+                });
+            }
+
             fetchApi('ai/review/' + postId, { method: 'POST' })
                 .then(function (response) {
+                    if (typeof Swal !== 'undefined') Swal.close();
                     if (response.success && response.data) {
                         displayReviewResults(response.data);
+                        ScalynAlert && ScalynAlert.toast('Content review complete');
                     }
                 })
                 .catch(function (err) {
+                    if (typeof Swal !== 'undefined') Swal.close();
                     if (errorEl) {
                         var errorText = document.getElementById('scalyn-review-error-text');
                         if (errorText) errorText.textContent = err.message || 'Content review failed.';
                         errorEl.style.display = '';
                     }
+                    ScalynAlert && ScalynAlert.error('Review Failed', err.message || 'Content review failed.');
                 })
                 .finally(function () {
                     btn.disabled = false;
-                    if (spinner) spinner.style.display = 'none';
+                    btn.innerHTML = origHtml;
                 });
         }
 
@@ -1273,6 +1554,65 @@
         var regenBtn = document.getElementById('scalyn-review-regenerate');
         if (regenBtn) {
             regenBtn.addEventListener('click', function () { runReview(regenBtn); });
+        }
+
+        // "Review Current" — recheck existing issues against current content.
+        var recheckBtn = document.getElementById('scalyn-review-recheck');
+        if (recheckBtn) {
+            recheckBtn.addEventListener('click', function () {
+                var postId = recheckBtn.getAttribute('data-post-id') || scalynQA.currentPostId;
+                if (!postId) return;
+
+                recheckBtn.disabled = true;
+                var origHtml = recheckBtn.innerHTML;
+                recheckBtn.innerHTML = '<span class="dashicons dashicons-update spin"></span> Checking...';
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: 'Reviewing Current Content',
+                        text: 'Checking which issues have been fixed...',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        showConfirmButton: false,
+                        didOpen: function () { Swal.showLoading(); },
+                        customClass: { popup: 'scalyn-swal-popup' },
+                    });
+                }
+
+                fetchApi('ai/review/' + postId + '/recheck', { method: 'POST' })
+                    .then(function (response) {
+                        if (typeof Swal !== 'undefined') Swal.close();
+
+                        if (response.success && response.data) {
+                            displayReviewResults(response.data);
+
+                            var resolved = response.data.resolved || 0;
+                            var active = response.data.still_active || 0;
+
+                            if (resolved > 0 && active === 0) {
+                                ScalynAlert && ScalynAlert.success('All Fixed!', 'All ' + resolved + ' issues have been resolved.');
+                            } else if (resolved > 0) {
+                                ScalynAlert && ScalynAlert.toast(resolved + ' issue(s) auto-resolved, ' + active + ' still active.');
+                            } else {
+                                ScalynAlert && ScalynAlert.toast('No issues resolved yet. Fix the issues in the post editor and try again.');
+                            }
+
+                            // Update the saved data element for persistence.
+                            var savedDataEl = document.getElementById('scalyn-saved-review-data');
+                            if (savedDataEl) {
+                                savedDataEl.textContent = JSON.stringify(response.data);
+                            }
+                        }
+                    })
+                    .catch(function (err) {
+                        if (typeof Swal !== 'undefined') Swal.close();
+                        ScalynAlert && ScalynAlert.error('Recheck Failed', err.message || 'Could not recheck issues.');
+                    })
+                    .finally(function () {
+                        recheckBtn.disabled = false;
+                        recheckBtn.innerHTML = origHtml;
+                    });
+            });
         }
 
         // Load saved review data if available.
@@ -1716,6 +2056,27 @@
         } else {
             initListPage();
         }
+
+        // Global: toggle check details lists.
+        initCheckDetailsToggle();
+    }
+
+    /**
+     * Handle expand/collapse of check details lists.
+     */
+    function initCheckDetailsToggle() {
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-check-details__toggle');
+            if (!btn) return;
+
+            var targetId = btn.getAttribute('data-target');
+            var list = targetId ? document.getElementById(targetId) : null;
+            if (!list) return;
+
+            var isOpen = list.style.display !== 'none';
+            list.style.display = isOpen ? 'none' : '';
+            btn.classList.toggle('scalyn-check-details__toggle--open', !isOpen);
+        });
     }
 
     if (document.readyState === 'loading') {

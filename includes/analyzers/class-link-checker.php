@@ -213,9 +213,10 @@ class Link_Checker implements Analyzer_Interface {
 			return $cached;
 		}
 
-		// SSRF protection: block private IPs.
-		$host = wp_parse_url( $url, PHP_URL_HOST );
-		if ( is_string( $host ) && $this->is_private_ip( $host ) ) {
+		// SSRF protection: block private IPs — but allow the site's own domain.
+		$host      = wp_parse_url( $url, PHP_URL_HOST );
+		$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
+		if ( is_string( $host ) && $host !== $site_host && $this->is_private_ip( $host ) ) {
 			$result = array(
 				'status_code' => 0,
 				'reachable'   => false,

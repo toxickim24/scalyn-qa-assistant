@@ -33,7 +33,16 @@ $check_categories = array(
 			'search_engine_visibility' => __( 'Search Engine Visibility', 'scalyn-qa-assistant' ),
 			'seo_plugin_installed'     => __( 'SEO Plugin Installed', 'scalyn-qa-assistant' ),
 			'sitemap_exists'           => __( 'Sitemap Exists', 'scalyn-qa-assistant' ),
+			'robots_txt'               => __( 'robots.txt Accessible', 'scalyn-qa-assistant' ),
+			'permalink_structure'      => __( 'Permalink Structure', 'scalyn-qa-assistant' ),
 			'llms_txt'                 => __( 'llms.txt', 'scalyn-qa-assistant' ),
+			'breadcrumbs_enabled'      => __( 'Breadcrumbs', 'scalyn-qa-assistant' ),
+			'redirect_manager'         => __( 'Redirect Manager', 'scalyn-qa-assistant' ),
+			'local_business_schema'    => __( 'Local Business Schema', 'scalyn-qa-assistant' ),
+			'four_oh_four_monitor'     => __( '404 Monitor', 'scalyn-qa-assistant' ),
+			'cornerstone_content'      => __( 'Cornerstone Content', 'scalyn-qa-assistant' ),
+			'instant_indexing'         => __( 'Instant Indexing', 'scalyn-qa-assistant' ),
+			'woocommerce_seo'          => __( 'WooCommerce SEO', 'scalyn-qa-assistant' ),
 		),
 	),
 	'analytics' => array(
@@ -47,6 +56,10 @@ $check_categories = array(
 		'label'  => __( 'Technical', 'scalyn-qa-assistant' ),
 		'checks' => array(
 			'ssl_enabled'            => __( 'SSL Enabled', 'scalyn-qa-assistant' ),
+			'debug_mode_disabled'    => __( 'Debug Mode Disabled', 'scalyn-qa-assistant' ),
+			'wp_core_updates'        => __( 'WordPress Updates', 'scalyn-qa-assistant' ),
+			'plugin_updates'         => __( 'Plugin Updates', 'scalyn-qa-assistant' ),
+			'wp_address_match'       => __( 'WP Address Match', 'scalyn-qa-assistant' ),
 			'favicon_exists'         => __( 'Favicon', 'scalyn-qa-assistant' ),
 			'php_version'            => __( 'PHP Version', 'scalyn-qa-assistant' ),
 			'php_memory_limit'       => __( 'PHP Memory Limit', 'scalyn-qa-assistant' ),
@@ -59,18 +72,77 @@ $check_categories = array(
 	'content' => array(
 		'label'  => __( 'Content', 'scalyn-qa-assistant' ),
 		'checks' => array(
-			'contact_page_exists'  => __( 'Contact Page', 'scalyn-qa-assistant' ),
-			'privacy_policy_exists' => __( 'Privacy Policy', 'scalyn-qa-assistant' ),
+			'contact_page_exists'    => __( 'Contact Page', 'scalyn-qa-assistant' ),
+			'privacy_policy_exists'  => __( 'Privacy Policy', 'scalyn-qa-assistant' ),
+			'default_content_cleanup' => __( 'Default Content Cleanup', 'scalyn-qa-assistant' ),
+			'default_tagline'        => __( 'Site Tagline', 'scalyn-qa-assistant' ),
+			'empty_pages'            => __( 'Empty Pages', 'scalyn-qa-assistant' ),
+			'four_oh_four_page'      => __( '404 Page', 'scalyn-qa-assistant' ),
+			'menu_exists'            => __( 'Navigation Menu', 'scalyn-qa-assistant' ),
 		),
 	),
 	'plugin_health' => array(
 		'label'  => __( 'Plugin Health', 'scalyn-qa-assistant' ),
 		'checks' => array(
-			'plugin_conflicts' => __( 'Plugin Conflicts', 'scalyn-qa-assistant' ),
-			'security_plugin'  => __( 'Security Plugin', 'scalyn-qa-assistant' ),
-			'cache_plugin'     => __( 'Cache Plugin', 'scalyn-qa-assistant' ),
+			'plugin_conflicts'          => __( 'Plugin Conflicts', 'scalyn-qa-assistant' ),
+			'security_plugin'           => __( 'Security Plugin', 'scalyn-qa-assistant' ),
+			'cache_plugin'              => __( 'Cache Plugin', 'scalyn-qa-assistant' ),
+			'backup_plugin'             => __( 'Backup Plugin', 'scalyn-qa-assistant' ),
+			'smtp_plugin'               => __( 'SMTP / Mail Plugin', 'scalyn-qa-assistant' ),
+			'image_optimization_plugin' => __( 'Image Optimization Plugin', 'scalyn-qa-assistant' ),
 		),
 	),
+	'settings' => array(
+		'label'  => __( 'WordPress Settings', 'scalyn-qa-assistant' ),
+		'checks' => array(
+			'admin_username' => __( 'Admin Username', 'scalyn-qa-assistant' ),
+			'timezone_set'   => __( 'Timezone', 'scalyn-qa-assistant' ),
+			'comments_open'  => __( 'Comments', 'scalyn-qa-assistant' ),
+		),
+	),
+);
+
+// Detect SEO plugins and pro versions (same as page-audits.php).
+if ( ! function_exists( 'is_plugin_active' ) ) {
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+}
+
+$seo_plugins_detected = array();
+if ( defined( 'RANK_MATH_VERSION' ) ) {
+	$seo_plugins_detected['rankmath'] = defined( 'RANK_MATH_PRO_VERSION' ) ? 'pro' : 'free';
+}
+if ( defined( 'WPSEO_VERSION' ) ) {
+	$seo_plugins_detected['yoast'] = defined( 'WPSEO_PREMIUM_FILE' ) ? 'pro' : 'free';
+}
+if ( defined( 'AIOSEO_VERSION' ) ) {
+	$seo_plugins_detected['aioseo'] = defined( 'AIOSEO_PRO_VERSION' ) ? 'pro' : 'free';
+}
+if ( defined( 'SEOPRESS_VERSION' ) ) {
+	$seo_plugins_detected['seopress'] = defined( 'SEOPRESS_PRO_VERSION' ) ? 'pro' : 'free';
+}
+if ( defined( 'THE_SEO_FRAMEWORK_VERSION' ) ) {
+	$seo_plugins_detected['tsf'] = defined( 'THE_SEO_FRAMEWORK_EXTENSION_MANAGER_VERSION' ) ? 'pro' : 'free';
+}
+
+$has_any_pro        = in_array( 'pro', $seo_plugins_detected, true );
+$has_any_seo_plugin = ! empty( $seo_plugins_detected );
+
+// Pro-enhanced checks with descriptions.
+$pro_enhanced_checks = array(
+	'redirect_manager'      => __( 'Pro: Auto redirects', 'scalyn-qa-assistant' ),
+	'local_business_schema' => __( 'Pro: Local SEO module', 'scalyn-qa-assistant' ),
+	'cornerstone_content'   => __( 'Pro: Internal linking boost', 'scalyn-qa-assistant' ),
+	'instant_indexing'      => __( 'Pro: IndexNow support', 'scalyn-qa-assistant' ),
+	'woocommerce_seo'       => __( 'Pro: Product schema', 'scalyn-qa-assistant' ),
+	'breadcrumbs_enabled'   => __( 'Pro: Advanced breadcrumbs', 'scalyn-qa-assistant' ),
+);
+
+// Checks that need an SEO plugin to be useful.
+$requires_seo_plugin = array(
+	'redirect_manager',
+	'local_business_schema',
+	'cornerstone_content',
+	'instant_indexing',
 );
 
 // If no settings saved yet, all checks are enabled.
@@ -100,6 +172,38 @@ $has_saved = ! empty( $enabled_checks );
 	</div>
 
 	<form id="scalyn-launch-settings-form">
+
+		<?php if ( ! empty( $seo_plugins_detected ) ) : ?>
+		<div class="scalyn-card">
+			<h2 class="scalyn-card-title"><?php esc_html_e( 'Detected SEO Plugins', 'scalyn-qa-assistant' ); ?></h2>
+			<div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+				<?php
+				$plugin_names = array(
+					'rankmath' => 'Rank Math',
+					'yoast'    => 'Yoast SEO',
+					'aioseo'   => 'All in One SEO',
+					'seopress' => 'SEOPress',
+					'tsf'      => 'The SEO Framework',
+				);
+				foreach ( $seo_plugins_detected as $slug => $tier ) :
+					$name   = $plugin_names[ $slug ] ?? $slug;
+					$is_pro = 'pro' === $tier;
+					$color  = $is_pro ? 'var(--scalyn-success)' : 'var(--scalyn-text-muted)';
+					$bg     = $is_pro ? 'var(--scalyn-success-light)' : 'var(--scalyn-surface-subtle, #f3f4f6)';
+				?>
+					<span style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.25rem 0.625rem;border-radius:999px;font-size:0.75rem;font-weight:600;color:<?php echo esc_attr( $color ); ?>;background:<?php echo esc_attr( $bg ); ?>;border:1px solid <?php echo esc_attr( $color ); ?>;">
+						<?php echo esc_html( $name ); ?>
+						<span style="font-weight:400;"><?php echo $is_pro ? esc_html__( '(Pro)', 'scalyn-qa-assistant' ) : esc_html__( '(Free)', 'scalyn-qa-assistant' ); ?></span>
+					</span>
+				<?php endforeach; ?>
+			</div>
+			<?php if ( ! $has_any_pro ) : ?>
+				<p class="scalyn-field-description" style="margin-top:0.5rem;">
+					<?php esc_html_e( 'Pro-enhanced checks are unchecked by default. Upgrade your SEO plugin to unlock richer analysis.', 'scalyn-qa-assistant' ); ?>
+				</p>
+			<?php endif; ?>
+		</div>
+		<?php endif; ?>
 
 		<!-- PHP Requirements -->
 		<div class="scalyn-card">
@@ -164,16 +268,33 @@ $has_saved = ! empty( $enabled_checks );
 
 				<div class="scalyn-checks-grid">
 					<?php foreach ( $category['checks'] as $check_id => $check_label ) :
-						$is_enabled = $has_saved ? in_array( $check_id, $enabled_checks, true ) : true;
+						$is_pro_check    = isset( $pro_enhanced_checks[ $check_id ] );
+						$needs_seo       = in_array( $check_id, $requires_seo_plugin, true );
+
+						if ( $has_saved ) {
+							$is_enabled = in_array( $check_id, $enabled_checks, true );
+						} else {
+							$is_enabled = $is_pro_check ? $has_any_pro : true;
+						}
 					?>
-						<label class="scalyn-checkbox-label">
+						<label class="scalyn-checkbox-label" style="display:flex;align-items:center;gap:0.375rem;<?php echo ( $needs_seo && ! $has_any_seo_plugin ) ? 'opacity:0.5;' : ''; ?>">
 							<input
 								type="checkbox"
 								name="enabled_checks[]"
 								value="<?php echo esc_attr( $check_id ); ?>"
 								<?php checked( $is_enabled ); ?>
+								<?php echo ( $needs_seo && ! $has_any_seo_plugin ) ? 'disabled' : ''; ?>
 							>
 							<?php echo esc_html( $check_label ); ?>
+							<?php if ( $is_pro_check ) : ?>
+								<span style="font-size:0.625rem;font-weight:600;padding:0.1rem 0.375rem;border-radius:999px;background:<?php echo $has_any_pro ? 'var(--scalyn-success-light)' : 'var(--scalyn-surface-subtle, #f3f4f6)'; ?>;color:<?php echo $has_any_pro ? 'var(--scalyn-success)' : 'var(--scalyn-text-muted)'; ?>;border:1px solid <?php echo $has_any_pro ? 'var(--scalyn-success)' : 'var(--scalyn-border-light)'; ?>;">
+									<?php esc_html_e( 'PRO', 'scalyn-qa-assistant' ); ?>
+								</span>
+								<span style="font-size:0.6875rem;color:var(--scalyn-text-muted);"><?php echo esc_html( $pro_enhanced_checks[ $check_id ] ); ?></span>
+							<?php endif; ?>
+							<?php if ( $needs_seo && ! $has_any_seo_plugin ) : ?>
+								<span style="font-size:0.6875rem;color:var(--scalyn-text-muted);"><?php esc_html_e( '(requires SEO plugin)', 'scalyn-qa-assistant' ); ?></span>
+							<?php endif; ?>
 						</label>
 					<?php endforeach; ?>
 				</div>

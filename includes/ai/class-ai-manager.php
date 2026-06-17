@@ -789,6 +789,61 @@ class AI_Manager {
 	}
 
 	/**
+	 * Generate free-form text using a custom prompt.
+	 *
+	 * Tries each provider in the priority chain until one succeeds.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param string $prompt     The full prompt to send.
+	 * @param int    $max_tokens Maximum response tokens.
+	 * @return array{text: string, provider: string, model: string}
+	 */
+	public function generate_text( string $prompt, int $max_tokens = 1000 ): array {
+		$empty = array( 'text' => '', 'provider' => '', 'model' => '' );
+
+		if ( ! $this->is_enabled() ) {
+			return $empty;
+		}
+
+		if ( ! $this->check_rate_limit() ) {
+			throw new \RuntimeException(
+				__( 'Daily AI request limit reached. Please try again tomorrow or increase the limit in Advanced settings.', 'scalyn-qa-assistant' )
+			);
+		}
+
+		$chain = $this->get_priority_chain();
+
+		foreach ( $chain as $provider_key ) {
+			$provider = $this->build_provider_by_key( $provider_key );
+
+			if ( null === $provider ) {
+				continue;
+			}
+
+			try {
+				$start    = microtime( true );
+				$response = $provider->generate( $prompt, $max_tokens );
+				$elapsed  = ( microtime( true ) - $start ) * 1000;
+
+				if ( '' !== trim( $response ) ) {
+					AI_Health_Monitor::record_success( $provider_key, $elapsed );
+					$this->log_request( 0, $provider->get_name(), $this->get_provider_model_label( $provider ), true, strlen( $prompt ) );
+					return array(
+						'text'     => trim( $response ),
+						'provider' => $provider->get_name(),
+						'model'    => $this->get_provider_model_label( $provider ),
+					);
+				}
+			} catch ( \Throwable $e ) {
+				AI_Health_Monitor::record_failure( $provider_key, $e->getMessage() );
+			}
+		}
+
+		return $empty;
+	}
+
+	/**
 	 * Persist AI-generated meta drafts to postmeta.
 	 *
 	 * @param int   $post_id The post ID.

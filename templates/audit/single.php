@@ -506,11 +506,15 @@ $permalink     = get_permalink( $post_id );
 						</table>
 					</div>
 
-					<!-- Regenerate -->
-					<div class="scalyn-ai-result__footer" style="margin-top:0.75rem;">
-						<button type="button" id="scalyn-review-regenerate" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
+					<!-- Actions -->
+					<div class="scalyn-ai-result__footer" style="margin-top:0.75rem;display:flex;gap:0.5rem;">
+						<button type="button" id="scalyn-review-recheck" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
+							<span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>
+							<?php esc_html_e( 'Review Current', 'scalyn-qa-assistant' ); ?>
+						</button>
+						<button type="button" id="scalyn-review-regenerate" class="scalyn-btn scalyn-btn--ghost" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">
 							<span class="dashicons dashicons-update" aria-hidden="true"></span>
-							<?php esc_html_e( 'Review Again', 'scalyn-qa-assistant' ); ?>
+							<?php esc_html_e( 'Regenerate with AI', 'scalyn-qa-assistant' ); ?>
 						</button>
 					</div>
 				</div>

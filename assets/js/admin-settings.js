@@ -504,12 +504,21 @@
                 enabledChecks.push(cb.value);
             });
 
+            var payload = {
+                enabled_checks: enabledChecks,
+            };
+
+            // Image optimization threshold.
+            var maxSizeInput = form.querySelector('[name="max_image_file_size"]');
+            if (maxSizeInput) {
+                var maxSize = parseInt(maxSizeInput.value, 10);
+                payload.max_image_file_size = isNaN(maxSize) ? 900 : Math.min(10000, Math.max(1, maxSize));
+            }
+
             fetchApi('settings', {
                 method: 'POST',
                 body: JSON.stringify({
-                    page_audit_settings: {
-                        enabled_checks: enabledChecks,
-                    },
+                    page_audit_settings: payload,
                 }),
             }).then(function () {
                 ScalynAlert && ScalynAlert.toast('Page audit settings saved');

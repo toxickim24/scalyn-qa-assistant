@@ -36,25 +36,55 @@ if ( $score >= 80 ) {
 
 // Group checks by their ID prefix for category assignment.
 $category_map = array(
+	// SEO.
 	'search_engine_visibility' => 'seo',
 	'seo_plugin_installed'     => 'seo',
 	'sitemap_exists'           => 'seo',
+	'robots_txt'               => 'seo',
+	'permalink_structure'      => 'seo',
 	'llms_txt'                 => 'seo',
-	'ga4_configured'       => 'analytics',
-	'gtm_configured'       => 'analytics',
-	'ssl_enabled'          => 'technical',
-	'favicon_exists'       => 'technical',
-	'php_version'          => 'technical',
-	'contact_page_exists'  => 'content',
-	'privacy_policy_exists' => 'content',
-	'plugin_conflicts'     => 'plugin_health',
-	'php_memory_limit'     => 'technical',
-	'php_max_execution_time' => 'technical',
-	'php_max_input_time'   => 'technical',
-	'php_post_max_size'    => 'technical',
-	'php_upload_max_size'  => 'technical',
-	'security_plugin'      => 'plugin_health',
-	'cache_plugin'         => 'plugin_health',
+	'breadcrumbs_enabled'      => 'seo',
+	'redirect_manager'         => 'seo',
+	'local_business_schema'    => 'seo',
+	'four_oh_four_monitor'     => 'seo',
+	'cornerstone_content'      => 'seo',
+	'instant_indexing'         => 'seo',
+	'woocommerce_seo'          => 'seo',
+	// Analytics.
+	'ga4_configured'           => 'analytics',
+	'gtm_configured'           => 'analytics',
+	// Technical.
+	'ssl_enabled'              => 'technical',
+	'debug_mode_disabled'      => 'technical',
+	'wp_core_updates'          => 'technical',
+	'plugin_updates'           => 'technical',
+	'wp_address_match'         => 'technical',
+	'favicon_exists'           => 'technical',
+	'php_version'              => 'technical',
+	'php_memory_limit'         => 'technical',
+	'php_max_execution_time'   => 'technical',
+	'php_max_input_time'       => 'technical',
+	'php_post_max_size'        => 'technical',
+	'php_upload_max_size'      => 'technical',
+	// Content.
+	'contact_page_exists'      => 'content',
+	'privacy_policy_exists'    => 'content',
+	'default_content_cleanup'  => 'content',
+	'default_tagline'          => 'content',
+	'empty_pages'              => 'content',
+	'four_oh_four_page'        => 'content',
+	'menu_exists'              => 'content',
+	// Plugin health.
+	'plugin_conflicts'         => 'plugin_health',
+	'security_plugin'          => 'plugin_health',
+	'cache_plugin'             => 'plugin_health',
+	'backup_plugin'            => 'plugin_health',
+	'smtp_plugin'              => 'plugin_health',
+	'image_optimization_plugin' => 'plugin_health',
+	// Settings.
+	'admin_username'           => 'settings',
+	'timezone_set'             => 'settings',
+	'comments_open'            => 'settings',
 );
 
 $category_labels = array(
@@ -63,7 +93,19 @@ $category_labels = array(
 	'technical'     => __( 'Technical', 'scalyn-qa-assistant' ),
 	'content'       => __( 'Content', 'scalyn-qa-assistant' ),
 	'plugin_health' => __( 'Plugin Health', 'scalyn-qa-assistant' ),
+	'settings'      => __( 'WordPress Settings', 'scalyn-qa-assistant' ),
 );
+
+// Auto-fixable check IDs.
+$auto_fixable = \Scalyn\QA\Launch\Launch_Checker::get_auto_fixable();
+
+// Check if AI is configured.
+$ai_manager    = new \Scalyn\QA\AI\AI_Manager();
+$ai_configured = $ai_manager->is_enabled() && null !== $ai_manager->get_primary_provider();
+
+// Load persisted AI-generated content.
+$ai_content = get_option( 'scalyn_qa_launch_ai_content', array() );
+$ai_content = is_array( $ai_content ) ? $ai_content : array();
 
 // Load launch-scoped ignore rules.
 $launch_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'launch' );
@@ -79,6 +121,7 @@ $grouped = array(
 	'technical'     => array(),
 	'content'       => array(),
 	'plugin_health' => array(),
+	'settings'      => array(),
 );
 
 $grouped_ignored = array(
@@ -87,6 +130,7 @@ $grouped_ignored = array(
 	'technical'     => array(),
 	'content'       => array(),
 	'plugin_health' => array(),
+	'settings'      => array(),
 );
 
 foreach ( $results as $check ) {
@@ -119,6 +163,12 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 				<span class="dashicons dashicons-update" aria-hidden="true"></span>
 				<?php esc_html_e( 'Run Check', 'scalyn-qa-assistant' ); ?>
 			</button>
+			<?php if ( $ai_configured ) : ?>
+			<button type="button" id="scalyn-launch-generate-ai" class="scalyn-btn scalyn-btn--small scalyn-btn--ai">
+				<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
+				<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
+			</button>
+			<?php endif; ?>
 		</div>
 		<p class="scalyn-page-header__meta">
 			<?php
@@ -156,6 +206,7 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 				'technical'     => __( 'Technical', 'scalyn-qa-assistant' ),
 				'content'       => __( 'Content', 'scalyn-qa-assistant' ),
 				'plugin_health' => __( 'Plugin Health', 'scalyn-qa-assistant' ),
+				'settings'      => __( 'WordPress Settings', 'scalyn-qa-assistant' ),
 			);
 
 			foreach ( $score_cards as $cat_key => $cat_label ) :
@@ -242,6 +293,65 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 									?>
 								<?php endif; ?>
 
+								<?php $check_id = $item['id'] ?? ''; ?>
+
+								<?php if ( 'llms_txt' === $check_id ) : ?>
+								<button
+									type="button"
+									class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-llms-txt-editor"
+									data-check-id="llms_txt"
+								>
+									<span class="dashicons dashicons-edit" aria-hidden="true"></span>
+									<?php echo 'pass' === $c_status ? esc_html__( 'Edit', 'scalyn-qa-assistant' ) : esc_html__( 'Generate', 'scalyn-qa-assistant' ); ?>
+								</button>
+
+								<?php elseif ( 'local_business_schema' === $check_id ) : ?>
+								<?php
+								$lb_managed_by = '';
+								$lb_edit_url   = '';
+								if ( defined( 'RANK_MATH_PRO_VERSION' ) ) {
+									$lb_managed_by = 'Rank Math Pro';
+									$lb_edit_url   = admin_url( 'admin.php?page=rank-math-options-titles#setting-panel-local' );
+								} elseif ( defined( 'SEOPRESS_PRO_VERSION' ) ) {
+									$lb_managed_by = 'SEOPress Pro';
+									$lb_edit_url   = admin_url( 'admin.php?page=seopress-pro-page#tab=tab_seopress_local_business' );
+								}
+								?>
+								<?php if ( '' !== $lb_edit_url ) : ?>
+								<a
+									href="<?php echo esc_url( $lb_edit_url ); ?>"
+									class="scalyn-btn scalyn-btn--small scalyn-btn--secondary"
+									title="<?php echo esc_attr( sprintf( __( 'Manage in %s', 'scalyn-qa-assistant' ), $lb_managed_by ) ); ?>"
+								>
+									<span class="dashicons dashicons-edit" aria-hidden="true"></span>
+									<?php echo esc_html( sprintf( __( 'Edit in %s', 'scalyn-qa-assistant' ), $lb_managed_by ) ); ?>
+								</a>
+								<?php endif; ?>
+
+								<?php endif; ?>
+
+								<?php
+								// Show Auto Fix button if:
+								// 1. Check is not passing AND
+								// 2. Either the check is in AUTO_FIXABLE without needing quick_fix (simple fixes like comments, tagline)
+								//    OR the check returned quick_fix = 'auto_fix' (conditional fixes like breadcrumbs, 404 monitor)
+								$module_toggle_checks = array( 'breadcrumbs_enabled', 'redirect_manager', 'four_oh_four_monitor', 'instant_indexing' );
+								$is_module_toggle     = in_array( $check_id, $module_toggle_checks, true );
+								$show_auto_fix        = 'pass' !== $c_status && isset( $auto_fixable[ $check_id ] )
+									&& ( ! $is_module_toggle || ( $item['quick_fix'] ?? '' ) === 'auto_fix' );
+								?>
+								<?php if ( $show_auto_fix ) : ?>
+								<button
+									type="button"
+									class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-launch-auto-fix"
+									data-check-id="<?php echo esc_attr( $check_id ); ?>"
+									title="<?php echo esc_attr( $auto_fixable[ $check_id ] ); ?>"
+								>
+									<span class="dashicons dashicons-admin-generic" aria-hidden="true"></span>
+									<?php esc_html_e( 'Auto Fix', 'scalyn-qa-assistant' ); ?>
+								</button>
+								<?php endif; ?>
+
 								<?php if ( ! empty( $item['tooltip'] ) ) : ?>
 									<?php
 									$text = $item['tooltip'];
@@ -261,6 +371,167 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 								</button>
 								<?php endif; ?>
 							</div>
+
+							<?php
+							// Inline AI panel — visible as long as AI content exists for this check.
+							$ai_map = array(
+								'default_tagline'       => 'taglines',
+								'privacy_policy_exists' => 'privacy_policy',
+								'llms_txt'              => 'llms_txt',
+								'cornerstone_content'   => 'cornerstone',
+								'contact_page_exists'   => 'contact_page',
+								'local_business_schema' => 'local_business',
+							);
+							if ( $ai_configured && isset( $ai_map[ $check_id ] ) && ! empty( $ai_content[ $ai_map[ $check_id ] ] ) ) :
+								$ai_key  = $ai_map[ $check_id ];
+								$ai_data = $ai_content[ $ai_key ];
+								$ai_meta = '';
+								if ( ! empty( $ai_content['provider'] ) ) {
+									$ai_meta = sprintf( '%s / %s — %s',
+										esc_html( $ai_content['provider'] ),
+										esc_html( $ai_content['model'] ?? '' ),
+										esc_html( $ai_content['generated_at'] ?? '' ),
+									);
+								}
+
+								// For taglines: detect which one matches the current tagline.
+								$current_tagline = '';
+								if ( 'taglines' === $ai_key ) {
+									$current_tagline = get_option( 'blogdescription', '' );
+								}
+							?>
+							<div class="scalyn-ai-inline-result scalyn-launch-ai-panel" data-ai-key="<?php echo esc_attr( $ai_key ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>">
+								<div class="scalyn-ai-inline-result__content">
+									<span class="scalyn-ai-inline-result__label"><?php esc_html_e( 'AI Suggestion:', 'scalyn-qa-assistant' ); ?></span>
+
+									<?php if ( 'taglines' === $ai_key && is_array( $ai_data ) ) : ?>
+										<?php foreach ( $ai_data as $i => $tagline ) :
+											$is_active = ( '' !== $current_tagline && $current_tagline === $tagline );
+										?>
+										<label style="display:block;padding:6px 12px;margin:4px 0;border:1px solid <?php echo $is_active ? 'var(--scalyn-success)' : 'var(--scalyn-border-light)'; ?>;border-radius:6px;cursor:pointer;font-size:0.875rem;<?php echo $is_active ? 'background:var(--scalyn-success-light);' : ''; ?>">
+											<input type="radio" name="scalyn-launch-ai-tagline" value="<?php echo esc_attr( $tagline ); ?>" <?php checked( $is_active || ( '' === $current_tagline && 0 === $i ) ); ?> style="margin-right:8px;">
+											<?php echo esc_html( $tagline ); ?>
+											<?php if ( $is_active ) : ?>
+												<span style="color:var(--scalyn-success);font-size:0.75rem;margin-left:4px;"><?php esc_html_e( '(current)', 'scalyn-qa-assistant' ); ?></span>
+											<?php endif; ?>
+										</label>
+										<?php endforeach; ?>
+
+									<?php elseif ( 'cornerstone' === $ai_key && is_array( $ai_data ) ) : ?>
+										<?php
+										// Get currently marked cornerstone pages for comparison.
+										global $wpdb;
+										$current_cornerstone = array();
+										// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+										$cs_rows = $wpdb->get_results(
+											"SELECT p.post_title FROM {$wpdb->posts} p
+											INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+											WHERE p.post_status = 'publish'
+											AND ((pm.meta_key = '_yoast_wpseo_is_cornerstone' AND pm.meta_value = '1')
+											OR (pm.meta_key = 'rank_math_pillar_content' AND pm.meta_value = 'on'))
+											LIMIT 20",
+										);
+										foreach ( $cs_rows as $row ) {
+											$current_cornerstone[] = mb_strtolower( $row->post_title );
+										}
+										?>
+										<?php foreach ( $ai_data as $page_title ) :
+											$is_marked = in_array( mb_strtolower( trim( $page_title ) ), $current_cornerstone, true );
+										?>
+										<label style="display:block;padding:6px 12px;margin:4px 0;border:1px solid <?php echo $is_marked ? 'var(--scalyn-success)' : 'var(--scalyn-border-light)'; ?>;border-radius:6px;cursor:pointer;font-size:0.875rem;<?php echo $is_marked ? 'background:var(--scalyn-success-light);' : ''; ?>">
+											<input type="checkbox" name="scalyn-launch-ai-cornerstone[]" value="<?php echo esc_attr( $page_title ); ?>" <?php checked( true ); ?> style="margin-right:8px;">
+											<?php echo esc_html( $page_title ); ?>
+											<?php if ( $is_marked ) : ?>
+												<span style="color:var(--scalyn-success);font-size:0.75rem;margin-left:4px;"><?php esc_html_e( '(already marked)', 'scalyn-qa-assistant' ); ?></span>
+											<?php endif; ?>
+										</label>
+										<?php endforeach; ?>
+
+									<?php elseif ( 'local_business' === $ai_key && is_array( $ai_data ) ) : ?>
+										<?php
+										$lb_ai = $ai_data;
+										$lb_current = get_option( 'scalyn_qa_local_business_jsonld', array() );
+										// Merge current values as defaults.
+										if ( ! empty( $lb_current ) && is_array( $lb_current ) ) {
+											$lb_ai = array_merge( array(
+												'type'        => $lb_current['@type'] ?? '',
+												'name'        => $lb_current['name'] ?? '',
+												'description' => $lb_current['description'] ?? '',
+												'phone'       => $lb_current['telephone'] ?? '',
+												'email'       => $lb_current['email'] ?? '',
+											), $lb_ai );
+										}
+										?>
+										<div class="scalyn-lb-inline-form" style="display:grid;gap:0.5rem;margin:0.5rem 0;">
+											<label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;">
+												<span style="min-width:80px;font-weight:600;"><?php esc_html_e( 'Type', 'scalyn-qa-assistant' ); ?></span>
+												<input type="text" name="scalyn-lb-type" value="<?php echo esc_attr( $lb_ai['type'] ?? 'LocalBusiness' ); ?>" style="flex:1;padding:4px 8px;border:1px solid var(--scalyn-border-light);border-radius:4px;font-size:0.8125rem;">
+											</label>
+											<label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;">
+												<span style="min-width:80px;font-weight:600;"><?php esc_html_e( 'Name', 'scalyn-qa-assistant' ); ?></span>
+												<input type="text" name="scalyn-lb-name" value="<?php echo esc_attr( $lb_ai['name'] ?? '' ); ?>" style="flex:1;padding:4px 8px;border:1px solid var(--scalyn-border-light);border-radius:4px;font-size:0.8125rem;">
+											</label>
+											<label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;">
+												<span style="min-width:80px;font-weight:600;"><?php esc_html_e( 'Description', 'scalyn-qa-assistant' ); ?></span>
+												<input type="text" name="scalyn-lb-desc" value="<?php echo esc_attr( $lb_ai['description'] ?? '' ); ?>" style="flex:1;padding:4px 8px;border:1px solid var(--scalyn-border-light);border-radius:4px;font-size:0.8125rem;">
+											</label>
+											<label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;">
+												<span style="min-width:80px;font-weight:600;"><?php esc_html_e( 'Phone', 'scalyn-qa-assistant' ); ?></span>
+												<input type="text" name="scalyn-lb-phone" value="<?php echo esc_attr( $lb_ai['phone'] ?? '' ); ?>" style="flex:1;padding:4px 8px;border:1px solid var(--scalyn-border-light);border-radius:4px;font-size:0.8125rem;">
+											</label>
+											<label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;">
+												<span style="min-width:80px;font-weight:600;"><?php esc_html_e( 'Email', 'scalyn-qa-assistant' ); ?></span>
+												<input type="text" name="scalyn-lb-email" value="<?php echo esc_attr( $lb_ai['email'] ?? '' ); ?>" style="flex:1;padding:4px 8px;border:1px solid var(--scalyn-border-light);border-radius:4px;font-size:0.8125rem;">
+											</label>
+										</div>
+
+									<?php elseif ( is_array( $ai_data ) ) : ?>
+										<textarea class="scalyn-ai-inline-result__textarea" style="width:100%;height:180px;font-family:monospace;font-size:0.75rem;resize:vertical;padding:0.5rem;border:1px solid var(--scalyn-border-light);border-radius:4px;margin:0.5rem 0;"><?php echo esc_textarea( wp_json_encode( $ai_data, JSON_PRETTY_PRINT ) ); ?></textarea>
+
+									<?php else : ?>
+										<textarea class="scalyn-ai-inline-result__textarea" style="width:100%;height:180px;font-family:monospace;font-size:0.75rem;resize:vertical;padding:0.5rem;border:1px solid var(--scalyn-border-light);border-radius:4px;margin:0.5rem 0;"><?php echo esc_textarea( is_string( $ai_data ) ? $ai_data : '' ); ?></textarea>
+									<?php endif; ?>
+
+									<?php if ( $ai_meta ) : ?>
+										<span class="scalyn-ai-inline-result__meta"><?php echo esc_html( $ai_meta ); ?></span>
+									<?php endif; ?>
+								</div>
+								<div class="scalyn-ai-inline-result__actions">
+									<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-launch-ai-apply" data-ai-key="<?php echo esc_attr( $ai_key ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>" title="<?php esc_attr_e( 'Apply', 'scalyn-qa-assistant' ); ?>">
+										<span class="dashicons dashicons-yes" aria-hidden="true"></span>
+										<?php esc_html_e( 'Apply', 'scalyn-qa-assistant' ); ?>
+									</button>
+									<button type="button" class="scalyn-btn scalyn-btn--small scalyn-launch-ai-copy" data-ai-key="<?php echo esc_attr( $ai_key ); ?>" title="<?php esc_attr_e( 'Copy', 'scalyn-qa-assistant' ); ?>">
+										<span class="dashicons dashicons-clipboard" aria-hidden="true"></span>
+										<?php esc_html_e( 'Copy', 'scalyn-qa-assistant' ); ?>
+									</button>
+									<button type="button" class="scalyn-btn scalyn-btn--small scalyn-launch-ai-regenerate" data-ai-key="<?php echo esc_attr( $ai_key ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>" title="<?php esc_attr_e( 'Regenerate with AI', 'scalyn-qa-assistant' ); ?>">
+										<span class="dashicons dashicons-update" aria-hidden="true"></span>
+										<?php esc_html_e( 'Regenerate', 'scalyn-qa-assistant' ); ?>
+									</button>
+								</div>
+							</div>
+							<?php endif; ?>
+
+							<?php
+							// Show Regenerate button even when no AI content exists yet for this check.
+							if ( $ai_configured && isset( $ai_map[ $check_id ] ) && empty( $ai_content[ $ai_map[ $check_id ] ] ) ) :
+								$ai_key_for_regen = $ai_map[ $check_id ];
+							?>
+							<div class="scalyn-ai-inline-result scalyn-launch-ai-panel" data-ai-key="<?php echo esc_attr( $ai_key_for_regen ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>" style="opacity:0.7;">
+								<div class="scalyn-ai-inline-result__content">
+									<span class="scalyn-ai-inline-result__label"><?php esc_html_e( 'AI Suggestion:', 'scalyn-qa-assistant' ); ?></span>
+									<p class="scalyn-ai-inline-result__text" style="color:var(--scalyn-text-muted);"><?php esc_html_e( 'No AI content generated yet for this check. Click Regenerate or use the header "Generate with AI" button.', 'scalyn-qa-assistant' ); ?></p>
+								</div>
+								<div class="scalyn-ai-inline-result__actions">
+									<button type="button" class="scalyn-btn scalyn-btn--small scalyn-launch-ai-regenerate" data-ai-key="<?php echo esc_attr( $ai_key_for_regen ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>" title="<?php esc_attr_e( 'Regenerate with AI', 'scalyn-qa-assistant' ); ?>">
+										<span class="dashicons dashicons-update" aria-hidden="true"></span>
+										<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
+									</button>
+								</div>
+							</div>
+							<?php endif; ?>
+
 						</div>
 					<?php endforeach; ?>
 

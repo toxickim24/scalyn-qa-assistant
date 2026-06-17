@@ -23,6 +23,19 @@
     // -------------------------------------------------------------------------
 
     /**
+     * Escape HTML entities for safe rendering.
+     *
+     * @param {string} str - The string to escape.
+     * @returns {string} Escaped string.
+     */
+    function escapeHtml(str) {
+        if (!str) return '';
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    /**
      * Wrapper for fetch() that adds the REST nonce header and base URL.
      *
      * @param {string} endpoint - Relative endpoint path (e.g. 'scores/summary').
@@ -570,6 +583,468 @@
         });
     }
 
+    /**
+     * Handle "Auto Fix" buttons on launch checklist.
+     */
+    function initLaunchAutoFix() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-launch-auto-fix');
+            if (!btn) return;
+
+            var checkId = btn.getAttribute('data-check-id');
+            if (!checkId) return;
+
+            var label = btn.getAttribute('title') || 'Apply fix';
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Auto Configure',
+                    text: label + '?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Apply',
+                    confirmButtonColor: '#4a90d9',
+                    customClass: { popup: 'scalyn-swal-popup' },
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+                    performAutoFix(btn, checkId);
+                });
+            } else {
+                if (confirm(label + '?')) {
+                    performAutoFix(btn, checkId);
+                }
+            }
+        });
+    }
+
+    /**
+     * Call the auto-fix endpoint, then re-scan.
+     */
+    function performAutoFix(btn, checkId) {
+        btn.disabled = true;
+        var origHtml = btn.innerHTML;
+        btn.textContent = 'Fixing...';
+
+        fetchApi('launch/auto-fix', {
+            method: 'POST',
+            body: JSON.stringify({ check_id: checkId }),
+        })
+            .then(function (response) {
+                if (response.success && response.data) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.toast(response.data.message || 'Fixed');
+                    }
+                    // Re-run launch scan to update results.
+                    return fetchApi('launch/scan', { method: 'POST' });
+                }
+            })
+            .then(function () {
+                window.location.reload();
+            })
+            .catch(function (err) {
+                if (typeof ScalynAlert !== 'undefined') {
+                    ScalynAlert.error('Auto Fix Failed', err.message || 'Could not apply fix.');
+                }
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            });
+    }
+
+    /**
+     * Handle llms.txt Generate / Edit button — opens a textarea modal.
+     */
+    function initLlmsTxtEditor() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-llms-txt-editor');
+            if (!btn) return;
+
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.textContent = 'Loading...';
+
+            // Fetch current or default content.
+            fetchApi('launch/llms_txt', { method: 'GET' })
+                .then(function (response) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+
+                    var content = (response.data && response.data.content) || '';
+                    var exists = response.data && response.data.exists;
+
+                    if (typeof Swal === 'undefined') {
+                        alert('SweetAlert2 is required for the llms.txt editor.');
+                        return;
+                    }
+
+                    Swal.fire({
+                        title: exists ? 'Edit llms.txt' : 'Generate llms.txt',
+                        html: '<textarea id="scalyn-llms-txt-content" style="width:100%;height:300px;font-family:monospace;font-size:13px;resize:vertical;padding:8px;border:1px solid #d1d5db;border-radius:4px;">'
+                            + escapeHtml(content) + '</textarea>',
+                        width: 640,
+                        showCancelButton: true,
+                        confirmButtonText: 'Save',
+                        confirmButtonColor: '#4a90d9',
+                        customClass: { popup: 'scalyn-swal-popup' },
+                        preConfirm: function () {
+                            var textarea = document.getElementById('scalyn-llms-txt-content');
+                            var val = textarea ? textarea.value : '';
+                            if (!val.trim()) {
+                                Swal.showValidationMessage('Content cannot be empty.');
+                                return false;
+                            }
+                            return val;
+                        },
+                    }).then(function (result) {
+                        if (!result.isConfirmed || !result.value) return;
+
+                        if (typeof ScalynAlert !== 'undefined') {
+                            ScalynAlert.loading('Saving llms.txt...');
+                        }
+
+                        fetchApi('launch/auto-fix', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                check_id: 'llms_txt',
+                                content: result.value,
+                            }),
+                        })
+                            .then(function (res) {
+                                if (res.success) {
+                                    if (typeof ScalynAlert !== 'undefined') {
+                                        ScalynAlert.close();
+                                        ScalynAlert.toast(res.data.message || 'llms.txt saved');
+                                    }
+                                    return fetchApi('launch/scan', { method: 'POST' });
+                                }
+                            })
+                            .then(function () {
+                                window.location.reload();
+                            })
+                            .catch(function (err) {
+                                if (typeof ScalynAlert !== 'undefined') {
+                                    ScalynAlert.close();
+                                    ScalynAlert.error('Save Failed', err.message || 'Could not save llms.txt.');
+                                }
+                            });
+                    });
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.error('Error', err.message || 'Could not load llms.txt content.');
+                    }
+                });
+        });
+    }
+
+    /**
+     * Handle single "Generate with AI" button — generates all content in one call,
+     * saves to option, and reloads to show inline panels.
+     */
+    /**
+     * Handle Local Business Schema Edit button — opens a form modal.
+     */
+    function initLocalBizEditor() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-local-biz-editor');
+            if (!btn) return;
+
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.textContent = 'Loading...';
+
+            fetchApi('launch/local_business', { method: 'GET' })
+                .then(function (response) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+
+                    var data = (response.data && response.data.data) || {};
+
+                    if (typeof Swal === 'undefined') return;
+
+                    var formHtml = '<div style="text-align:left;">'
+                        + '<label style="display:block;margin-bottom:12px;">'
+                        + '<span style="font-weight:600;font-size:13px;">Business Type</span>'
+                        + '<input id="scalyn-lb-type" class="swal2-input" value="' + escapeHtml(data.type || 'LocalBusiness') + '" placeholder="e.g. Restaurant, Dentist, LocalBusiness" style="margin-top:4px;">'
+                        + '</label>'
+                        + '<label style="display:block;margin-bottom:12px;">'
+                        + '<span style="font-weight:600;font-size:13px;">Business Name</span>'
+                        + '<input id="scalyn-lb-name" class="swal2-input" value="' + escapeHtml(data.name || '') + '" style="margin-top:4px;">'
+                        + '</label>'
+                        + '<label style="display:block;margin-bottom:12px;">'
+                        + '<span style="font-weight:600;font-size:13px;">Description</span>'
+                        + '<textarea id="scalyn-lb-desc" class="swal2-textarea" style="margin-top:4px;height:60px;">' + escapeHtml(data.description || '') + '</textarea>'
+                        + '</label>'
+                        + '<label style="display:block;margin-bottom:12px;">'
+                        + '<span style="font-weight:600;font-size:13px;">Phone</span>'
+                        + '<input id="scalyn-lb-phone" class="swal2-input" value="' + escapeHtml(data.phone || '') + '" placeholder="+1234567890" style="margin-top:4px;">'
+                        + '</label>'
+                        + '<label style="display:block;margin-bottom:12px;">'
+                        + '<span style="font-weight:600;font-size:13px;">Email</span>'
+                        + '<input id="scalyn-lb-email" class="swal2-input" value="' + escapeHtml(data.email || '') + '" style="margin-top:4px;">'
+                        + '</label>'
+                        + '</div>';
+
+                    Swal.fire({
+                        title: 'Local Business Schema',
+                        html: formHtml,
+                        width: 520,
+                        showCancelButton: true,
+                        confirmButtonText: 'Save',
+                        confirmButtonColor: '#4a90d9',
+                        customClass: { popup: 'scalyn-swal-popup' },
+                        preConfirm: function () {
+                            return {
+                                type: document.getElementById('scalyn-lb-type').value.trim() || 'LocalBusiness',
+                                name: document.getElementById('scalyn-lb-name').value.trim(),
+                                description: document.getElementById('scalyn-lb-desc').value.trim(),
+                                phone: document.getElementById('scalyn-lb-phone').value.trim(),
+                                email: document.getElementById('scalyn-lb-email').value.trim(),
+                            };
+                        },
+                    }).then(function (result) {
+                        if (!result.isConfirmed || !result.value) return;
+
+                        ScalynAlert && ScalynAlert.loading('Saving Local Business schema...');
+
+                        fetchApi('launch/auto-fix', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                check_id: 'local_business_schema',
+                                content: JSON.stringify(result.value),
+                            }),
+                        }).then(function (res) {
+                            ScalynAlert && ScalynAlert.close();
+                            if (res.success) {
+                                ScalynAlert && ScalynAlert.toast(res.data.message || 'Saved');
+                                return fetchApi('launch/scan', { method: 'POST' });
+                            }
+                        }).then(function () {
+                            window.location.reload();
+                        }).catch(function (err) {
+                            ScalynAlert && ScalynAlert.close();
+                            ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to save.');
+                        });
+                    });
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    ScalynAlert && ScalynAlert.error('Error', 'Could not load business data.');
+                });
+        });
+    }
+
+    function initLaunchAiGenerate() {
+        var btn = document.getElementById('scalyn-launch-generate-ai');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="dashicons dashicons-update spin"></span> Generating...';
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Generating with AI',
+                    text: 'This may take a moment...',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showConfirmButton: false,
+                    didOpen: function () { Swal.showLoading(); },
+                    customClass: { popup: 'scalyn-swal-popup' },
+                });
+            }
+
+            fetchApi('launch/ai_generate', {
+                method: 'POST',
+                body: JSON.stringify({}),
+            })
+                .then(function (response) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.close();
+                    }
+
+                    if (!response.success || !response.data) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        ScalynAlert && ScalynAlert.error('AI Failed', 'No content generated.');
+                        return;
+                    }
+
+                    ScalynAlert && ScalynAlert.toast('AI content generated — review suggestions below each check.');
+                    // Reload to show persisted inline panels.
+                    window.location.reload();
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.close();
+                    }
+                    ScalynAlert && ScalynAlert.error('AI Generation Failed', err.message || 'Unknown error.');
+                });
+        });
+    }
+
+    /**
+     * Handle inline AI panel "Apply" buttons.
+     */
+    function initLaunchAiApply() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-launch-ai-apply');
+            if (!btn) return;
+
+            var aiKey   = btn.getAttribute('data-ai-key');
+            var checkId = btn.getAttribute('data-check-id');
+            if (!aiKey || !checkId) return;
+
+            // Get the content to apply.
+            var content = '';
+            if (aiKey === 'taglines') {
+                var selected = document.querySelector('input[name="scalyn-launch-ai-tagline"]:checked');
+                content = selected ? selected.value : '';
+            } else if (aiKey === 'cornerstone') {
+                // Checkboxes — collect checked page titles as JSON array.
+                var checked = document.querySelectorAll('input[name="scalyn-launch-ai-cornerstone[]"]:checked');
+                var titles = [];
+                checked.forEach(function (cb) { titles.push(cb.value); });
+                content = titles.length ? JSON.stringify(titles) : '';
+            } else if (aiKey === 'local_business') {
+                // Inline form fields.
+                var panel = btn.closest('.scalyn-launch-ai-panel');
+                var form = panel ? panel.querySelector('.scalyn-lb-inline-form') : null;
+                if (form) {
+                    content = JSON.stringify({
+                        type: (form.querySelector('[name="scalyn-lb-type"]') || {}).value || 'LocalBusiness',
+                        name: (form.querySelector('[name="scalyn-lb-name"]') || {}).value || '',
+                        description: (form.querySelector('[name="scalyn-lb-desc"]') || {}).value || '',
+                        phone: (form.querySelector('[name="scalyn-lb-phone"]') || {}).value || '',
+                        email: (form.querySelector('[name="scalyn-lb-email"]') || {}).value || '',
+                    });
+                }
+            } else {
+                var panel = btn.closest('.scalyn-launch-ai-panel');
+                var textarea = panel ? panel.querySelector('.scalyn-ai-inline-result__textarea') : null;
+                content = textarea ? textarea.value.trim() : '';
+            }
+
+            if (!content) {
+                ScalynAlert && ScalynAlert.error('Error', 'No content to apply.');
+                return;
+            }
+
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.textContent = 'Applying...';
+
+            fetchApi('launch/auto-fix', {
+                method: 'POST',
+                body: JSON.stringify({ check_id: checkId, content: content }),
+            })
+                .then(function (res) {
+                    if (res.success) {
+                        ScalynAlert && ScalynAlert.toast(res.data.message || 'Applied');
+                        return fetchApi('launch/scan', { method: 'POST' });
+                    }
+                })
+                .then(function () {
+                    window.location.reload();
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    ScalynAlert && ScalynAlert.error('Apply Failed', err.message || 'Could not apply.');
+                });
+        });
+    }
+
+    /**
+     * Handle inline AI panel "Copy" buttons.
+     */
+    function initLaunchAiCopy() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-launch-ai-copy');
+            if (!btn) return;
+
+            var aiKey = btn.getAttribute('data-ai-key');
+            var panel = btn.closest('.scalyn-launch-ai-panel');
+            var text  = '';
+
+            if (aiKey === 'taglines') {
+                var selected = panel ? panel.querySelector('input[name="scalyn-launch-ai-tagline"]:checked') : null;
+                text = selected ? selected.value : '';
+            } else if (aiKey === 'cornerstone') {
+                var checked = panel ? panel.querySelectorAll('input[name="scalyn-launch-ai-cornerstone[]"]:checked') : [];
+                var titles = [];
+                checked.forEach(function (cb) { titles.push(cb.value); });
+                text = titles.join(', ');
+            } else if (aiKey === 'local_business') {
+                var form = panel ? panel.querySelector('.scalyn-lb-inline-form') : null;
+                if (form) {
+                    text = 'Type: ' + ((form.querySelector('[name="scalyn-lb-type"]') || {}).value || '')
+                        + '\nName: ' + ((form.querySelector('[name="scalyn-lb-name"]') || {}).value || '')
+                        + '\nDescription: ' + ((form.querySelector('[name="scalyn-lb-desc"]') || {}).value || '')
+                        + '\nPhone: ' + ((form.querySelector('[name="scalyn-lb-phone"]') || {}).value || '')
+                        + '\nEmail: ' + ((form.querySelector('[name="scalyn-lb-email"]') || {}).value || '');
+                }
+            } else {
+                var textarea = panel ? panel.querySelector('.scalyn-ai-inline-result__textarea') : null;
+                text = textarea ? textarea.value.trim() : '';
+            }
+
+            if (text && navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(function () {
+                    ScalynAlert && ScalynAlert.toast('Copied to clipboard');
+                });
+            }
+        });
+    }
+
+    /**
+     * Handle inline AI panel "Regenerate" buttons — regenerates just that one check.
+     */
+    function initLaunchAiRegenerate() {
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            var btn = e.target.closest('.scalyn-launch-ai-regenerate');
+            if (!btn) return;
+
+            var aiKey = btn.getAttribute('data-ai-key');
+            if (!aiKey) return;
+
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="dashicons dashicons-update spin"></span> Regenerating...';
+
+            fetchApi('launch/ai_generate', {
+                method: 'POST',
+                body: JSON.stringify({ type: aiKey }),
+            })
+                .then(function (response) {
+                    if (response.success) {
+                        ScalynAlert && ScalynAlert.toast('Regenerated — reloading...');
+                        window.location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        ScalynAlert && ScalynAlert.error('Failed', 'AI regeneration failed.');
+                    }
+                })
+                .catch(function (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    ScalynAlert && ScalynAlert.error('Error', err.message || 'Regeneration failed.');
+                });
+        });
+    }
+
     function init() {
         // Animate existing score circles rendered server-side.
         animateAllScoreCircles();
@@ -585,6 +1060,13 @@
         initLaunchScan();
         initIgnoreCheck();
         initRemoveIgnore();
+        initLaunchAutoFix();
+        initLlmsTxtEditor();
+        initLocalBizEditor();
+        initLaunchAiGenerate();
+        initLaunchAiApply();
+        initLaunchAiCopy();
+        initLaunchAiRegenerate();
 
         // Start auto-refresh.
         startAutoRefresh();

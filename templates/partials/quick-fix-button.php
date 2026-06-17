@@ -59,9 +59,27 @@ $button_config = array(
 		'data_key' => 'install-seo-plugin',
 		'is_link'  => true,
 	),
+	'generate_ai_keyword' => array(
+		'label'    => __( 'Generate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-admin-customizer',
+		'class'    => 'scalyn-btn--ai',
+		'data_key' => 'generate-ai-keyword',
+	),
+	'regenerate_ai_keyword' => array(
+		'label'    => __( 'Regenerate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-update',
+		'class'    => 'scalyn-btn--ghost',
+		'data_key' => 'generate-ai-keyword',
+	),
 );
 
 if ( ! isset( $button_config[ $action ] ) ) {
+	return;
+}
+
+// Hide AI-related quick fix buttons when AI is disabled.
+$ai_actions = array( 'generate_ai_meta', 'regenerate_ai_meta', 'generate_ai_keyword', 'regenerate_ai_keyword' );
+if ( in_array( $action, $ai_actions, true ) && ! ( new \Scalyn\QA\AI\AI_Manager() )->is_enabled() ) {
 	return;
 }
 

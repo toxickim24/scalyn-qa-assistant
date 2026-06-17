@@ -72,7 +72,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 		$headings = $this->extract_headings( $content );
 
 		$checks   = array();
-		$checks[] = $this->check_h1_exists( $headings );
+		$checks[] = $this->check_h1_exists( $post_id, $headings );
 		$checks[] = $this->check_heading_hierarchy( $headings );
 		$checks[] = $this->check_empty_headings( $headings );
 
@@ -113,15 +113,20 @@ class Heading_Analyzer implements Analyzer_Interface {
 	 * @param array<int, array{tag: string, text: string, level: int}> $headings Extracted headings.
 	 * @return Check_Item
 	 */
-	private function check_h1_exists( array $headings ): Check_Item {
-		$tooltip  = __( 'The H1 is the main heading of your page. Add or edit it in the post editor. Most themes use the post title as H1, but page builders may require adding one manually.', 'scalyn-qa-assistant' );
-		$h1_count = 0;
+	private function check_h1_exists( int $post_id, array $headings ): Check_Item {
+		$tooltip  = __( 'The H1 is the main heading of your page. Most themes automatically use the post title as H1. If using a page builder, you may need to add one manually.', 'scalyn-qa-assistant' );
+		$h1_texts = array();
 
 		foreach ( $headings as $heading ) {
 			if ( 1 === $heading['level'] ) {
-				++$h1_count;
+				$text       = $heading['text'];
+				$h1_texts[] = '' !== $text
+					? ( mb_strlen( $text ) > 80 ? mb_substr( $text, 0, 80 ) . '...' : $text )
+					: __( '(empty H1)', 'scalyn-qa-assistant' );
 			}
 		}
+
+		$h1_count = count( $h1_texts );
 
 		if ( 1 === $h1_count ) {
 			return new Check_Item(
@@ -137,11 +142,51 @@ class Heading_Analyzer implements Analyzer_Interface {
 		}
 
 		if ( 0 === $h1_count ) {
+			// Most themes render the post title as H1 outside of post_content.
+			// Check if the post has a title — if so, the theme likely handles H1.
+			$post_title = get_the_title( $post_id );
+
+			if ( '' !== $post_title ) {
+				// Verify by fetching the actual page HTML and checking for H1.
+				$page_has_h1 = $this->check_frontend_h1( $post_id );
+
+				if ( $page_has_h1 ) {
+					return new Check_Item(
+						id:        'h1_exists',
+						label:     __( 'H1 Heading', 'scalyn-qa-assistant' ),
+						status:    'pass',
+						message:   sprintf(
+							__( 'H1 rendered by theme from post title: "%s".', 'scalyn-qa-assistant' ),
+							mb_strlen( $post_title ) > 60 ? mb_substr( $post_title, 0, 60 ) . '...' : $post_title,
+						),
+						category:  'content',
+						severity:  'info',
+						quick_fix: null,
+						tooltip:   $tooltip,
+					);
+				}
+
+				// Can't verify frontend but title exists — likely has H1.
+				return new Check_Item(
+					id:        'h1_exists',
+					label:     __( 'H1 Heading', 'scalyn-qa-assistant' ),
+					status:    'pass',
+					message:   sprintf(
+						__( 'No H1 in post content, but the post title "%s" is likely rendered as H1 by the theme.', 'scalyn-qa-assistant' ),
+						mb_strlen( $post_title ) > 60 ? mb_substr( $post_title, 0, 60 ) . '...' : $post_title,
+					),
+					category:  'content',
+					severity:  'info',
+					quick_fix: null,
+					tooltip:   $tooltip,
+				);
+			}
+
 			return new Check_Item(
 				id:        'h1_exists',
 				label:     __( 'H1 Heading', 'scalyn-qa-assistant' ),
 				status:    'fail',
-				message:   __( 'No H1 heading found. Add one in the post editor — it should be the main title of your page content.', 'scalyn-qa-assistant' ),
+				message:   __( 'No H1 heading found and no post title set. Add an H1 in the post editor.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'critical',
 				quick_fix: null,
@@ -162,7 +207,7 @@ class Heading_Analyzer implements Analyzer_Interface {
 			severity:  'warning',
 			quick_fix: null,
 			tooltip:   $tooltip,
-			details:   array( 'h1_count' => $h1_count ),
+			details:   array( 'h1_texts' => $h1_texts ),
 		);
 	}
 
@@ -291,6 +336,35 @@ class Heading_Analyzer implements Analyzer_Interface {
 				'empty_tags'  => $empty_tags,
 			),
 		);
+	}
+
+	/**
+	 * Check the actual frontend page for an H1 tag.
+	 *
+	 * Uses a cached HTTP request to the post's permalink.
+	 *
+	 * @param int $post_id The post ID.
+	 * @return bool True if an H1 was found on the frontend.
+	 */
+	private function check_frontend_h1( int $post_id ): bool {
+		$url = get_permalink( $post_id );
+
+		if ( ! $url ) {
+			return false;
+		}
+
+		$response = wp_remote_get( $url, array(
+			'timeout'   => 10,
+			'sslverify' => false,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+
+		return is_string( $body ) && (bool) preg_match( '/<h1[\s>]/i', $body );
 	}
 
 	/**

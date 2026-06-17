@@ -51,25 +51,55 @@ class Launch_Page {
 
 		// Calculate per-category scores.
 		$category_map = array(
+			// SEO.
 			'search_engine_visibility' => 'seo',
 			'seo_plugin_installed'     => 'seo',
 			'sitemap_exists'           => 'seo',
+			'robots_txt'               => 'seo',
+			'permalink_structure'      => 'seo',
 			'llms_txt'                 => 'seo',
+			'breadcrumbs_enabled'      => 'seo',
+			'redirect_manager'         => 'seo',
+			'local_business_schema'    => 'seo',
+			'four_oh_four_monitor'     => 'seo',
+			'cornerstone_content'      => 'seo',
+			'instant_indexing'         => 'seo',
+			'woocommerce_seo'          => 'seo',
+			// Analytics.
 			'ga4_configured'           => 'analytics',
 			'gtm_configured'           => 'analytics',
+			// Technical.
 			'ssl_enabled'              => 'technical',
+			'debug_mode_disabled'      => 'technical',
+			'wp_core_updates'          => 'technical',
+			'plugin_updates'           => 'technical',
+			'wp_address_match'         => 'technical',
 			'favicon_exists'           => 'technical',
-			'contact_page_exists'      => 'content',
-			'privacy_policy_exists'    => 'content',
-			'plugin_conflicts'         => 'plugin_health',
 			'php_version'              => 'technical',
 			'php_memory_limit'         => 'technical',
 			'php_max_execution_time'   => 'technical',
 			'php_max_input_time'       => 'technical',
 			'php_post_max_size'        => 'technical',
 			'php_upload_max_size'      => 'technical',
+			// Content.
+			'contact_page_exists'      => 'content',
+			'privacy_policy_exists'    => 'content',
+			'default_content_cleanup'  => 'content',
+			'default_tagline'          => 'content',
+			'empty_pages'              => 'content',
+			'four_oh_four_page'        => 'content',
+			'menu_exists'              => 'content',
+			// Plugin health.
+			'plugin_conflicts'         => 'plugin_health',
 			'security_plugin'          => 'plugin_health',
 			'cache_plugin'             => 'plugin_health',
+			'backup_plugin'            => 'plugin_health',
+			'smtp_plugin'              => 'plugin_health',
+			'image_optimization_plugin' => 'plugin_health',
+			// Settings.
+			'admin_username'           => 'settings',
+			'timezone_set'             => 'settings',
+			'comments_open'            => 'settings',
 		);
 
 		$category_counts = array();

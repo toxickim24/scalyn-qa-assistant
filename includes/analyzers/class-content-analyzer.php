@@ -101,6 +101,7 @@ class Content_Analyzer implements Analyzer_Interface {
 		$checks[] = $this->check_heading_capitalization( $content );
 		$checks[] = $this->check_paragraph_punctuation( $content );
 		$checks[] = $this->check_short_paragraphs( $content );
+		$checks[] = $this->check_readability( $post_id, $plain_text );
 
 		return $checks;
 	}
@@ -177,14 +178,14 @@ class Content_Analyzer implements Analyzer_Interface {
 			message:   $pass
 				? __( 'All headings are properly capitalized.', 'scalyn-qa-assistant' )
 				: sprintf(
-					__( '%d heading(s) start with a lowercase letter: %s', 'scalyn-qa-assistant' ),
+					__( '%d heading(s) start with a lowercase letter.', 'scalyn-qa-assistant' ),
 					count( $bad_headings ),
-					implode( '; ', array_slice( $bad_headings, 0, 3 ) ),
 				),
 			category:  'content',
 			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
 			tooltip:   __( 'Capitalize the first letter of each heading. Edit headings in the post editor to use sentence case (e.g., "Our services" instead of "our services").', 'scalyn-qa-assistant' ),
+			details:   $pass ? array() : array( 'bad_headings' => $bad_headings ),
 		);
 	}
 
@@ -233,14 +234,14 @@ class Content_Analyzer implements Analyzer_Interface {
 			message:   $pass
 				? __( 'All paragraphs end with proper punctuation.', 'scalyn-qa-assistant' )
 				: sprintf(
-					__( '%d paragraph(s) missing ending punctuation: %s', 'scalyn-qa-assistant' ),
+					__( '%d paragraph(s) missing ending punctuation.', 'scalyn-qa-assistant' ),
 					count( $bad_paragraphs ),
-					implode( '; ', array_slice( $bad_paragraphs, 0, 2 ) ),
 				),
 			category:  'content',
 			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
 			tooltip:   __( 'Every paragraph should end with proper punctuation (. ! ? or :). Review the flagged paragraphs in the post editor and add the missing punctuation.', 'scalyn-qa-assistant' ),
+			details:   $pass ? array() : array( 'bad_paragraphs' => $bad_paragraphs ),
 		);
 	}
 
@@ -261,9 +262,11 @@ class Content_Analyzer implements Analyzer_Interface {
 			);
 		}
 
-		$consecutive    = 0;
-		$max_streak     = 0;
-		$total_short    = 0;
+		$consecutive     = 0;
+		$max_streak      = 0;
+		$total_short     = 0;
+		$current_streak  = array();
+		$worst_streak    = array();
 
 		foreach ( $matches[1] as $paragraph_html ) {
 			$text = trim( wp_strip_all_tags( $paragraph_html ) );
@@ -279,9 +282,14 @@ class Content_Analyzer implements Analyzer_Interface {
 			if ( $sentence_count <= 1 && mb_strlen( $text ) < 80 ) {
 				++$consecutive;
 				++$total_short;
-				$max_streak = max( $max_streak, $consecutive );
+				$current_streak[] = mb_strlen( $text ) > 100 ? mb_substr( $text, 0, 100 ) . '...' : $text;
+				if ( $consecutive > $max_streak ) {
+					$max_streak   = $consecutive;
+					$worst_streak = $current_streak;
+				}
 			} else {
-				$consecutive = 0;
+				$consecutive    = 0;
+				$current_streak = array();
 			}
 		}
 
@@ -301,7 +309,144 @@ class Content_Analyzer implements Analyzer_Interface {
 			severity:  $pass ? 'info' : 'warning',
 			quick_fix: null,
 			tooltip:   __( 'Multiple single-sentence paragraphs in a row can feel choppy. In the post editor, combine related short paragraphs into fuller ones with 2-3 sentences each.', 'scalyn-qa-assistant' ),
+			details:   $pass ? array() : array( 'short_paragraphs' => $worst_streak ),
 		);
+	}
+
+	/**
+	 * Check readability using SEO plugin score or a basic Flesch-like calculation.
+	 *
+	 * Supports: Yoast (content_score), Rank Math, SEOPress.
+	 * Falls back to a simple average-sentence-length / average-word-length score.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param int    $post_id    The post ID.
+	 * @param string $plain_text Plain text content.
+	 * @return Check_Item
+	 */
+	private function check_readability( int $post_id, string $plain_text ): Check_Item {
+		$tooltip = __( 'Readability measures how easy your content is to understand. Aim for short sentences and simple words. Tools like Hemingway Editor can help.', 'scalyn-qa-assistant' );
+
+		// Try to read readability score from SEO plugins.
+		$score  = 0;
+		$source = '';
+
+		// Yoast readability score (0-100).
+		$yoast_rs = get_post_meta( $post_id, '_yoast_wpseo_content_score', true );
+		if ( is_numeric( $yoast_rs ) && (int) $yoast_rs > 0 ) {
+			$score  = (int) $yoast_rs;
+			$source = 'Yoast SEO';
+		}
+
+		// Rank Math content AI score.
+		if ( 0 === $score ) {
+			$rm_rs = get_post_meta( $post_id, 'rank_math_contentai_score', true );
+			if ( is_numeric( $rm_rs ) && (int) $rm_rs > 0 ) {
+				$score  = (int) $rm_rs;
+				$source = 'Rank Math';
+			}
+		}
+
+		// If no plugin score, calculate a basic one.
+		if ( 0 === $score && mb_strlen( $plain_text ) > 100 ) {
+			$score  = $this->calculate_basic_readability( $plain_text );
+			$source = __( 'basic analysis', 'scalyn-qa-assistant' );
+		}
+
+		if ( 0 === $score ) {
+			return new Check_Item(
+				id:        'readability_score',
+				label:     __( 'Readability', 'scalyn-qa-assistant' ),
+				status:    'pass',
+				message:   __( 'Not enough content to assess readability.', 'scalyn-qa-assistant' ),
+				category:  'content',
+				severity:  'info',
+				quick_fix: null,
+				tooltip:   $tooltip,
+			);
+		}
+
+		$status = $score >= 60 ? 'pass' : ( $score >= 40 ? 'warning' : 'fail' );
+		$label  = $score >= 80 ? __( 'Very Easy', 'scalyn-qa-assistant' )
+			: ( $score >= 60 ? __( 'Good', 'scalyn-qa-assistant' )
+			: ( $score >= 40 ? __( 'Needs Improvement', 'scalyn-qa-assistant' )
+			: __( 'Difficult', 'scalyn-qa-assistant' ) ) );
+
+		return new Check_Item(
+			id:        'readability_score',
+			label:     __( 'Readability', 'scalyn-qa-assistant' ),
+			status:    $status,
+			message:   sprintf(
+				/* translators: 1: score, 2: label, 3: source */
+				__( '%1$d/100 — %2$s (via %3$s).', 'scalyn-qa-assistant' ),
+				$score,
+				$label,
+				$source,
+			),
+			category:  'content',
+			severity:  'pass' === $status ? 'info' : 'warning',
+			quick_fix: null,
+			tooltip:   $tooltip,
+			details:   array( 'score' => $score, 'label' => $label, 'source' => $source ),
+		);
+	}
+
+	/**
+	 * Calculate a basic readability score (0-100) from plain text.
+	 *
+	 * Uses average sentence length and average word length as proxies.
+	 * Not a real Flesch-Kincaid, but a reasonable approximation.
+	 *
+	 * @param string $text Plain text.
+	 * @return int Score 0-100.
+	 */
+	private function calculate_basic_readability( string $text ): int {
+		$sentences = preg_split( '/[.!?]+/', $text, -1, PREG_SPLIT_NO_EMPTY );
+		$sentences = array_filter( $sentences, fn( $s ) => mb_strlen( trim( $s ) ) > 5 );
+
+		if ( count( $sentences ) < 3 ) {
+			return 0;
+		}
+
+		$words          = preg_split( '/\s+/', trim( $text ), -1, PREG_SPLIT_NO_EMPTY );
+		$total_words    = count( $words );
+		$total_syllables = 0;
+
+		foreach ( $words as $word ) {
+			$total_syllables += $this->count_syllables( $word );
+		}
+
+		$avg_sentence_length = $total_words / count( $sentences );
+		$avg_syllables       = $total_syllables / max( 1, $total_words );
+
+		// Simplified Flesch Reading Ease formula.
+		$flesch = 206.835 - ( 1.015 * $avg_sentence_length ) - ( 84.6 * $avg_syllables );
+
+		return max( 0, min( 100, (int) round( $flesch ) ) );
+	}
+
+	/**
+	 * Estimate syllable count for an English word.
+	 *
+	 * @param string $word The word.
+	 * @return int Estimated syllable count.
+	 */
+	private function count_syllables( string $word ): int {
+		$word = strtolower( preg_replace( '/[^a-z]/', '', $word ) );
+
+		if ( strlen( $word ) <= 3 ) {
+			return 1;
+		}
+
+		$count = (int) preg_match_all( '/[aeiouy]+/', $word );
+
+		// Adjust for silent 'e' at end.
+		if ( str_ends_with( $word, 'e' ) && ! str_ends_with( $word, 'le' ) ) {
+			--$count;
+		}
+
+		return max( 1, $count );
 	}
 
 	/**

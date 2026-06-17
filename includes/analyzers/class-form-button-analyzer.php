@@ -92,24 +92,22 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 	 */
 	private function check_empty_buttons( HTML_Parser $parser ): Check_Item {
 		$tooltip       = __( 'Buttons need visible text or an aria-label for accessibility. Find the empty buttons in the post editor and add text content or an aria-label attribute.', 'scalyn-qa-assistant' );
-		$empty_count   = 0;
-		$empty_details = array();
+		$empty_labels  = array();
 		$buttons       = $parser->get_buttons();
 
-		foreach ( $buttons as $button ) {
+		foreach ( $buttons as $index => $button ) {
 			$text       = trim( wp_strip_all_tags( $button['text'] ) );
 			$aria_label = trim( $button['aria_label'] );
 			$title      = trim( $button['title'] );
 
 			if ( '' === $text && '' === $aria_label && '' === $title ) {
-				++$empty_count;
-				$element = 'button' === $button['tag'] ? 'button' : 'a[role="button"]';
-				$empty_details[] = array(
-					'element' => $element,
-					'tag'     => $button['tag'],
-				);
+				$element = 'button' === $button['tag'] ? '<button>' : '<a role="button">';
+				$href    = $button['href'] ? ' href="' . $button['href'] . '"' : '';
+				$empty_labels[] = sprintf( '%s%s (#%d)', $element, $href, $index + 1 );
 			}
 		}
+
+		$empty_count = count( $empty_labels );
 
 		if ( 0 === $empty_count ) {
 			return new Check_Item(
@@ -131,8 +129,8 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			message:   sprintf(
 				/* translators: %d: number of empty buttons */
 				_n(
-					'%d button found without text or aria-label. Add visible text or an aria-label attribute in the post editor.',
-					'%d buttons found without text or aria-label. Add visible text or aria-label attributes in the post editor.',
+					'%d button found without text or aria-label.',
+					'%d buttons found without text or aria-label.',
 					$empty_count,
 					'scalyn-qa-assistant',
 				),
@@ -142,10 +140,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			severity:  'critical',
 			quick_fix: null,
 			tooltip:   $tooltip,
-			details:   array(
-				'empty_count' => $empty_count,
-				'buttons'     => $empty_details,
-			),
+			details:   array( 'empty_buttons' => $empty_labels ),
 		);
 	}
 
@@ -158,17 +153,16 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 	 * @return Check_Item
 	 */
 	private function check_placeholder_links( HTML_Parser $parser ): Check_Item {
-		$tooltip           = __( 'Links with href="#" or "javascript:void(0)" are placeholders. In the post editor, replace them with real URLs or convert them to button elements.', 'scalyn-qa-assistant' );
-		$raw_placeholders  = $parser->get_placeholder_links();
-		$placeholder_count = count( $raw_placeholders );
-		$placeholder_links = array();
+		$tooltip          = __( 'Links with href="#" or "javascript:void(0)" are placeholders. In the post editor, replace them with real URLs or convert them to button elements.', 'scalyn-qa-assistant' );
+		$raw_placeholders = $parser->get_placeholder_links();
+		$placeholder_labels = array();
 
 		foreach ( $raw_placeholders as $link ) {
-			$placeholder_links[] = array(
-				'href' => $link['url'],
-				'text' => $link['text'] ?: __( '(no text)', 'scalyn-qa-assistant' ),
-			);
+			$text = $link['text'] ?: __( '(no text)', 'scalyn-qa-assistant' );
+			$placeholder_labels[] = sprintf( '"%s" (%s)', $text, $link['url'] );
 		}
+
+		$placeholder_count = count( $placeholder_labels );
 
 		if ( 0 === $placeholder_count ) {
 			return new Check_Item(
@@ -190,8 +184,8 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			message:   sprintf(
 				/* translators: %d: number of placeholder links */
 				_n(
-					'%d placeholder link found. Replace with a real URL or use a button element.',
-					'%d placeholder links found. Replace with real URLs or use button elements.',
+					'%d placeholder link found.',
+					'%d placeholder links found.',
 					$placeholder_count,
 					'scalyn-qa-assistant',
 				),
@@ -201,10 +195,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			severity:  'warning',
 			quick_fix: null,
 			tooltip:   $tooltip,
-			details:   array(
-				'placeholder_count' => $placeholder_count,
-				'links'             => $placeholder_links,
-			),
+			details:   array( 'placeholder_links' => $placeholder_labels ),
 		);
 	}
 
@@ -325,12 +316,16 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			);
 		}
 
-		$invalid_triggers = array_filter(
-			$triggers,
-			static fn( array $trigger ): bool => false === $trigger['valid'],
-		);
+		$invalid_labels = array();
 
-		$invalid_count = count( $invalid_triggers );
+		foreach ( $triggers as $trigger ) {
+			if ( false === $trigger['valid'] ) {
+				$target = $trigger['target'] ?: __( '(no target)', 'scalyn-qa-assistant' );
+				$invalid_labels[] = sprintf( '%s on <%s> (target: %s)', $trigger['type'], $trigger['element'] ?? 'unknown', $target );
+			}
+		}
+
+		$invalid_count = count( $invalid_labels );
 
 		if ( $invalid_count > 0 ) {
 			return new Check_Item(
@@ -347,11 +342,7 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 				severity:  'info',
 				quick_fix: null,
 				tooltip:   $tooltip,
-				details:   array(
-					'total_triggers'   => count( $triggers ),
-					'invalid_triggers' => $invalid_count,
-					'triggers'         => $triggers,
-				),
+				details:   array( 'invalid_triggers' => $invalid_labels ),
 			);
 		}
 
@@ -373,10 +364,6 @@ class Form_Button_Analyzer implements Analyzer_Interface {
 			severity:  'info',
 			quick_fix: null,
 			tooltip:   $tooltip,
-			details:   array(
-				'total_triggers' => count( $triggers ),
-				'triggers'       => $triggers,
-			),
 		);
 	}
 

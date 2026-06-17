@@ -326,6 +326,11 @@ class Settings_Controller extends REST_Controller {
 					? array_map( 'sanitize_key', $pa['enabled_checks'] )
 					: array(),
 			);
+
+			if ( isset( $pa['max_image_file_size'] ) ) {
+				$page_audit_data['max_image_file_size'] = max( 1, min( 10000, (int) $pa['max_image_file_size'] ) );
+			}
+
 			update_option( 'scalyn_qa_page_audit_settings', $page_audit_data, false );
 		}
 
