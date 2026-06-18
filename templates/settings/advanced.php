@@ -280,6 +280,12 @@ $max_ai_requests_per_day  = isset( $settings['max_ai_requests_per_day'] ) ? (int
 								<?php esc_html_e( 'Loading AI usage log...', 'scalyn-qa-assistant' ); ?>
 							</p>
 						</div>
+						<div style="margin-top:0.5rem;">
+							<button type="button" id="scalyn-clear-ai-log" class="scalyn-btn scalyn-btn--small scalyn-btn--danger">
+								<span class="dashicons dashicons-trash" aria-hidden="true"></span>
+								<?php esc_html_e( 'Clear AI Log', 'scalyn-qa-assistant' ); ?>
+							</button>
+						</div>
 					</td>
 				</tr>
 			</table>
@@ -297,11 +303,18 @@ $max_ai_requests_per_day  = isset( $settings['max_ai_requests_per_day'] ) ? (int
 	<div class="scalyn-card">
 		<h2 class="scalyn-card-title"><?php esc_html_e( 'Debug Mode', 'scalyn-qa-assistant' ); ?></h2>
 		<div class="scalyn-toggle-row">
-			<label for="scalyn-debug-mode"><?php esc_html_e( 'Enable Debug Logging', 'scalyn-qa-assistant' ); ?></label>
-			<input type="checkbox" id="scalyn-debug-mode" <?php checked( ! empty( $settings['debug_mode'] ) ); ?>>
-			<p class="description">
-				<?php esc_html_e( 'When enabled, logs AI failures, link checker failures, and REST API errors. Useful for troubleshooting.', 'scalyn-qa-assistant' ); ?>
-			</p>
+			<input
+				type="checkbox"
+				id="scalyn-debug-mode"
+				<?php checked( ! empty( $settings['debug_mode'] ) ); ?>
+				class="scalyn-toggle-checkbox"
+			>
+			<label for="scalyn-debug-mode" class="scalyn-toggle-label">
+				<strong><?php esc_html_e( 'Enable Debug Logging', 'scalyn-qa-assistant' ); ?></strong>
+				<span class="scalyn-field-description">
+					<?php esc_html_e( 'When enabled, logs AI failures, link checker failures, and REST API errors. Useful for troubleshooting.', 'scalyn-qa-assistant' ); ?>
+				</span>
+			</label>
 		</div>
 		<div class="scalyn-card">
 			<h3><?php esc_html_e( 'Debug Log', 'scalyn-qa-assistant' ); ?></h3>

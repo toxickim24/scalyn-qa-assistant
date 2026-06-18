@@ -1239,24 +1239,26 @@
      * Initialize AI alt text generation and apply.
      */
     function initAiAltText() {
-        // Load saved alt text data if available.
-        var savedEl = document.getElementById('scalyn-saved-ai-alt-texts');
-        if (savedEl) {
+        // Load saved alt text results from data attribute if available.
+        var container = document.querySelector('.scalyn-ai-alt-results[data-check-id="image_alt_text"]');
+        if (container && container.getAttribute('data-saved-results')) {
             try {
-                var saved = JSON.parse(savedEl.textContent);
-                if (saved && saved.results && saved.results.length > 0) {
-                    displayAltTextResults(saved.results);
+                var saved = JSON.parse(container.getAttribute('data-saved-results'));
+                if (saved && saved.length > 0) {
+                    displayAltTextResults(saved);
                 }
             } catch (e) {}
         }
 
-        // Apply alt text button.
+        // Apply single alt text button.
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('.scalyn-alt-apply');
             if (!btn) return;
 
+            var row = btn.closest('.scalyn-alt-row');
             var src = btn.getAttribute('data-src');
-            var altText = btn.getAttribute('data-alt');
+            var input = row ? row.querySelector('.scalyn-alt-input') : null;
+            var altText = input ? input.value.trim() : btn.getAttribute('data-alt');
             var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl();
             if (!src || !altText || !postId) return;
 
@@ -1266,14 +1268,62 @@
                 body: JSON.stringify({ src: src, alt_text: altText }),
             })
                 .then(function (response) {
-                    if (response.success) {
-                        if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Alt text applied — rescanning...');
-                        return fetchApi('scan/' + postId, { method: 'POST' });
+                    if (response.success && row) {
+                        markAltRowApplied(row);
+                        ScalynAlert.toast('Alt text applied');
+                        var rescanBtn = document.querySelector('#scalyn-rescan') || document.querySelector('.scalyn-rescan');
+                        if (rescanBtn) rescanBtn.click();
                     }
                 })
-                .then(function () { window.location.reload(); })
                 .catch(function (err) {
-                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.error('Apply Failed', err.message || 'Failed to apply alt text.');
+                    ScalynAlert.error('Apply Failed', err.message || 'Failed to apply alt text.');
+                    btn.disabled = false;
+                });
+        });
+
+        // Apply All alt texts button.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-alt-apply-all');
+            if (!btn) return;
+
+            var container = btn.closest('.scalyn-ai-alt-results');
+            var rows = container ? container.querySelectorAll('.scalyn-alt-row:not(.scalyn-alt-row--applied)') : [];
+            if (rows.length === 0) return;
+
+            btn.disabled = true;
+            ScalynAlert.loading('Applying all alt texts…');
+
+            var postId = container.getAttribute('data-post-id') || getPostIdFromUrl();
+            var promises = [];
+
+            rows.forEach(function (row) {
+                var src = row.getAttribute('data-src');
+                var input = row.querySelector('.scalyn-alt-input');
+                var altText = input ? input.value.trim() : '';
+                if (!src || !altText) return;
+
+                promises.push(
+                    fetchApi('ai/apply-alt/' + postId, {
+                        method: 'POST',
+                        body: JSON.stringify({ src: src, alt_text: altText }),
+                    }).then(function (response) {
+                        if (response.success) markAltRowApplied(row);
+                    })
+                );
+            });
+
+            Promise.all(promises)
+                .then(function () {
+                    ScalynAlert.close();
+                    ScalynAlert.toast('All alt texts applied');
+                    var rescanBtn = document.querySelector('#scalyn-rescan') || document.querySelector('.scalyn-rescan');
+                    if (rescanBtn) rescanBtn.click();
+                })
+                .catch(function (err) {
+                    ScalynAlert.close();
+                    ScalynAlert.error('Apply Failed', err.message || 'Some alt texts failed to apply.');
+                })
+                .finally(function () {
                     btn.disabled = false;
                 });
         });
@@ -1282,13 +1332,32 @@
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('.scalyn-alt-copy');
             if (!btn) return;
-            var altText = btn.getAttribute('data-alt');
+            var row = btn.closest('.scalyn-alt-row');
+            var input = row ? row.querySelector('.scalyn-alt-input') : null;
+            var altText = input ? input.value.trim() : btn.getAttribute('data-alt');
             if (altText) {
                 navigator.clipboard.writeText(altText).then(function () {
-                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Alt text copied');
+                    ScalynAlert.toast('Alt text copied');
                 });
             }
         });
+    }
+
+    /**
+     * Mark an alt text row as applied.
+     */
+    function markAltRowApplied(row) {
+        row.classList.add('scalyn-alt-row--applied');
+        var actions = row.querySelector('.scalyn-ai-inline-result__actions');
+        if (actions) {
+            actions.innerHTML = '<span style="color:var(--scalyn-success);font-size:0.8125rem;font-weight:600;">' +
+                '<span class="dashicons dashicons-yes-alt" style="font-size:16px;width:16px;height:16px;margin-right:4px;"></span>Applied</span>';
+        }
+        var input = row.querySelector('.scalyn-alt-input');
+        if (input) {
+            input.disabled = true;
+            input.style.opacity = '0.6';
+        }
     }
 
     /**
@@ -1299,29 +1368,64 @@
         if (!container || !results || results.length === 0) return;
 
         var postId = container.getAttribute('data-post-id') || getPostIdFromUrl() || '';
+        var checkItem = container.closest('.scalyn-check-item');
+        var isPass = checkItem && checkItem.getAttribute('data-status') === 'pass';
+        var validCount = results.filter(function (r) { return !r.error && r.alt_text; }).length;
+
+        // Header with Apply All (only when not already all applied).
         var html = '';
+        var headerLabel = isPass ? 'Applied Alt Text (' + validCount + ' images)' : 'Alt Text Suggestions (' + validCount + ' images)';
+
+        if (validCount > 1) {
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">' +
+                '<span class="scalyn-ai-inline-result__label" style="margin:0;">' + headerLabel + '</span>';
+            if (!isPass) {
+                html += '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-alt-apply-all">' +
+                    '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply All</button>';
+            }
+            html += '</div>';
+        }
 
         results.forEach(function (item) {
+            var filename = item.src.split('/').pop() || item.src;
+
             if (item.error) {
-                html += '<div class="scalyn-ai-inline-result" style="margin-bottom:0.5rem;">' +
+                html += '<div class="scalyn-ai-inline-result scalyn-alt-row" data-src="' + escAttr(item.src) + '" style="margin-bottom:0.5rem;">' +
+                    '<div class="scalyn-alt-thumb"><img src="' + escAttr(item.src) + '" alt="" onerror="this.style.display=\'none\'"></div>' +
                     '<div class="scalyn-ai-inline-result__content">' +
-                    '<span class="scalyn-ai-inline-result__label">Image: ' + escHtml(item.src.length > 60 ? item.src.substring(0, 60) + '...' : item.src) + '</span>' +
-                    '<p class="scalyn-ai-inline-result__text" style="color:var(--scalyn-danger);">Error: ' + escHtml(item.error) + '</p>' +
+                    '<span class="scalyn-ai-inline-result__label">' + escHtml(filename) + '</span>' +
+                    '<p class="scalyn-ai-inline-result__text" style="color:var(--scalyn-danger);margin:0.25rem 0;">Error: ' + escHtml(item.error) + '</p>' +
                     '</div></div>';
                 return;
             }
 
-            html += '<div class="scalyn-ai-inline-result" style="margin-bottom:0.5rem;">' +
-                '<div class="scalyn-ai-inline-result__content">' +
-                '<span class="scalyn-ai-inline-result__label">Image: ' + escHtml(item.src.length > 60 ? item.src.substring(0, 60) + '...' : item.src) + '</span>' +
-                '<p class="scalyn-ai-inline-result__text">' + escHtml(item.alt_text) + '</p>' +
-                '</div>' +
-                '<div class="scalyn-ai-inline-result__actions">' +
-                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-alt-copy" data-alt="' + escAttr(item.alt_text) + '" title="Copy">' +
-                '<span class="dashicons dashicons-clipboard" aria-hidden="true"></span> Copy</button>' +
-                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-alt-apply" data-src="' + escAttr(item.src) + '" data-alt="' + escAttr(item.alt_text) + '" data-post-id="' + escAttr(postId) + '" title="Apply">' +
-                '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>' +
-                '</div></div>';
+            if (isPass) {
+                // Pass state: show as applied (read-only).
+                html += '<div class="scalyn-ai-inline-result scalyn-alt-row scalyn-alt-row--applied" data-src="' + escAttr(item.src) + '" style="margin-bottom:0.5rem;">' +
+                    '<div class="scalyn-alt-thumb"><img src="' + escAttr(item.src) + '" alt="" onerror="this.style.display=\'none\'"></div>' +
+                    '<div class="scalyn-ai-inline-result__content">' +
+                    '<span class="scalyn-ai-inline-result__label">' + escHtml(filename) + '</span>' +
+                    '<input type="text" class="scalyn-alt-input" value="' + escAttr(item.alt_text) + '" disabled style="opacity:0.6;" />' +
+                    '</div>' +
+                    '<div class="scalyn-ai-inline-result__actions">' +
+                    '<span style="color:var(--scalyn-success);font-size:0.8125rem;font-weight:600;">' +
+                    '<span class="dashicons dashicons-yes-alt" style="font-size:16px;width:16px;height:16px;margin-right:4px;"></span>Applied</span>' +
+                    '</div></div>';
+            } else {
+                // Non-pass: editable with Copy/Apply buttons.
+                html += '<div class="scalyn-ai-inline-result scalyn-alt-row" data-src="' + escAttr(item.src) + '" style="margin-bottom:0.5rem;">' +
+                    '<div class="scalyn-alt-thumb"><img src="' + escAttr(item.src) + '" alt="" onerror="this.style.display=\'none\'"></div>' +
+                    '<div class="scalyn-ai-inline-result__content">' +
+                    '<span class="scalyn-ai-inline-result__label">' + escHtml(filename) + '</span>' +
+                    '<input type="text" class="scalyn-alt-input" value="' + escAttr(item.alt_text) + '" />' +
+                    '</div>' +
+                    '<div class="scalyn-ai-inline-result__actions">' +
+                    '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-alt-copy" title="Copy">' +
+                    '<span class="dashicons dashicons-clipboard" aria-hidden="true"></span> Copy</button>' +
+                    '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-alt-apply" data-src="' + escAttr(item.src) + '" data-post-id="' + escAttr(postId) + '" title="Apply">' +
+                    '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>' +
+                    '</div></div>';
+            }
         });
 
         container.innerHTML = html;
@@ -1329,22 +1433,32 @@
     }
 
     function escAttr(str) {
-        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function initGenerateAllAi() {
         var btn = document.getElementById('scalyn-generate-all-ai');
         if (!btn) return;
 
+        var hasRun = false;
+
         btn.addEventListener('click', function () {
+            if (hasRun) {
+                if (typeof ScalynAlert !== 'undefined') {
+                    ScalynAlert.warning('Already Generated', 'AI generation has already been run for this page. Use individual Regenerate buttons to regenerate specific items.');
+                }
+                return;
+            }
+
             var postId = btn.getAttribute('data-post-id') || getPostIdFromUrl();
             if (!postId) return;
 
+            hasRun = true;
             btn.disabled = true;
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
-                    title: 'Generating with AI',
-                    text: 'Analyzing content, generating meta suggestions, and reviewing...',
+                    title: 'Generating All with AI',
+                    text: 'Analyzing content, generating meta, keywords, images, and reviewing…',
                     allowOutsideClick: false,
                     allowEscapeKey: false,
                     showConfirmButton: false,
@@ -1371,6 +1485,12 @@
             if (hasKeywordCheck) {
                 apiCalls.push(fetchApi('ai/generate-keywords/' + postId, { method: 'POST' }));
                 callMap.keywords = nextIdx++;
+            }
+
+            var hasFeaturedImageCheck = !!document.querySelector('.scalyn-ai-featured-image-results[data-check-id="featured_image_exists"]');
+            if (hasFeaturedImageCheck) {
+                apiCalls.push(fetchApi('ai/generate-featured-image/' + postId, { method: 'POST' }));
+                callMap.featuredImage = nextIdx++;
             }
 
             Promise.all(apiCalls)
@@ -1402,6 +1522,17 @@
                         }
                     }
 
+                    if (callMap.featuredImage !== undefined) {
+                        var fiResponse = responses[callMap.featuredImage];
+                        if (fiResponse && fiResponse.success && fiResponse.data) {
+                            var fiPanel = document.querySelector('.scalyn-ai-featured-image-results[data-post-id="' + postId + '"]');
+                            if (fiPanel) {
+                                fiPanel.style.display = '';
+                                addFeaturedImageOption(fiPanel, fiResponse.data, postId);
+                            }
+                        }
+                    }
+
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.toast('AI analysis complete');
                     }
@@ -1411,6 +1542,7 @@
                         ScalynAlert.close();
                         ScalynAlert.error('AI Analysis Failed', err.message || 'An error occurred.');
                     }
+                    hasRun = false;
                 })
                 .finally(function () {
                     btn.disabled = false;
@@ -1813,7 +1945,7 @@
 
     function escHtml(str) {
         var div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
+        div.appendChild(document.createTextNode(String(str || '')));
         return div.innerHTML;
     }
 
@@ -1932,6 +2064,14 @@
                     generateAiFeaturedImage(postId, btn);
                     break;
 
+                case 'generate-ai-alt':
+                    triggerAiAltGeneration(postId, btn);
+                    break;
+
+                case 'use-titles-as-alt':
+                    triggerTitlesAsAlt(postId, btn);
+                    break;
+
                 case 'upload-featured-image':
                     openMediaLibrary(postId);
                     break;
@@ -1988,6 +2128,71 @@
     }
 
     /**
+     * Trigger AI alt text generation for all images missing alt.
+     */
+    function triggerAiAltGeneration(postId, triggerBtn) {
+        if (!postId) return;
+
+        if (triggerBtn) triggerBtn.disabled = true;
+        Swal.fire({
+            title: 'Generating alt text…',
+            text: 'This may take a moment for multiple images.',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: function () { Swal.showLoading(); },
+            customClass: { popup: 'scalyn-swal-popup' },
+        });
+
+        fetchApi('ai/generate-alt/' + postId, { method: 'POST' })
+            .then(function (response) {
+                Swal.close();
+                if (response.success && response.data && response.data.results) {
+                    displayAltTextResults(response.data.results);
+                    ScalynAlert.toast('Alt text generated for ' + response.data.results.length + ' images');
+                } else {
+                    ScalynAlert.error('No Results', 'AI returned no alt text suggestions. Check your OpenAI provider settings.');
+                }
+            })
+            .catch(function (err) {
+                Swal.close();
+                ScalynAlert.error('Alt Text Generation Failed', err.message || 'An error occurred.');
+            })
+            .finally(function () {
+                if (triggerBtn) triggerBtn.disabled = false;
+            });
+    }
+
+    /**
+     * Apply image titles as alt text immediately, then rescan.
+     */
+    function triggerTitlesAsAlt(postId, triggerBtn) {
+        if (!postId) return;
+
+        if (triggerBtn) triggerBtn.disabled = true;
+        ScalynAlert.loading('Applying titles as alt text…');
+
+        fetchApi('ai/titles-as-alt/' + postId, { method: 'POST' })
+            .then(function (response) {
+                Swal.close();
+                if (response.success && response.data && response.data.applied > 0) {
+                    ScalynAlert.toast(response.data.message || 'Titles applied as alt text');
+                    var rescanBtn = document.querySelector('#scalyn-rescan') || document.querySelector('.scalyn-rescan');
+                    if (rescanBtn) rescanBtn.click();
+                } else {
+                    ScalynAlert.warning('No Titles Found', 'Could not find image titles to use. Images may not be in the Media Library.');
+                }
+            })
+            .catch(function (err) {
+                Swal.close();
+                ScalynAlert.error('Failed', err.message || 'An error occurred.');
+            })
+            .finally(function () {
+                if (triggerBtn) triggerBtn.disabled = false;
+            });
+    }
+
+    /**
      * Generate a featured image using AI (DALL-E) and set it on the post.
      *
      * @param {string|number} postId - Post ID.
@@ -2007,19 +2212,18 @@
             '<p style="margin:8px 0 0;color:var(--scalyn-text-muted);font-size:13px;">Generating image… This may take 15–30 seconds.</p>' +
             '</div>';
 
-        // If no grid yet, set it up.
+        // If no grid yet, set it up matching the standard __content / __actions layout.
         if (!panel.querySelector('.scalyn-fi-grid')) {
             panel.innerHTML = '<div class="scalyn-ai-inline-result">' +
-                '<div class="scalyn-ai-inline-result__content" style="width:100%;">' +
+                '<div class="scalyn-ai-inline-result__content">' +
                 '<span class="scalyn-ai-inline-result__label">AI Generated Images</span>' +
                 '<div class="scalyn-fi-grid"></div>' +
-                '<div class="scalyn-fi-actions" style="margin-top:8px;">' +
-                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ai scalyn-fi-regenerate" data-post-id="' + postId + '">' +
-                '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI</button>' +
+                '<span class="scalyn-ai-inline-result__meta scalyn-fi-meta"></span>' +
+                '</div>' +
+                '<div class="scalyn-ai-inline-result__actions">' +
                 '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-fi-apply" data-post-id="' + postId + '" disabled>' +
                 '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>' +
-                '<span class="scalyn-fi-meta"></span>' +
-                '</div></div></div>';
+                '</div></div>';
         }
 
         var grid = panel.querySelector('.scalyn-fi-grid');
@@ -2054,17 +2258,27 @@
         if (!grid) return;
 
         var count = grid.querySelectorAll('.scalyn-fi-option').length;
-        var isFirst = count === 0;
         var filename = data.url.split('/').pop() || 'ai-featured-' + (count + 1) + '.png';
 
+        // Deselect all existing options and select the new one.
+        grid.querySelectorAll('.scalyn-fi-option').forEach(function (opt) {
+            opt.classList.remove('selected');
+            var r = opt.querySelector('input[type="radio"]');
+            if (r) r.checked = false;
+        });
+
         var option = document.createElement('label');
-        option.className = 'scalyn-fi-option' + (isFirst ? ' selected' : '');
+        option.className = 'scalyn-fi-option selected';
         option.innerHTML = '<img src="' + data.url + '" alt="AI generated option ' + (count + 1) + '" />' +
             '<div class="scalyn-fi-option-footer">' +
-            '<input type="radio" name="scalyn-fi-select-' + postId + '" value="' + data.attachment_id + '"' + (isFirst ? ' checked' : '') + '>' +
+            '<input type="radio" name="scalyn-fi-select-' + postId + '" value="' + data.attachment_id + '" checked>' +
             '<span>' + filename + '</span></div>';
 
         grid.appendChild(option);
+
+        // Update header label to reflect multiple options.
+        var label = panel.querySelector('.scalyn-ai-inline-result__label');
+        if (label) label.textContent = 'Featured Image Options';
 
         // Update meta text.
         var meta = panel.querySelector('.scalyn-fi-meta');
@@ -2076,8 +2290,16 @@
         var applyBtn = panel.querySelector('.scalyn-fi-apply');
         if (applyBtn) applyBtn.disabled = false;
 
-        // Handle radio selection and visual highlight.
+        // Wire up radio selection highlight.
+        bindFiRadioHighlight(option, grid);
+    }
+
+    /**
+     * Bind radio change to highlight the selected featured image option.
+     */
+    function bindFiRadioHighlight(option, grid) {
         var radio = option.querySelector('input[type="radio"]');
+        if (!radio) return;
         radio.addEventListener('change', function () {
             grid.querySelectorAll('.scalyn-fi-option').forEach(function (opt) {
                 opt.classList.remove('selected');
@@ -2090,15 +2312,16 @@
      * Handle inline featured image Regenerate and Apply clicks.
      */
     function initFeaturedImageInline() {
-        document.addEventListener('click', function (e) {
-            // Regenerate button.
-            var regenBtn = e.target.closest('.scalyn-fi-regenerate');
-            if (regenBtn) {
-                var postId = regenBtn.getAttribute('data-post-id');
-                generateAiFeaturedImage(postId, null);
-                return;
-            }
+        // Wire up radio highlights on server-rendered options (current featured image).
+        document.querySelectorAll('.scalyn-ai-featured-image-results').forEach(function (panel) {
+            var grid = panel.querySelector('.scalyn-fi-grid');
+            if (!grid) return;
+            grid.querySelectorAll('.scalyn-fi-option').forEach(function (option) {
+                bindFiRadioHighlight(option, grid);
+            });
+        });
 
+        document.addEventListener('click', function (e) {
             // Apply button.
             var applyBtn = e.target.closest('.scalyn-fi-apply');
             if (applyBtn) {

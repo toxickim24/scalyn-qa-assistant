@@ -279,7 +279,50 @@ class SEO_Analyzer implements Analyzer_Interface {
 	private function check_featured_image( int $post_id ): Check_Item {
 		$tooltip = __( 'Featured images appear in social media shares and search results. Set one in the post editor via the "Featured Image" panel in the right sidebar.', 'scalyn-qa-assistant' );
 
+		// Build the list of AI-generated images for this post.
+		$ai_history   = get_post_meta( $post_id, '_scalyn_qa_ai_featured_images', true );
+		$ai_history   = is_array( $ai_history ) ? $ai_history : array();
+
+		// Backfill: find AI-generated images attached to this post by filename pattern.
+		if ( empty( $ai_history ) ) {
+			$attached = get_posts( array(
+				'post_type'      => 'attachment',
+				'post_mime_type' => 'image',
+				'post_parent'    => $post_id,
+				'posts_per_page' => 20,
+				'post_status'    => 'inherit',
+				'fields'         => 'ids',
+			) );
+			foreach ( $attached as $att_id ) {
+				$file = basename( get_attached_file( $att_id ) ?: '' );
+				if ( str_contains( $file, '-ai-featured' ) ) {
+					$ai_history[] = $att_id;
+				}
+			}
+			if ( ! empty( $ai_history ) ) {
+				update_post_meta( $post_id, '_scalyn_qa_ai_featured_images', $ai_history );
+			}
+		}
+
+		$ai_images = array();
+		foreach ( $ai_history as $aid ) {
+			$aid = (int) $aid;
+			$url = wp_get_attachment_image_url( $aid, 'medium' );
+			if ( $url ) {
+				$ai_images[] = array(
+					'attachment_id' => $aid,
+					'url'           => $url,
+					'filename'      => basename( get_attached_file( $aid ) ?: '' ),
+				);
+			}
+		}
+
 		if ( has_post_thumbnail( $post_id ) ) {
+			$thumb_id  = (int) get_post_thumbnail_id( $post_id );
+			$thumb_url = get_the_post_thumbnail_url( $post_id, 'medium' );
+			$full_url  = get_the_post_thumbnail_url( $post_id, 'full' );
+			$filename  = $thumb_id > 0 ? basename( get_attached_file( $thumb_id ) ?: '' ) : '';
+
 			return new Check_Item(
 				id:        'featured_image_exists',
 				label:     __( 'Featured Image', 'scalyn-qa-assistant' ),
@@ -287,8 +330,15 @@ class SEO_Analyzer implements Analyzer_Interface {
 				message:   __( 'Featured image is set.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'info',
-				quick_fix: null,
+				quick_fix: 'regenerate_ai_featured_image',
 				tooltip:   $tooltip,
+				details:   array(
+					'thumbnail_url'   => $thumb_url ?: '',
+					'full_url'        => $full_url ?: '',
+					'attachment_id'   => $thumb_id,
+					'filename'        => $filename,
+					'ai_images'       => $ai_images,
+				),
 			);
 		}
 
@@ -300,6 +350,9 @@ class SEO_Analyzer implements Analyzer_Interface {
 			category:  'seo',
 			severity:  'critical',
 			quick_fix: 'generate_ai_featured_image',
+			details:   array(
+				'ai_images' => $ai_images,
+			),
 			tooltip:   $tooltip,
 		);
 	}
@@ -370,12 +423,12 @@ class SEO_Analyzer implements Analyzer_Interface {
 				status:    'fail',
 				message:   sprintf(
 					/* translators: %d: number of images */
-					__( 'None of the %d images have alt text. Click each image in the post editor and add descriptive alt text in the block settings.', 'scalyn-qa-assistant' ),
+					__( 'None of the %d images have alt text. Use Quick Fix to apply image titles as alt text, or Generate with AI.', 'scalyn-qa-assistant' ),
 					$total_images,
 				),
 				category:  'seo',
 				severity:  'warning',
-				quick_fix: null,
+				quick_fix: 'use_titles_as_alt',
 				tooltip:   $tooltip,
 				details:   array( 'missing_alt_images' => $missing_alt ),
 			);
@@ -387,13 +440,13 @@ class SEO_Analyzer implements Analyzer_Interface {
 			status:    'warning',
 			message:   sprintf(
 				/* translators: 1: missing count, 2: total count */
-				__( '%1$d of %2$d images are missing alt text. Click each image in the post editor and add descriptive alt text in the block settings.', 'scalyn-qa-assistant' ),
+				__( '%1$d of %2$d images are missing alt text. Use Quick Fix to apply image titles as alt text, or Generate with AI.', 'scalyn-qa-assistant' ),
 				$missing_count,
 				$total_images,
 			),
 			category:  'seo',
 			severity:  'warning',
-			quick_fix: null,
+			quick_fix: 'use_titles_as_alt',
 			tooltip:   $tooltip,
 			details:   array( 'missing_alt_images' => $missing_alt ),
 		);

@@ -151,7 +151,7 @@ $permalink     = get_permalink( $post_id );
 					data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
 				>
 					<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
-					<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
+					<?php esc_html_e( 'Generate All with AI', 'scalyn-qa-assistant' ); ?>
 				</button>
 			<?php endif; ?>
 			<button type="button" id="scalyn-add-note" class="scalyn-btn scalyn-btn--secondary" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>">

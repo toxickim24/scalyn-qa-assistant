@@ -17,6 +17,8 @@ defined( 'ABSPATH' ) || exit;
 use Scalyn\QA\Scoring\Scoring_Engine;
 use Scalyn\QA\Models\Scan_Result;
 use Scalyn\QA\Integrations\SEO_Integration;
+use Scalyn\QA\AI\AI_Manager;
+use Scalyn\QA\AI\AI_Health_Monitor;
 
 /**
  * Class Dashboard_Page
@@ -35,11 +37,14 @@ class Dashboard_Page {
 	 */
 	public function render(): void {
 		$data = array(
-			'project_scores'        => $this->get_project_scores(),
+			'project_scores'          => $this->get_project_scores(),
 			'pages_needing_attention' => $this->get_pages_needing_attention(),
-			'recent_scans'          => $this->get_recent_scans(),
-			'seo_plugin_status'     => $this->get_seo_plugin_status(),
-			'launch_summary'        => $this->get_launch_summary(),
+			'recent_scans'            => $this->get_recent_scans(),
+			'seo_plugin_status'       => $this->get_seo_plugin_status(),
+			'launch_summary'          => $this->get_launch_summary(),
+			'top_issues'              => $this->get_top_issues(),
+			'scan_coverage'           => $this->get_scan_coverage(),
+			'ai_status'               => $this->get_ai_status(),
 		);
 
 		$this->load_template( 'dashboard/overview.php', $data );
@@ -228,6 +233,152 @@ class Dashboard_Page {
 		}
 
 		return $summary;
+	}
+
+	/**
+	 * Aggregate top failing checks across all scanned pages.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @return array<int, array{id: string, label: string, count: int, category: string}>
+	 */
+	private function get_top_issues(): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$post_ids = $wpdb->get_col(
+			"SELECT DISTINCT post_id
+			 FROM {$wpdb->postmeta}
+			 WHERE meta_key = '_scalyn_qa_scan_results'",
+		);
+
+		if ( empty( $post_ids ) ) {
+			return array();
+		}
+
+		$issue_counts = array();
+		$issue_labels = array();
+		$issue_cats   = array();
+
+		foreach ( $post_ids as $post_id ) {
+			$post_id = (int) $post_id;
+			$post    = get_post( $post_id );
+			if ( ! $post || 'publish' !== $post->post_status ) {
+				continue;
+			}
+
+			$scan_data = get_post_meta( $post_id, '_scalyn_qa_scan_results', true );
+			if ( ! is_array( $scan_data ) ) {
+				continue;
+			}
+
+			foreach ( $scan_data as $category => $checks ) {
+				if ( ! is_array( $checks ) ) {
+					continue;
+				}
+				foreach ( $checks as $check ) {
+					if ( ! is_array( $check ) ) {
+						continue;
+					}
+					$status = $check['status'] ?? 'pass';
+					if ( 'pass' === $status ) {
+						continue;
+					}
+					$id    = $check['id'] ?? '';
+					$label = $check['label'] ?? $id;
+					if ( '' === $id ) {
+						continue;
+					}
+					if ( ! isset( $issue_counts[ $id ] ) ) {
+						$issue_counts[ $id ] = 0;
+						$issue_labels[ $id ] = $label;
+						$issue_cats[ $id ]   = $category;
+					}
+					++$issue_counts[ $id ];
+				}
+			}
+		}
+
+		arsort( $issue_counts );
+
+		$top = array();
+		$i   = 0;
+		foreach ( $issue_counts as $id => $count ) {
+			if ( ++$i > 10 ) {
+				break;
+			}
+			$top[] = array(
+				'id'       => $id,
+				'label'    => $issue_labels[ $id ],
+				'count'    => $count,
+				'category' => $issue_cats[ $id ],
+			);
+		}
+
+		return $top;
+	}
+
+	/**
+	 * Get scan coverage — pages scanned vs total scannable pages.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @return array{scanned: int, total: int}
+	 */
+	private function get_scan_coverage(): array {
+		$settings   = get_option( 'scalyn_qa_settings', array() );
+		$post_types = isset( $settings['post_types'] ) && is_array( $settings['post_types'] ) ? $settings['post_types'] : array( 'post', 'page' );
+
+		$total = 0;
+		foreach ( $post_types as $pt ) {
+			$count_obj = wp_count_posts( $pt );
+			$total    += (int) ( $count_obj->publish ?? 0 );
+		}
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$scanned = (int) $wpdb->get_var(
+			"SELECT COUNT(DISTINCT pm.post_id)
+			 FROM {$wpdb->postmeta} pm
+			 INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+			 WHERE pm.meta_key = '_scalyn_qa_scores'
+			 AND p.post_status = 'publish'",
+		);
+
+		return array(
+			'scanned' => $scanned,
+			'total'   => $total,
+		);
+	}
+
+	/**
+	 * Get AI provider status for the dashboard.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @return array{enabled: bool, provider: string, status: string}
+	 */
+	private function get_ai_status(): array {
+		$ai_manager = new AI_Manager();
+		$result     = array(
+			'enabled'  => $ai_manager->is_enabled(),
+			'provider' => '',
+			'status'   => 'not_configured',
+		);
+
+		if ( ! $result['enabled'] ) {
+			return $result;
+		}
+
+		$chain = $ai_manager->get_priority_chain();
+		if ( ! empty( $chain ) ) {
+			$primary_key     = $chain[0];
+			$result['provider'] = ucfirst( $primary_key );
+			$health          = AI_Health_Monitor::get_health( $primary_key );
+			$result['status'] = $health['status'] ?? 'unknown';
+		}
+
+		return $result;
 	}
 
 	/**

@@ -166,7 +166,7 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 			<?php if ( $ai_configured ) : ?>
 			<button type="button" id="scalyn-launch-generate-ai" class="scalyn-btn scalyn-btn--small scalyn-btn--ai">
 				<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
-				<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
+				<?php esc_html_e( 'Generate All with AI', 'scalyn-qa-assistant' ); ?>
 			</button>
 			<?php endif; ?>
 		</div>
@@ -521,7 +521,7 @@ if ( null !== $last_scan && $last_scan > 0 ) {
 							<div class="scalyn-ai-inline-result scalyn-launch-ai-panel" data-ai-key="<?php echo esc_attr( $ai_key_for_regen ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>" style="opacity:0.7;">
 								<div class="scalyn-ai-inline-result__content">
 									<span class="scalyn-ai-inline-result__label"><?php esc_html_e( 'AI Suggestion:', 'scalyn-qa-assistant' ); ?></span>
-									<p class="scalyn-ai-inline-result__text" style="color:var(--scalyn-text-muted);"><?php esc_html_e( 'No AI content generated yet for this check. Click Regenerate or use the header "Generate with AI" button.', 'scalyn-qa-assistant' ); ?></p>
+									<p class="scalyn-ai-inline-result__text" style="color:var(--scalyn-text-muted);"><?php esc_html_e( 'No AI content generated yet for this check. Click Generate with AI or use the header "Generate All with AI" button.', 'scalyn-qa-assistant' ); ?></p>
 								</div>
 								<div class="scalyn-ai-inline-result__actions">
 									<button type="button" class="scalyn-btn scalyn-btn--small scalyn-launch-ai-regenerate" data-ai-key="<?php echo esc_attr( $ai_key_for_regen ); ?>" data-check-id="<?php echo esc_attr( $check_id ); ?>" title="<?php esc_attr_e( 'Regenerate with AI', 'scalyn-qa-assistant' ); ?>">

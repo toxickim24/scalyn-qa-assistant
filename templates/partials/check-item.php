@@ -27,8 +27,13 @@ $tooltip    = isset( $item['tooltip'] ) ? $item['tooltip'] : '';
 $details    = isset( $item['details'] ) && is_array( $item['details'] ) ? $item['details'] : array();
 
 // Extract the first array-valued detail for the expandable list.
+// Skip keys used for structured data (not meant for the expandable list).
 $details_list = array();
-foreach ( $details as $detail_value ) {
+$details_skip_keys = array( 'ai_images' );
+foreach ( $details as $detail_key => $detail_value ) {
+	if ( in_array( $detail_key, $details_skip_keys, true ) ) {
+		continue;
+	}
 	if ( is_array( $detail_value ) && ! empty( $detail_value ) ) {
 		$details_list = $detail_value;
 		break;
@@ -67,6 +72,14 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 			include SCALYN_QA_PLUGIN_DIR . 'templates/partials/quick-fix-button.php';
 			?>
 		<?php endif; ?>
+
+		<?php if ( 'image_alt_text' === $item_id && 'pass' !== $status ) : ?>
+			<?php
+			$action = 'generate_ai_alt';
+			include SCALYN_QA_PLUGIN_DIR . 'templates/partials/quick-fix-button.php';
+			?>
+		<?php endif; ?>
+
 
 		<?php if ( ! empty( $tooltip ) ) : ?>
 			<?php
@@ -246,9 +259,83 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 	</div>
 	<?php endif; ?>
 
-	<?php if ( $check_item_ai_enabled && 'featured_image_exists' === $item_id && 'pass' !== $status ) : ?>
-	<!-- Inline AI featured image results -->
-	<div class="scalyn-ai-featured-image-results" data-check-id="featured_image_exists" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>" style="display:none;">
+	<?php if ( $check_item_ai_enabled && 'featured_image_exists' === $item_id ) : ?>
+	<?php
+	$fi_thumb_url     = $details['thumbnail_url'] ?? '';
+	$fi_attachment_id = (int) ( $details['attachment_id'] ?? 0 );
+	$fi_filename      = $details['filename'] ?? '';
+	$fi_has_image     = 'pass' === $status && '' !== $fi_thumb_url;
+	$fi_ai_images     = $details['ai_images'] ?? array();
+	$fi_has_any       = $fi_has_image || ! empty( $fi_ai_images );
+
+	// Build the list of all images to show (current + AI history, deduplicated).
+	$fi_all_options = array();
+	$fi_seen_ids    = array();
+
+	// Current featured image first (if set).
+	if ( $fi_has_image && $fi_attachment_id > 0 ) {
+		$fi_all_options[] = array(
+			'attachment_id' => $fi_attachment_id,
+			'url'           => $fi_thumb_url,
+			'filename'      => $fi_filename,
+			'is_current'    => true,
+		);
+		$fi_seen_ids[] = $fi_attachment_id;
+	}
+
+	// AI-generated images (skip the current one if it's already shown).
+	foreach ( $fi_ai_images as $fi_ai ) {
+		$aid = (int) $fi_ai['attachment_id'];
+		if ( in_array( $aid, $fi_seen_ids, true ) ) {
+			continue;
+		}
+		$fi_all_options[] = array(
+			'attachment_id' => $aid,
+			'url'           => $fi_ai['url'],
+			'filename'      => $fi_ai['filename'],
+			'is_current'    => false,
+		);
+		$fi_seen_ids[] = $aid;
+	}
+
+	$fi_label = count( $fi_all_options ) > 1
+		? __( 'Featured Image Options', 'scalyn-qa-assistant' )
+		: ( $fi_has_image ? __( 'Current Featured Image', 'scalyn-qa-assistant' ) : __( 'AI Generated Images', 'scalyn-qa-assistant' ) );
+	?>
+	<!-- Inline AI featured image panel -->
+	<div
+		class="scalyn-ai-featured-image-results"
+		data-check-id="featured_image_exists"
+		data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
+		style="<?php echo $fi_has_any ? '' : 'display:none;'; ?>"
+	>
+		<div class="scalyn-ai-inline-result">
+			<div class="scalyn-ai-inline-result__content">
+				<span class="scalyn-ai-inline-result__label"><?php echo esc_html( $fi_label ); ?></span>
+				<div class="scalyn-fi-grid">
+					<?php foreach ( $fi_all_options as $fi_idx => $fi_opt ) : ?>
+					<?php $fi_is_selected = $fi_opt['is_current'] || ( ! $fi_has_image && 0 === $fi_idx ); ?>
+					<label class="scalyn-fi-option<?php echo $fi_is_selected ? ' selected' : ''; ?>">
+						<img src="<?php echo esc_url( $fi_opt['url'] ); ?>" alt="<?php echo esc_attr( $fi_opt['filename'] ); ?>" />
+						<div class="scalyn-fi-option-footer">
+							<input type="radio" name="scalyn-fi-select-<?php echo esc_attr( (string) $post_id ); ?>" value="<?php echo esc_attr( (string) $fi_opt['attachment_id'] ); ?>"<?php checked( $fi_is_selected ); ?>>
+							<span><?php echo esc_html( $fi_opt['filename'] ); ?></span>
+							<?php if ( $fi_opt['is_current'] ) : ?>
+								<span style="color:var(--scalyn-success);font-size:0.6875rem;margin-left:auto;"><?php esc_html_e( '(current)', 'scalyn-qa-assistant' ); ?></span>
+							<?php endif; ?>
+						</div>
+					</label>
+					<?php endforeach; ?>
+				</div>
+				<span class="scalyn-ai-inline-result__meta scalyn-fi-meta"></span>
+			</div>
+			<div class="scalyn-ai-inline-result__actions">
+				<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-fi-apply" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"<?php echo $fi_has_any ? '' : ' disabled'; ?> title="<?php esc_attr_e( 'Set as featured image', 'scalyn-qa-assistant' ); ?>">
+					<span class="dashicons dashicons-yes" aria-hidden="true"></span>
+					<?php esc_html_e( 'Apply', 'scalyn-qa-assistant' ); ?>
+				</button>
+			</div>
+		</div>
 	</div>
 	<?php endif; ?>
 

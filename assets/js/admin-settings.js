@@ -190,8 +190,20 @@
             providers: {}
         };
 
-        // AI enabled toggle.
+        // AI enabled toggle — auto-enable if a provider is active, prevent enable if none.
         var enableToggle = document.querySelector('[name="enable_ai"]');
+        var providerActive = hasActiveProvider();
+
+        if (enableToggle && enableToggle.checked && !providerActive) {
+            enableToggle.checked = false;
+            showAiNotice('AI features disabled — no provider is configured with an API key and active role.', 'warning');
+        } else if (enableToggle && !enableToggle.checked && providerActive) {
+            enableToggle.checked = true;
+            showAiNotice('AI features auto-enabled — a configured provider was detected.', 'success');
+        } else {
+            hideAiNotice();
+        }
+
         aiConfig.enabled = enableToggle ? enableToggle.checked : false;
 
         // Provider configs — field names match template: openai_api_key, openai_model, openai_role
@@ -473,6 +485,38 @@
     }
 
     /**
+     * Check if any AI provider has a configured key and an active role (primary/fallback).
+     */
+    function hasActiveProvider() {
+        var providerKeys = ['openai', 'claude', 'gemini', 'openrouter', 'custom'];
+        for (var i = 0; i < providerKeys.length; i++) {
+            var provider = providerKeys[i];
+            var keyInput = document.querySelector('[name="' + provider + '_api_key"]');
+            var roleInput = document.querySelector('input[name="' + provider + '_role"]:checked');
+            var hasKey = keyInput && (keyInput.value.trim() !== '' || keyInput.getAttribute('data-configured') === '1');
+            var hasActiveRole = roleInput && roleInput.value !== 'disabled';
+            if (hasKey && hasActiveRole) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Show or hide the AI toggle notice.
+     */
+    function showAiNotice(message, type) {
+        var notice = document.getElementById('scalyn-ai-toggle-notice');
+        if (!notice) return;
+        notice.className = 'scalyn-notice scalyn-notice--' + type;
+        notice.textContent = message;
+        notice.style.display = '';
+    }
+
+    function hideAiNotice() {
+        var notice = document.getElementById('scalyn-ai-toggle-notice');
+        if (notice) notice.style.display = 'none';
+    }
+
+    /**
      * Handle enable/disable AI toggle.
      */
     function initAiEnableToggle() {
@@ -480,6 +524,14 @@
         if (!toggle) return;
 
         toggle.addEventListener('change', function () {
+            hideAiNotice();
+
+            if (toggle.checked && !hasActiveProvider()) {
+                toggle.checked = false;
+                showAiNotice('Cannot enable AI features. Please configure at least one AI provider with an API key and set its role to Primary or Fallback first.', 'warning');
+                return;
+            }
+
             var aiFields = document.querySelectorAll('.scalyn-ai-provider-fields');
             aiFields.forEach(function (field) {
                 field.style.opacity = toggle.checked ? '1' : '0.5';
@@ -707,6 +759,7 @@
         initImportSettings();
         initAiUsageForm();
         loadAiLog();
+        initClearAiLog();
         initDebugMode();
         loadDebugLog();
         initDebugFilter();
@@ -917,7 +970,17 @@
                 }
                 if (response.success && response.data) {
                     var imported = response.data.imported || [];
-                    var message = 'Imported: ' + imported.join(', ');
+                    var labelMap = {
+                        'settings': 'General Settings',
+                        'ai_config (API keys preserved)': 'AI Config (API keys preserved)',
+                        'page_audit_settings': 'Page Audit Settings',
+                        'global_ignores': 'Global Ignores',
+                        'launch_settings': 'Launch Checklist Settings',
+                        'local_business': 'Local Business Schema',
+                        'launch_ai_content': 'Launch AI Content',
+                    };
+                    var labels = imported.map(function (key) { return labelMap[key] || key; });
+                    var message = 'Imported: ' + labels.join(', ');
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.success('Import Complete', message);
                     }
@@ -1015,6 +1078,46 @@
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(str));
         return div.innerHTML;
+    }
+
+    /**
+     * Handle the "Clear AI Log" button.
+     */
+    function initClearAiLog() {
+        var btn = document.getElementById('scalyn-clear-ai-log');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            Swal.fire({
+                title: 'Clear AI Usage Log',
+                text: 'This will permanently delete all AI usage log entries. Continue?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Clear Log',
+                confirmButtonColor: '#dc3545',
+                customClass: { popup: 'scalyn-swal-popup' },
+            }).then(function (result) {
+                if (!result.isConfirmed) return;
+
+                btn.disabled = true;
+                fetchApi('ai/log', { method: 'DELETE' })
+                    .then(function (response) {
+                        if (response.success) {
+                            ScalynAlert.toast('AI usage log cleared');
+                            var container = document.getElementById('scalyn-ai-log-container');
+                            if (container) {
+                                container.innerHTML = '<p class="scalyn-field-description">No AI requests logged yet.</p>';
+                            }
+                        }
+                    })
+                    .catch(function (err) {
+                        ScalynAlert.error('Failed', err.message || 'Failed to clear AI log.');
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                    });
+            });
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -1429,7 +1532,17 @@
 
                 if (response.success && response.data) {
                     var restored = response.data.restored || [];
-                    var message = 'Restored: ' + restored.join(', ');
+                    var labelMap = {
+                        'settings': 'General Settings',
+                        'ai_config': 'AI Config',
+                        'page_audit_settings': 'Page Audit Settings',
+                        'global_ignores': 'Global Ignores',
+                        'launch_settings': 'Launch Checklist Settings',
+                        'local_business': 'Local Business Schema',
+                        'launch_ai_content': 'Launch AI Content',
+                    };
+                    var labels = restored.map(function (key) { return labelMap[key] || key; });
+                    var message = 'Restored: ' + labels.join(', ');
 
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.success('Rollback Complete', message);

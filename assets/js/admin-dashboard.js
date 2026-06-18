@@ -247,7 +247,7 @@
      * Shows a confirmation dialog, then performs a batch scan with progress.
      */
     function handleScanAll() {
-        var scanAllBtn = document.getElementById('scalyn-scan-all');
+        var scanAllBtn = document.getElementById('scalyn-scan-all') || document.getElementById('scalyn-scan-all-pages');
         if (!scanAllBtn) {
             return;
         }
@@ -276,26 +276,58 @@
      * from the pages needing attention widget and scanning in batches of 20.
      */
     function runBatchScan() {
-        // Collect post IDs from the pages needing attention table.
-        var rows = document.querySelectorAll('[data-post-id]');
-        var postIds = [];
-
-        rows.forEach(function (row) {
-            var id = parseInt(row.getAttribute('data-post-id'), 10);
-            if (id > 0 && postIds.indexOf(id) === -1) {
-                postIds.push(id);
-            }
-        });
-
-        if (postIds.length === 0) {
-            if (typeof ScalynAlert !== 'undefined') {
-                ScalynAlert.warning('No Pages', 'No pages found to scan.');
-            }
-            return;
+        if (typeof ScalynAlert !== 'undefined') {
+            ScalynAlert.loading('Loading pages...');
         }
 
+        // Fetch all scannable post IDs from the server.
+        fetchApi('scan/post-ids', { method: 'GET' })
+            .then(function (response) {
+                var postIds = (response.success && response.data && response.data.post_ids) ? response.data.post_ids : [];
+
+                // Fallback: collect from DOM if endpoint doesn't exist.
+                if (postIds.length === 0) {
+                    var rows = document.querySelectorAll('[data-post-id]');
+                    rows.forEach(function (row) {
+                        var id = parseInt(row.getAttribute('data-post-id'), 10);
+                        if (id > 0 && postIds.indexOf(id) === -1) {
+                            postIds.push(id);
+                        }
+                    });
+                }
+
+                if (postIds.length === 0) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.close();
+                        ScalynAlert.warning('No Pages', 'No pages found to scan.');
+                    }
+                    return;
+                }
+
+                startBatchScan(postIds);
+            })
+            .catch(function () {
+                // Fallback: collect from DOM.
+                var rows = document.querySelectorAll('[data-post-id]');
+                var postIds = [];
+                rows.forEach(function (row) {
+                    var id = parseInt(row.getAttribute('data-post-id'), 10);
+                    if (id > 0 && postIds.indexOf(id) === -1) {
+                        postIds.push(id);
+                    }
+                });
+                if (postIds.length > 0) {
+                    startBatchScan(postIds);
+                } else if (typeof ScalynAlert !== 'undefined') {
+                    ScalynAlert.close();
+                    ScalynAlert.warning('No Pages', 'No pages found to scan.');
+                }
+            });
+    }
+
+    function startBatchScan(postIds) {
         if (typeof ScalynAlert !== 'undefined') {
-            ScalynAlert.loading('Scanning pages...');
+            ScalynAlert.loading('Scanning ' + postIds.length + ' pages...');
         }
 
         // Process in batches of 20 (API limit).

@@ -39,6 +39,12 @@ $button_config = array(
 		'class'    => 'scalyn-btn--ai',
 		'data_key' => 'generate-ai-featured-image',
 	),
+	'regenerate_ai_featured_image' => array(
+		'label'    => __( 'Regenerate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-update',
+		'class'    => 'scalyn-btn--ghost',
+		'data_key' => 'generate-ai-featured-image',
+	),
 	'upload_featured_image' => array(
 		'label'    => __( 'Upload Image', 'scalyn-qa-assistant' ),
 		'icon'     => 'dashicons-format-image',
@@ -65,6 +71,24 @@ $button_config = array(
 		'data_key' => 'install-seo-plugin',
 		'is_link'  => true,
 	),
+	'generate_ai_alt' => array(
+		'label'    => __( 'Generate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-admin-customizer',
+		'class'    => 'scalyn-btn--ai',
+		'data_key' => 'generate-ai-alt',
+	),
+	'regenerate_ai_alt' => array(
+		'label'    => __( 'Regenerate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-update',
+		'class'    => 'scalyn-btn--ghost',
+		'data_key' => 'generate-ai-alt',
+	),
+	'use_titles_as_alt' => array(
+		'label'    => __( 'Quick Fix', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-admin-generic',
+		'class'    => 'scalyn-btn--secondary',
+		'data_key' => 'use-titles-as-alt',
+	),
 	'generate_ai_keyword' => array(
 		'label'    => __( 'Generate with AI', 'scalyn-qa-assistant' ),
 		'icon'     => 'dashicons-admin-customizer',
@@ -84,7 +108,7 @@ if ( ! isset( $button_config[ $action ] ) ) {
 }
 
 // Hide AI-related quick fix buttons when AI is disabled.
-$ai_actions = array( 'generate_ai_meta', 'regenerate_ai_meta', 'generate_ai_keyword', 'regenerate_ai_keyword', 'generate_ai_featured_image' );
+$ai_actions = array( 'generate_ai_meta', 'regenerate_ai_meta', 'generate_ai_keyword', 'regenerate_ai_keyword', 'generate_ai_featured_image', 'regenerate_ai_featured_image', 'generate_ai_alt', 'regenerate_ai_alt' );
 if ( in_array( $action, $ai_actions, true ) && ! ( new \Scalyn\QA\AI\AI_Manager() )->is_enabled() ) {
 	return;
 }

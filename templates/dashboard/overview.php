@@ -13,6 +13,9 @@ $pages_needing_attention = isset( $pages_needing_attention ) && is_array( $pages
 $recent_scans            = isset( $recent_scans ) && is_array( $recent_scans ) ? $recent_scans : array();
 $seo_plugin_status       = isset( $seo_plugin_status ) ? $seo_plugin_status : null;
 $launch_summary          = isset( $launch_summary ) && is_array( $launch_summary ) ? $launch_summary : array();
+$top_issues              = isset( $top_issues ) && is_array( $top_issues ) ? $top_issues : array();
+$scan_coverage           = isset( $scan_coverage ) && is_array( $scan_coverage ) ? $scan_coverage : array();
+$ai_status               = isset( $ai_status ) && is_array( $ai_status ) ? $ai_status : array();
 
 $seo_ready    = (int) ( $project_scores['seo_ready'] ?? 0 );
 $qa_ready     = (int) ( $project_scores['qa_ready'] ?? 0 );
@@ -25,8 +28,12 @@ $launch_warning   = (int) ( $launch_summary['warning'] ?? 0 );
 $launch_total     = (int) ( $launch_summary['total'] ?? 0 );
 $launch_last_scan = $launch_summary['last_scan'] ?? null;
 
-$total_pages_attention = count( $pages_needing_attention );
-$total_scans           = count( $recent_scans );
+$scanned_count = (int) ( $scan_coverage['scanned'] ?? 0 );
+$total_pages   = (int) ( $scan_coverage['total'] ?? 0 );
+
+$ai_enabled  = ! empty( $ai_status['enabled'] );
+$ai_provider = $ai_status['provider'] ?? '';
+$ai_health   = $ai_status['status'] ?? 'not_configured';
 
 // Overall status
 $overall_status = \Scalyn\QA\Models\Score::calculate_status( $overall );
@@ -52,7 +59,7 @@ $overall_label  = match ( $overall_status ) {
 		<span class="scalyn-version"><?php echo esc_html( 'v' . SCALYN_QA_VERSION ); ?></span>
 	</div>
 
-	<!-- Hero: Overall Score + Category Scores -->
+	<!-- Hero: Overall Score + Category Scores + Scan All -->
 	<div class="scalyn-dashboard-hero">
 		<div class="scalyn-dashboard-hero__main">
 			<div class="scalyn-score-circle scalyn-score-circle--large scalyn-score-circle--<?php echo esc_attr( $overall_status ); ?>"
@@ -63,6 +70,19 @@ $overall_label  = match ( $overall_status ) {
 				<span class="scalyn-dashboard-hero__label"><?php esc_html_e( 'Overall Score', 'scalyn-qa-assistant' ); ?></span>
 				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( $overall_status ); ?>"><?php echo esc_html( $overall_label ); ?></span>
 				<span class="scalyn-dashboard-hero__formula"><?php esc_html_e( 'SEO 35% + QA 35% + Launch 30%', 'scalyn-qa-assistant' ); ?></span>
+				<div class="scalyn-dashboard-hero__actions">
+					<button type="button" id="scalyn-scan-all-pages" class="scalyn-btn scalyn-btn--small">
+						<span class="dashicons dashicons-update" aria-hidden="true"></span>
+						<?php
+						printf(
+							/* translators: 1: scanned count, 2: total count */
+							esc_html__( 'Scan All Pages (%1$d/%2$d)', 'scalyn-qa-assistant' ),
+							$scanned_count,
+							$total_pages,
+						);
+						?>
+					</button>
+				</div>
 			</div>
 		</div>
 		<div class="scalyn-dashboard-hero__categories">
@@ -105,7 +125,7 @@ $overall_label  = match ( $overall_status ) {
 		</div>
 	</div>
 
-	<!-- Three Column: Site Status + Environment + Actions -->
+	<!-- Three Column: Site Status + Top Issues + Quick Actions -->
 	<div class="scalyn-grid scalyn-grid--3">
 		<!-- Site Status -->
 		<div class="scalyn-card">
@@ -130,84 +150,116 @@ $overall_label  = match ( $overall_status ) {
 					</div>
 				</div>
 				<div class="scalyn-kpi">
-					<div class="scalyn-kpi__icon scalyn-kpi__icon--<?php echo is_ssl() ? 'success' : 'danger'; ?>">
-						<span class="dashicons <?php echo is_ssl() ? 'dashicons-lock' : 'dashicons-unlock'; ?>" aria-hidden="true"></span>
+					<?php
+					$ai_icon_status = 'neutral';
+					$ai_icon        = 'dashicons-admin-generic';
+					$ai_display     = __( 'Not Configured', 'scalyn-qa-assistant' );
+					if ( $ai_enabled && '' !== $ai_provider ) {
+						$ai_display     = $ai_provider;
+						$ai_icon        = 'dashicons-admin-customizer';
+						$ai_icon_status = 'healthy' === $ai_health ? 'success' : ( 'degraded' === $ai_health ? 'warning' : 'primary' );
+					}
+					?>
+					<div class="scalyn-kpi__icon scalyn-kpi__icon--<?php echo esc_attr( $ai_icon_status ); ?>">
+						<span class="dashicons <?php echo esc_attr( $ai_icon ); ?>" aria-hidden="true"></span>
 					</div>
 					<div class="scalyn-kpi__content">
-						<span class="scalyn-kpi__value"><?php echo is_ssl() ? 'HTTPS' : 'HTTP'; ?></span>
-						<span class="scalyn-kpi__label"><?php esc_html_e( 'SSL Status', 'scalyn-qa-assistant' ); ?></span>
+						<span class="scalyn-kpi__value"><?php echo esc_html( $ai_display ); ?></span>
+						<span class="scalyn-kpi__label"><?php esc_html_e( 'AI Provider', 'scalyn-qa-assistant' ); ?></span>
 					</div>
 				</div>
 				<div class="scalyn-kpi">
-					<div class="scalyn-kpi__icon scalyn-kpi__icon--primary">
-						<span class="dashicons dashicons-clock" aria-hidden="true"></span>
+					<?php
+					$coverage_pct    = $total_pages > 0 ? round( ( $scanned_count / $total_pages ) * 100 ) : 0;
+					$coverage_status = $coverage_pct >= 80 ? 'success' : ( $coverage_pct >= 50 ? 'warning' : 'danger' );
+					?>
+					<div class="scalyn-kpi__icon scalyn-kpi__icon--<?php echo esc_attr( $coverage_status ); ?>">
+						<span class="dashicons dashicons-chart-bar" aria-hidden="true"></span>
 					</div>
 					<div class="scalyn-kpi__content">
-						<span class="scalyn-kpi__value"><?php
-						if ( null !== $launch_last_scan ) {
-							$ts = is_numeric( $launch_last_scan ) ? (int) $launch_last_scan : strtotime( $launch_last_scan );
-							echo esc_html( human_time_diff( $ts, time() ) . ' ' . __( 'ago', 'scalyn-qa-assistant' ) );
-						} else {
-							esc_html_e( 'Never', 'scalyn-qa-assistant' );
-						}
-						?></span>
-						<span class="scalyn-kpi__label"><?php esc_html_e( 'Last Launch Check', 'scalyn-qa-assistant' ); ?></span>
+						<span class="scalyn-kpi__value"><?php echo esc_html( $scanned_count . '/' . $total_pages ); ?></span>
+						<span class="scalyn-kpi__label"><?php esc_html_e( 'Pages Scanned', 'scalyn-qa-assistant' ); ?></span>
 					</div>
 				</div>
 			</div>
 		</div>
 
-		<!-- Environment -->
+		<!-- Top Issues -->
 		<div class="scalyn-card">
-			<h2 class="scalyn-card-title"><?php esc_html_e( 'Environment', 'scalyn-qa-assistant' ); ?></h2>
-			<div class="scalyn-kpi-list">
-				<div class="scalyn-kpi">
-					<div class="scalyn-kpi__icon scalyn-kpi__icon--primary">
-						<span class="dashicons dashicons-wordpress" aria-hidden="true"></span>
-					</div>
-					<div class="scalyn-kpi__content">
-						<span class="scalyn-kpi__value"><?php echo esc_html( get_bloginfo( 'version' ) ); ?></span>
-						<span class="scalyn-kpi__label"><?php esc_html_e( 'WordPress', 'scalyn-qa-assistant' ); ?></span>
-					</div>
+			<h2 class="scalyn-card-title"><?php esc_html_e( 'Top Issues', 'scalyn-qa-assistant' ); ?></h2>
+			<?php if ( empty( $top_issues ) ) : ?>
+				<p class="scalyn-empty"><?php esc_html_e( 'No issues found. Your site is in great shape!', 'scalyn-qa-assistant' ); ?></p>
+			<?php else : ?>
+				<div class="scalyn-issue-list">
+					<?php foreach ( $top_issues as $issue ) :
+						$issue_status = $issue['count'] >= 5 ? 'danger' : ( $issue['count'] >= 2 ? 'warning' : 'neutral' );
+					?>
+						<div class="scalyn-issue-row">
+							<div class="scalyn-issue-row__icon scalyn-kpi__icon--<?php echo esc_attr( $issue_status ); ?>">
+								<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( $issue_status === 'danger' ? 'red' : ( $issue_status === 'warning' ? 'yellow' : 'green' ) ); ?>"><?php echo esc_html( (string) $issue['count'] ); ?></span>
+							</div>
+							<div class="scalyn-issue-row__content">
+								<span class="scalyn-issue-row__label"><?php echo esc_html( $issue['label'] ); ?></span>
+								<span class="scalyn-issue-row__meta"><?php
+									printf(
+										/* translators: 1: count, 2: category */
+										esc_html__( '%1$d pages affected | %2$s', 'scalyn-qa-assistant' ),
+										$issue['count'],
+										ucfirst( $issue['category'] ),
+									);
+								?></span>
+							</div>
+						</div>
+					<?php endforeach; ?>
 				</div>
-				<div class="scalyn-kpi">
-					<div class="scalyn-kpi__icon scalyn-kpi__icon--<?php echo version_compare( phpversion(), '8.2', '>=' ) ? 'success' : 'warning'; ?>">
-						<span class="dashicons dashicons-editor-code" aria-hidden="true"></span>
-					</div>
-					<div class="scalyn-kpi__content">
-						<span class="scalyn-kpi__value"><?php echo esc_html( phpversion() ); ?></span>
-						<span class="scalyn-kpi__label"><?php esc_html_e( 'PHP Version', 'scalyn-qa-assistant' ); ?></span>
-					</div>
-				</div>
-				<div class="scalyn-kpi">
-					<div class="scalyn-kpi__icon scalyn-kpi__icon--neutral">
-						<span class="dashicons dashicons-admin-appearance" aria-hidden="true"></span>
-					</div>
-					<div class="scalyn-kpi__content">
-						<span class="scalyn-kpi__value"><?php echo esc_html( wp_get_theme()->get( 'Name' ) ); ?></span>
-						<span class="scalyn-kpi__label"><?php esc_html_e( 'Active Theme', 'scalyn-qa-assistant' ); ?></span>
-					</div>
-				</div>
-				<div class="scalyn-kpi">
-					<div class="scalyn-kpi__icon scalyn-kpi__icon--neutral">
-						<span class="dashicons dashicons-list-view" aria-hidden="true"></span>
-					</div>
-					<div class="scalyn-kpi__content">
-						<?php
-						$settings   = get_option( 'scalyn_qa_settings', array() );
-						$post_types = isset( $settings['post_types'] ) && is_array( $settings['post_types'] ) ? $settings['post_types'] : array( 'post', 'page' );
-						?>
-						<span class="scalyn-kpi__value"><?php echo esc_html( implode( ', ', array_map( 'ucfirst', $post_types ) ) ); ?></span>
-						<span class="scalyn-kpi__label"><?php esc_html_e( 'Scanned Post Types', 'scalyn-qa-assistant' ); ?></span>
-					</div>
-				</div>
-			</div>
+			<?php endif; ?>
 		</div>
 
 		<!-- Quick Actions -->
 		<div class="scalyn-card">
 			<h2 class="scalyn-card-title"><?php esc_html_e( 'Quick Actions', 'scalyn-qa-assistant' ); ?></h2>
 			<div class="scalyn-actions-list">
+				<?php
+				// Contextual actions based on actual issues.
+				$contextual_actions = array();
+
+				foreach ( $top_issues as $issue ) {
+					if ( count( $contextual_actions ) >= 3 ) {
+						break;
+					}
+					$contextual_actions[] = array(
+						'icon'  => 'dashicons-admin-tools',
+						'label' => sprintf(
+							/* translators: 1: count, 2: issue label */
+							__( 'Fix %1$d pages: %2$s', 'scalyn-qa-assistant' ),
+							$issue['count'],
+							$issue['label'],
+						),
+						'url'   => admin_url( 'admin.php?page=scalyn-qa-audits' ),
+					);
+				}
+
+				if ( empty( $contextual_actions ) ) :
+				?>
+					<div class="scalyn-empty" style="padding:0.5rem 0;">
+						<span class="dashicons dashicons-yes-alt" style="color:var(--scalyn-success);margin-right:4px;" aria-hidden="true"></span>
+						<?php esc_html_e( 'No critical issues to fix!', 'scalyn-qa-assistant' ); ?>
+					</div>
+				<?php
+				else :
+					foreach ( $contextual_actions as $action ) :
+				?>
+					<a href="<?php echo esc_url( $action['url'] ); ?>" class="scalyn-action-link">
+						<span class="dashicons <?php echo esc_attr( $action['icon'] ); ?>" aria-hidden="true"></span>
+						<span><?php echo esc_html( $action['label'] ); ?></span>
+					</a>
+				<?php
+					endforeach;
+				endif;
+				?>
+
+				<hr style="border:none;border-top:1px solid var(--scalyn-border-light);margin:0.5rem 0;">
+
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-qa-audits' ) ); ?>" class="scalyn-action-link">
 					<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
 					<span><?php esc_html_e( 'View All Page Audits', 'scalyn-qa-assistant' ); ?></span>
@@ -219,14 +271,6 @@ $overall_label  = match ( $overall_status ) {
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-qa-settings&tab=ai-providers' ) ); ?>" class="scalyn-action-link">
 					<span class="dashicons dashicons-admin-generic" aria-hidden="true"></span>
 					<span><?php esc_html_e( 'Configure AI Providers', 'scalyn-qa-assistant' ); ?></span>
-				</a>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-qa-knowledge' ) ); ?>" class="scalyn-action-link">
-					<span class="dashicons dashicons-book" aria-hidden="true"></span>
-					<span><?php esc_html_e( 'Knowledge Center', 'scalyn-qa-assistant' ); ?></span>
-				</a>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-qa-system-info' ) ); ?>" class="scalyn-action-link">
-					<span class="dashicons dashicons-info" aria-hidden="true"></span>
-					<span><?php esc_html_e( 'System Information', 'scalyn-qa-assistant' ); ?></span>
 				</a>
 			</div>
 		</div>

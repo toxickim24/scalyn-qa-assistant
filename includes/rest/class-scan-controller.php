@@ -89,6 +89,16 @@ class Scan_Controller extends REST_Controller {
 
 		register_rest_route(
 			$this->namespace,
+			'/scan/post-ids',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_scannable_post_ids' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+			),
+		);
+
+		register_rest_route(
+			$this->namespace,
 			'/scan/batch',
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
@@ -135,6 +145,11 @@ class Scan_Controller extends REST_Controller {
 			return $this->error( 'post_not_found', __( 'Post not found.', 'scalyn-qa-assistant' ), 404 );
 		}
 
+		// Clear Elementor cache before scanning so we get fresh rendered content.
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			\Elementor\Plugin::$instance->files_manager->clear_cache();
+		}
+
 		$scan_result = $this->execute_scan( $post_id );
 
 		return $this->success( $scan_result->to_array(), 201 );
@@ -176,6 +191,33 @@ class Scan_Controller extends REST_Controller {
 	 * @param \WP_REST_Request $request The REST request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
+	/**
+	 * GET /scan/post-ids — return all scannable published post IDs.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response
+	 */
+	public function get_scannable_post_ids( \WP_REST_Request $request ): \WP_REST_Response {
+		$settings   = get_option( 'scalyn_qa_settings', array() );
+		$post_types = isset( $settings['post_types'] ) && is_array( $settings['post_types'] ) ? $settings['post_types'] : array( 'post', 'page' );
+
+		$posts = get_posts( array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => 500,
+			'fields'         => 'ids',
+			'orderby'        => 'ID',
+			'order'          => 'ASC',
+		) );
+
+		return $this->success( array(
+			'post_ids' => array_map( 'intval', $posts ),
+			'count'    => count( $posts ),
+		) );
+	}
+
 	public function run_batch_scan( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$post_ids = $request->get_param( 'post_ids' );
 

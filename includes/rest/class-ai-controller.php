@@ -133,6 +133,16 @@ class AI_Controller extends REST_Controller {
 
 		register_rest_route(
 			$this->namespace,
+			'/ai/log',
+			array(
+				'methods'             => \WP_REST_Server::DELETABLE,
+				'callback'            => array( $this, 'clear_ai_log' ),
+				'permission_callback' => array( $this, 'can_manage' ),
+			),
+		);
+
+		register_rest_route(
+			$this->namespace,
 			'/ai/drafts/(?P<post_id>\d+)',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -223,6 +233,25 @@ class AI_Controller extends REST_Controller {
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'apply_featured_image' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
+		// POST /ai/titles-as-alt/{post_id} — use image titles as alt text.
+		register_rest_route(
+			$this->namespace,
+			'/ai/titles-as-alt/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'use_titles_as_alt' ),
 				'permission_callback' => array( $this, 'can_edit' ),
 				'args'                => array(
 					'post_id' => array(
@@ -627,6 +656,9 @@ PROMPT;
 			return $this->error( 'ai_not_enabled', __( 'AI features are not enabled.', 'scalyn-qa-assistant' ), 400 );
 		}
 
+		// Allow extra time for processing many images.
+		set_time_limit( 600 );
+
 		try {
 			$result = $ai_manager->generate_alt_texts( $post_id );
 		} catch ( \Throwable $e ) {
@@ -693,6 +725,148 @@ PROMPT;
 			'applied'       => true,
 			'attachment_id' => $attachment_id,
 			'message'       => __( 'Featured image set successfully.', 'scalyn-qa-assistant' ),
+		) );
+	}
+
+	/**
+	 * Apply AI-generated alt text to an image attachment.
+	 *
+	 * Use image titles (attachment post_title) as alt text for images missing alt.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function use_titles_as_alt( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+		$params  = $request->get_json_params();
+		$preview = ! empty( $params['preview'] );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return $this->error( 'post_not_found', __( 'Post not found.', 'scalyn-qa-assistant' ), 404 );
+		}
+
+		// Get rendered content (Elementor-aware).
+		$content = '';
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			$elementor = \Elementor\Plugin::$instance;
+			if ( $elementor && method_exists( $elementor->db, 'is_built_with_elementor' ) && $elementor->db->is_built_with_elementor( $post_id ) ) {
+				$content = $elementor->frontend->get_builder_content( $post_id, true );
+			}
+		}
+		if ( '' === $content ) {
+			$content = (string) apply_filters( 'the_content', $post->post_content );
+		}
+		$parser  = new \Scalyn\QA\Analyzers\HTML_Parser( $content );
+		$images  = $parser->get_images();
+
+		$results  = array();
+		$updated  = $post->post_content;
+
+		foreach ( $images as $image ) {
+			if ( $image['has_alt'] || empty( $image['src'] ) ) {
+				continue;
+			}
+
+			$src           = $image['src'];
+			$attachment_id = attachment_url_to_postid( $src );
+
+			// Try partial match for resized images.
+			if ( 0 === $attachment_id ) {
+				$upload_dir = wp_get_upload_dir();
+				$relative   = str_replace( $upload_dir['baseurl'] . '/', '', $src );
+				$base       = preg_replace( '/-\d+x\d+(\.[a-z]+)$/i', '$1', $relative );
+				global $wpdb;
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$attachment_id = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND guid LIKE %s LIMIT 1",
+						'%' . $wpdb->esc_like( $base ) . '%',
+					),
+				);
+			}
+
+			if ( 0 === $attachment_id ) {
+				$results[] = array( 'src' => $src, 'error' => 'Attachment not found.' );
+				continue;
+			}
+
+			$title = get_the_title( $attachment_id );
+			if ( '' === $title ) {
+				$title = pathinfo( basename( get_attached_file( $attachment_id ) ?: $src ), PATHINFO_FILENAME );
+				$title = str_replace( array( '-', '_' ), ' ', $title );
+				$title = ucfirst( $title );
+			}
+
+			$alt_text = sanitize_text_field( $title );
+
+			// In preview mode, just return the data without applying.
+			if ( $preview ) {
+				$results[] = array(
+					'src'           => $src,
+					'alt_text'      => $alt_text,
+					'attachment_id' => $attachment_id,
+				);
+				continue;
+			}
+
+			// Apply: save to attachment meta.
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', $alt_text );
+
+			// Update alt in post content HTML.
+			$escaped_src = preg_quote( $src, '/' );
+			$safe_alt    = esc_attr( $alt_text );
+
+			$new_content = preg_replace(
+				'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)alt=["\'][^"\']*["\']([^>]*?>)/i',
+				'$1alt="' . $safe_alt . '"$2',
+				$updated,
+			);
+
+			if ( $new_content === $updated ) {
+				$new_content = preg_replace(
+					'/(<img[^>]*src=["\']' . $escaped_src . '["\'][^>]*?)(\s*\/?>)/i',
+					'$1 alt="' . $safe_alt . '"$2',
+					$updated,
+				);
+			}
+
+			$updated = $new_content;
+
+			$results[] = array(
+				'src'           => $src,
+				'alt_text'      => $alt_text,
+				'attachment_id' => $attachment_id,
+			);
+		}
+
+		if ( ! $preview && $updated !== $post->post_content ) {
+			wp_update_post( array(
+				'ID'           => $post_id,
+				'post_content' => $updated,
+			) );
+		}
+
+		// Clear Elementor cache so rescan picks up updated alt text.
+		if ( ! $preview && class_exists( '\Elementor\Plugin' ) ) {
+			\Elementor\Plugin::$instance->files_manager->clear_cache();
+		}
+
+		$applied_count = count( array_filter( $results, static fn( $r ) => ! isset( $r['error'] ) ) );
+
+		return $this->success( array(
+			'results' => $results,
+			'applied' => $preview ? 0 : $applied_count,
+			'preview' => $preview,
+			'message' => $preview
+				? sprintf( __( 'Found %d image titles to use as alt text.', 'scalyn-qa-assistant' ), $applied_count )
+				: sprintf( __( 'Applied titles as alt text to %d images.', 'scalyn-qa-assistant' ), $applied_count ),
 		) );
 	}
 
@@ -788,6 +962,11 @@ PROMPT;
 					'post_content' => $updated,
 				) );
 			}
+		}
+
+		// Clear Elementor cache so rescan picks up updated alt text.
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			\Elementor\Plugin::$instance->files_manager->clear_cache();
 		}
 
 		return $this->success( array(
@@ -1103,6 +1282,25 @@ PROMPT;
 			array(
 				'entries' => $log,
 				'count'   => count( $log ),
+			),
+		);
+	}
+
+	/**
+	 * DELETE /ai/log — clear AI usage log.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response
+	 */
+	public function clear_ai_log( \WP_REST_Request $request ): \WP_REST_Response {
+		delete_option( 'scalyn_qa_ai_log' );
+
+		return $this->success(
+			array(
+				'cleared' => true,
+				'message' => __( 'AI usage log cleared.', 'scalyn-qa-assistant' ),
 			),
 		);
 	}

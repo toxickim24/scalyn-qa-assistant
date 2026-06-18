@@ -596,6 +596,9 @@ class Settings_Controller extends REST_Controller {
 
 		$page_audit_settings = get_option( 'scalyn_qa_page_audit_settings', array() );
 		$global_ignores      = get_option( self::GLOBAL_IGNORES_OPTION, array() );
+		$launch_settings     = get_option( 'scalyn_qa_launch_settings', array() );
+		$local_business      = get_option( 'scalyn_qa_local_business_jsonld', array() );
+		$launch_ai_content   = get_option( 'scalyn_qa_launch_ai_content', array() );
 
 		$export = array(
 			'plugin_version'      => defined( 'SCALYN_QA_VERSION' ) ? SCALYN_QA_VERSION : '1.0.0',
@@ -604,6 +607,9 @@ class Settings_Controller extends REST_Controller {
 			'ai_config'           => $ai_config,
 			'page_audit_settings' => is_array( $page_audit_settings ) ? $page_audit_settings : array(),
 			'global_ignores'      => is_array( $global_ignores ) ? $global_ignores : array(),
+			'launch_settings'     => is_array( $launch_settings ) ? $launch_settings : array(),
+			'local_business'      => is_array( $local_business ) ? $local_business : array(),
+			'launch_ai_content'   => is_array( $launch_ai_content ) ? $launch_ai_content : array(),
 		);
 
 		return $this->success( $export );
@@ -627,7 +633,7 @@ class Settings_Controller extends REST_Controller {
 		}
 
 		// Validate structure — must have at least one importable key.
-		$valid_keys = array( 'settings', 'ai_config', 'page_audit_settings', 'global_ignores' );
+		$valid_keys = array( 'settings', 'ai_config', 'page_audit_settings', 'global_ignores', 'launch_settings', 'local_business', 'launch_ai_content' );
 		$has_data   = false;
 
 		foreach ( $valid_keys as $key ) {
@@ -652,9 +658,12 @@ class Settings_Controller extends REST_Controller {
 			'ai_config'           => get_option( self::AI_CONFIG_OPTION, array() ),
 			'page_audit_settings' => get_option( 'scalyn_qa_page_audit_settings', array() ),
 			'global_ignores'      => get_option( self::GLOBAL_IGNORES_OPTION, array() ),
-			'created_at'     => gmdate( 'c' ),
-			'created_by'     => $current_user->display_name,
-			'reason'         => 'Pre-import backup',
+			'launch_settings'     => get_option( 'scalyn_qa_launch_settings', array() ),
+			'local_business'      => get_option( 'scalyn_qa_local_business_jsonld', array() ),
+			'launch_ai_content'   => get_option( 'scalyn_qa_launch_ai_content', array() ),
+			'created_at'          => gmdate( 'c' ),
+			'created_by'          => $current_user->display_name,
+			'reason'              => 'Pre-import backup',
 		);
 		update_option( self::BACKUP_OPTION, $backup, false );
 
@@ -684,6 +693,24 @@ class Settings_Controller extends REST_Controller {
 		if ( isset( $params['global_ignores'] ) && is_array( $params['global_ignores'] ) ) {
 			update_option( self::GLOBAL_IGNORES_OPTION, $params['global_ignores'], false );
 			$imported[] = 'global_ignores';
+		}
+
+		// Import launch checklist settings.
+		if ( isset( $params['launch_settings'] ) && is_array( $params['launch_settings'] ) ) {
+			update_option( 'scalyn_qa_launch_settings', $params['launch_settings'], false );
+			$imported[] = 'launch_settings';
+		}
+
+		// Import local business schema.
+		if ( isset( $params['local_business'] ) && is_array( $params['local_business'] ) ) {
+			update_option( 'scalyn_qa_local_business_jsonld', $params['local_business'], false );
+			$imported[] = 'local_business';
+		}
+
+		// Import launch AI content.
+		if ( isset( $params['launch_ai_content'] ) && is_array( $params['launch_ai_content'] ) ) {
+			update_option( 'scalyn_qa_launch_ai_content', $params['launch_ai_content'], false );
+			$imported[] = 'launch_ai_content';
 		}
 
 		// AI config: import structure but NOT API keys (they are masked).
@@ -797,6 +824,24 @@ class Settings_Controller extends REST_Controller {
 		if ( isset( $backup['global_ignores'] ) && is_array( $backup['global_ignores'] ) ) {
 			update_option( self::GLOBAL_IGNORES_OPTION, $backup['global_ignores'], false );
 			$restored[] = 'global_ignores';
+		}
+
+		// Restore launch checklist settings.
+		if ( isset( $backup['launch_settings'] ) && is_array( $backup['launch_settings'] ) ) {
+			update_option( 'scalyn_qa_launch_settings', $backup['launch_settings'], false );
+			$restored[] = 'launch_settings';
+		}
+
+		// Restore local business schema.
+		if ( isset( $backup['local_business'] ) && is_array( $backup['local_business'] ) ) {
+			update_option( 'scalyn_qa_local_business_jsonld', $backup['local_business'], false );
+			$restored[] = 'local_business';
+		}
+
+		// Restore launch AI content.
+		if ( isset( $backup['launch_ai_content'] ) && is_array( $backup['launch_ai_content'] ) ) {
+			update_option( 'scalyn_qa_launch_ai_content', $backup['launch_ai_content'], false );
+			$restored[] = 'launch_ai_content';
 		}
 
 		// Clear the backup after successful restore.

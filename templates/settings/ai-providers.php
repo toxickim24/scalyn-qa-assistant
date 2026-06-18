@@ -153,6 +153,7 @@ $mask_key = function ( string $key ): string {
 				</span>
 			</label>
 		</div>
+		<div id="scalyn-ai-toggle-notice" class="scalyn-notice" style="display:none;margin-top:0.75rem;"></div>
 	</div>
 
 	<!-- Provider Cards -->

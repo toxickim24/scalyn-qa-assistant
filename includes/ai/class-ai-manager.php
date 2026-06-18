@@ -346,9 +346,18 @@ class AI_Manager {
 			throw new \RuntimeException( __( 'Post not found.', 'scalyn-qa-assistant' ) );
 		}
 
-		// Get rendered content and find images missing alt text.
-		$content = (string) apply_filters( 'the_content', $post->post_content );
-		$parser  = new \Scalyn\QA\Analyzers\HTML_Parser( $content );
+		// Get rendered content (Elementor-aware) and find images missing alt text.
+		$content = '';
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			$elementor = \Elementor\Plugin::$instance;
+			if ( $elementor && method_exists( $elementor->db, 'is_built_with_elementor' ) && $elementor->db->is_built_with_elementor( $post_id ) ) {
+				$content = $elementor->frontend->get_builder_content( $post_id, true );
+			}
+		}
+		if ( '' === $content ) {
+			$content = (string) apply_filters( 'the_content', $post->post_content );
+		}
+		$parser = new \Scalyn\QA\Analyzers\HTML_Parser( $content );
 		$images  = $parser->get_images();
 
 		$missing = array();
@@ -468,7 +477,8 @@ class AI_Manager {
 		$prompt = "Create a professional, high-quality blog featured image for an article titled \"{$title}\". ";
 		$prompt .= "The image should be visually appealing, modern, and relevant to the topic. ";
 		$prompt .= "Content summary: {$excerpt}. ";
-		$prompt .= "Style: Clean, professional, suitable for a business website or blog. No text overlays.";
+		$prompt .= "Style: Clean, professional, suitable for a business website or blog. ";
+		$prompt .= "CRITICAL: The image must contain absolutely NO text, NO words, NO letters, NO numbers, NO watermarks, NO logos, NO captions, NO titles, NO labels, NO writing of any kind. Pure visual imagery only.";
 
 		$start    = microtime( true );
 		$b64_data = $provider->generate_image( $prompt );
@@ -503,6 +513,12 @@ class AI_Manager {
 			@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			throw new \RuntimeException( 'Failed to save image: ' . $attachment_id->get_error_message() );
 		}
+
+		// Track all AI-generated featured image IDs for this post.
+		$history = get_post_meta( $post_id, '_scalyn_qa_ai_featured_images', true );
+		$history = is_array( $history ) ? $history : array();
+		$history[] = $attachment_id;
+		update_post_meta( $post_id, '_scalyn_qa_ai_featured_images', array_unique( $history ) );
 
 		return array(
 			'attachment_id' => $attachment_id,
