@@ -194,13 +194,9 @@ final class Admin_Assets {
 
 			// Collect ignored check IDs for this post.
 			$ignored_ids = array();
-			$post_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_post( $inspector_post_id );
-			foreach ( $post_ignores as $rule ) {
-				$ignored_ids[] = $rule->check_id;
-			}
 			$audit_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'audit' );
 			foreach ( $audit_ignores as $rule ) {
-				if ( 'global' === $rule->type || null === $rule->post_id || 0 === $rule->post_id ) {
+				if ( 'global' === $rule->type || null === $rule->post_id || 0 === $rule->post_id || $inspector_post_id === $rule->post_id ) {
 					$ignored_ids[] = $rule->check_id;
 				}
 			}
