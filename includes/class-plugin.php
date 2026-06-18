@@ -64,7 +64,8 @@ final class Plugin {
 		// Admin services.
 		$this->services['admin_menu']   = Admin\Admin_Menu::instance();
 		$this->services['admin_assets'] = Admin\Admin_Assets::instance();
-		$this->services['metabox']      = Admin\Metabox::instance();
+		// Metabox disabled — QA Inspector on frontend replaces in-editor checklist.
+		// $this->services['metabox']      = Admin\Metabox::instance();
 		$this->services['toolbar']      = Admin\Toolbar::instance();
 
 		// GitHub updater — register update hooks.
