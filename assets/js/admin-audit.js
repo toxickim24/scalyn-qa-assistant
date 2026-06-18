@@ -1560,12 +1560,17 @@
                     // Switch all Generate buttons to Regenerate.
                     switchAllGenerateToRegenerate();
 
+                    // Disable the main button permanently for this session.
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="dashicons dashicons-yes-alt" aria-hidden="true"></span> AI Generated';
+                    btn.classList.remove('scalyn-btn--ai');
+                    btn.classList.add('scalyn-btn--secondary');
+                    btn.style.opacity = '0.6';
+                    btn.style.pointerEvents = 'none';
+
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.toast('AI analysis complete');
                     }
-                })
-                .finally(function () {
-                    btn.disabled = false;
                 });
         });
     }
