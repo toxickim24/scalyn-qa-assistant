@@ -1534,8 +1534,11 @@
                     }
 
                     if (typeof ScalynAlert !== 'undefined') {
-                        ScalynAlert.toast('AI analysis complete');
+                        ScalynAlert.toast('AI analysis complete — rescanning…');
                     }
+                    // Trigger rescan to reflect changes.
+                    var rescanBtn = document.querySelector('#scalyn-rescan') || document.querySelector('.scalyn-rescan');
+                    if (rescanBtn) rescanBtn.click();
                 })
                 .catch(function (err) {
                     if (typeof ScalynAlert !== 'undefined') {
