@@ -212,6 +212,7 @@ final class Admin_Assets {
 				'aiFeatured'       => ! empty( $ai_featured_opts ) ? $ai_featured_opts : false,
 				'currentThumbnail' => $current_thumb_id,
 				'ignoredChecks'    => array_values( array_unique( $ignored_ids ) ),
+				'notes'            => get_post_meta( $inspector_post_id, '_scalyn_qa_notes', true ) ?: array(),
 			);
 
 			wp_localize_script(

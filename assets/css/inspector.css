@@ -342,6 +342,71 @@ body.sqi-docked {
   text-overflow: ellipsis;
 }
 
+/* QA Notes */
+.sqi-note-form {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.sqi-note-input {
+  flex: 1;
+  background: var(--sqi-bg-hover);
+  border: 1px solid var(--sqi-border);
+  color: var(--sqi-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.sqi-note-input:focus {
+  outline: none;
+  border-color: var(--sqi-blue);
+}
+
+.sqi-note {
+  padding: 6px 8px;
+  border-radius: var(--sqi-radius);
+  background: var(--sqi-bg-hover);
+  margin-bottom: 4px;
+}
+
+.sqi-note__text {
+  font-size: 11px;
+  color: var(--sqi-text);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.sqi-note__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--sqi-text-muted);
+}
+
+.sqi-note__delete {
+  background: none;
+  border: none;
+  color: var(--sqi-text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.sqi-note:hover .sqi-note__delete {
+  opacity: 1;
+}
+
+.sqi-note__delete:hover {
+  color: var(--sqi-red);
+}
+
 .sqi-ignore-btn {
   position: absolute;
   top: 4px;

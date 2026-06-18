@@ -194,6 +194,58 @@
         // AI Content Review section.
         html += buildContentReview();
 
+        // QA Notes section.
+        html += buildNotes();
+
+        return html;
+    }
+
+    /**
+     * Build QA Notes section.
+     */
+    function buildNotes() {
+        var notes = data.notes || [];
+
+        var html = '<div class="sqi-category sqi-category--open" data-category="notes">';
+        html += '<div class="sqi-category__header">';
+        html += '<span class="sqi-category__title"><span class="sqi-category__arrow">\u25B6</span> QA Notes';
+        if (notes.length > 0) {
+            html += ' <span class="sqi-category__badge sqi-category__badge--green">' + notes.length + '</span>';
+        }
+        html += '</span></div>';
+
+        html += '<div class="sqi-category__list">';
+
+        // Add note form.
+        html += '<div class="sqi-note-form">';
+        html += '<input type="text" id="sqi-note-input" class="sqi-note-input" placeholder="Write a QA note..." />';
+        html += '<button class="sqi-action-btn sqi-action-btn--apply" id="sqi-btn-add-note">Add</button>';
+        html += '</div>';
+
+        // Existing notes.
+        if (notes.length > 0) {
+            notes.slice().reverse().forEach(function (note, idx) {
+                var realIndex = notes.length - 1 - idx;
+                var author = note.author || note.user_name || '';
+                var date = '';
+                if (note.created_at || note.date) {
+                    var d = new Date(note.created_at || note.date);
+                    date = d.toLocaleDateString();
+                }
+
+                html += '<div class="sqi-note" data-index="' + realIndex + '">';
+                html += '<div class="sqi-note__text">' + esc(note.content || '') + '</div>';
+                html += '<div class="sqi-note__meta">';
+                if (author) html += '<span>' + esc(author) + '</span>';
+                if (date) html += '<span>' + esc(date) + '</span>';
+                html += '<button class="sqi-note__delete" data-index="' + realIndex + '" title="Delete">\u2715</button>';
+                html += '</div></div>';
+            });
+        } else {
+            html += '<div style="font-size:11px;color:var(--sqi-text-muted);padding:4px 0;">No notes yet.</div>';
+        }
+
+        html += '</div></div>';
         return html;
     }
 
@@ -490,6 +542,74 @@
                 });
             };
         }
+
+        // Add Note button.
+        var addNoteBtn = document.getElementById('sqi-btn-add-note');
+        var noteInput = document.getElementById('sqi-note-input');
+        if (addNoteBtn && noteInput) {
+            var submitNote = function () {
+                var content = noteInput.value.trim();
+                if (!content) return;
+
+                addNoteBtn.disabled = true;
+                addNoteBtn.textContent = '...';
+
+                fetch(scalynQA.restUrl + 'notes/' + data.postId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ content: content }),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success && response.data && response.data.notes) {
+                        data.notes = response.data.notes;
+                        refreshPanel();
+                    }
+                    addNoteBtn.disabled = false;
+                    addNoteBtn.textContent = 'Add';
+                })
+                .catch(function () {
+                    addNoteBtn.disabled = false;
+                    addNoteBtn.textContent = 'Add';
+                });
+            };
+
+            addNoteBtn.onclick = submitNote;
+            noteInput.onkeydown = function (e) {
+                if (e.key === 'Enter') submitNote();
+            };
+        }
+
+        // Delete Note buttons.
+        panel.querySelectorAll('.sqi-note__delete').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var index = btn.getAttribute('data-index');
+                if (index === null) return;
+
+                btn.disabled = true;
+
+                fetch(scalynQA.restUrl + 'notes/' + data.postId + '/' + index, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success && response.data && response.data.notes) {
+                        data.notes = response.data.notes;
+                    } else {
+                        // Fallback: remove locally.
+                        data.notes.splice(parseInt(index, 10), 1);
+                    }
+                    refreshPanel();
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                });
+            };
+        });
 
         // Ignore check buttons.
         panel.querySelectorAll('.sqi-ignore-btn').forEach(function (btn) {
