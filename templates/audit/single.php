@@ -125,6 +125,28 @@ if ( is_array( $ai_drafts ) && ! empty( $ai_drafts ) ) {
 $edit_post_url = get_edit_post_link( $post_id, 'raw' );
 $permalink     = get_permalink( $post_id );
 ?>
+<?php
+// Compute per-category pass/warn/fail counts.
+$cat_counts = array();
+foreach ( array( 'seo' => $seo_checks, 'content' => $content_checks, 'functionality' => $func_checks ) as $cat_key => $cat_checks ) {
+	$cc = array( 'pass' => 0, 'warning' => 0, 'fail' => 0, 'total' => 0 );
+	foreach ( $cat_checks as $c ) {
+		if ( isset( $ignored_check_ids[ $c->id ] ) ) {
+			continue;
+		}
+		++$cc['total'];
+		match ( $c->status ) {
+			'pass' => ++$cc['pass'],
+			'warning' => ++$cc['warning'],
+			'fail' => ++$cc['fail'],
+			default => null,
+		};
+	}
+	$cat_counts[ $cat_key ] = $cc;
+}
+$total_checks = $cat_counts['seo']['total'] + $cat_counts['content']['total'] + $cat_counts['functionality']['total'];
+$total_pass   = $cat_counts['seo']['pass'] + $cat_counts['content']['pass'] + $cat_counts['functionality']['pass'];
+?>
 <div class="scalyn-wrap">
 	<!-- Header -->
 	<div class="scalyn-page-header">
@@ -159,7 +181,7 @@ $permalink     = get_permalink( $post_id );
 				<?php esc_html_e( 'Add Note', 'scalyn-qa-assistant' ); ?>
 			</button>
 			<?php if ( ! empty( $edit_post_url ) ) : ?>
-				<a href="<?php echo esc_url( $edit_post_url ); ?>" class="scalyn-btn scalyn-btn--secondary" target="_blank" rel="noopener noreferrer">
+				<a href="<?php echo esc_url( $edit_post_url ); ?>" class="scalyn-btn scalyn-btn--ghost" target="_blank" rel="noopener noreferrer">
 					<span class="dashicons dashicons-admin-post" aria-hidden="true"></span>
 					<?php esc_html_e( 'Edit Post', 'scalyn-qa-assistant' ); ?>
 				</a>
@@ -171,80 +193,99 @@ $permalink     = get_permalink( $post_id );
 				</a>
 			<?php endif; ?>
 		</div>
-		<p class="scalyn-page-header__meta">
-			<?php if ( ! empty( $scan_time_display ) ) : ?>
-				<?php
-				printf(
-					/* translators: %s: Human-readable time since last scan. */
-					esc_html__( 'Last Scanned: %s', 'scalyn-qa-assistant' ),
-					esc_html( $scan_time_display )
-				);
-				?>
-				<span class="scalyn-meta__sep">|</span>
-			<?php endif; ?>
-			<?php esc_html_e( 'Score:', 'scalyn-qa-assistant' ); ?>
-			<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( $status ); ?>">
-				<?php echo esc_html( (string) $overall ); ?>
-			</span>
-			<span class="scalyn-meta__sep">|</span>
-			<?php esc_html_e( 'Trend:', 'scalyn-qa-assistant' ); ?>
-			<span class="scalyn-trend scalyn-trend--<?php echo esc_attr( $trend ); ?>">
-				<span class="dashicons <?php echo esc_attr( $trend_icon ); ?>" aria-hidden="true"></span>
-				<?php echo esc_html( $trend_label ); ?>
-			</span>
-		</p>
 	</div>
 
 	<?php if ( ! $has_scan ) : ?>
-		<!-- No scan data available -->
-		<div class="scalyn-card">
-			<div class="scalyn-empty-state">
-				<span class="dashicons dashicons-search" aria-hidden="true"></span>
-				<h2><?php esc_html_e( 'No Scan Data Available', 'scalyn-qa-assistant' ); ?></h2>
-				<p><?php esc_html_e( 'This page has not been scanned yet. Click "Rescan" to perform the first audit.', 'scalyn-qa-assistant' ); ?></p>
-				<button
-					type="button"
-					class="scalyn-btn scalyn-rescan"
-					data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
-				>
-					<?php esc_html_e( 'Run First Scan', 'scalyn-qa-assistant' ); ?>
-				</button>
-			</div>
+		<!-- Empty State -->
+		<div class="scalyn-card" style="text-align:center;padding:3rem 2rem;">
+			<span class="dashicons dashicons-search" style="font-size:48px;width:48px;height:48px;color:var(--scalyn-text-faint);margin-bottom:1rem;" aria-hidden="true"></span>
+			<h2 style="margin:0 0 0.5rem;font-size:1.25rem;color:var(--scalyn-text-strong);"><?php esc_html_e( 'No Scan Data Available', 'scalyn-qa-assistant' ); ?></h2>
+			<p style="margin:0 0 1.5rem;color:var(--scalyn-text-muted);max-width:400px;margin-left:auto;margin-right:auto;">
+				<?php esc_html_e( 'This page has not been scanned yet. Run the first audit to see SEO, content, and functionality checks.', 'scalyn-qa-assistant' ); ?>
+			</p>
+			<button
+				type="button"
+				class="scalyn-btn scalyn-rescan"
+				data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
+			>
+				<span class="dashicons dashicons-update" aria-hidden="true"></span>
+				<?php esc_html_e( 'Run First Scan', 'scalyn-qa-assistant' ); ?>
+			</button>
 		</div>
 	<?php else : ?>
-		<!-- Score Summary Row -->
-		<div class="scalyn-grid scalyn-grid--4">
-			<?php
-			$label  = __( 'SEO Score', 'scalyn-qa-assistant' );
-			$score  = $seo_score;
-			$status = \Scalyn\QA\Models\Score::calculate_status( $score );
-			include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/score-summary.php';
-
-			$label  = __( 'Content Score', 'scalyn-qa-assistant' );
-			$score  = $cont_score;
-			$status = \Scalyn\QA\Models\Score::calculate_status( $score );
-			include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/score-summary.php';
-
-			$label  = __( 'Functionality Score', 'scalyn-qa-assistant' );
-			$score  = $func_score;
-			$status = \Scalyn\QA\Models\Score::calculate_status( $score );
-			include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/score-summary.php';
-
-			$label  = __( 'Overall Score', 'scalyn-qa-assistant' );
-			$score  = $overall;
-			$status = $scores->status;
-			include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/score-summary.php';
-			?>
+		<!-- Hero: Overall Score + Category Bars -->
+		<div class="scalyn-dashboard-hero">
+			<div class="scalyn-dashboard-hero__main">
+				<div class="scalyn-score-circle scalyn-score-circle--large scalyn-score-circle--<?php echo esc_attr( $scores->status ); ?>"
+					 style="--scalyn-score: <?php echo esc_attr( (string) $overall ); ?>">
+					<span class="scalyn-score-circle__value"><?php echo esc_html( (string) $overall ); ?><span class="scalyn-score-circle__unit">%</span></span>
+				</div>
+				<div class="scalyn-dashboard-hero__meta">
+					<span class="scalyn-dashboard-hero__label"><?php esc_html_e( 'Page Score', 'scalyn-qa-assistant' ); ?></span>
+					<span class="scalyn-trend scalyn-trend--<?php echo esc_attr( $trend ); ?>" style="display:inline-flex;align-items:center;gap:2px;">
+						<span class="dashicons <?php echo esc_attr( $trend_icon ); ?>" aria-hidden="true"></span>
+						<?php echo esc_html( $trend_label ); ?>
+					</span>
+					<span class="scalyn-dashboard-hero__formula">
+						<?php
+						printf(
+							esc_html__( '%1$d/%2$d checks passed | Last scanned: %3$s', 'scalyn-qa-assistant' ),
+							$total_pass,
+							$total_checks,
+							esc_html( $scan_time_display ?: __( 'Never', 'scalyn-qa-assistant' ) ),
+						);
+						?>
+					</span>
+				</div>
+			</div>
+			<div class="scalyn-dashboard-hero__categories">
+				<?php
+				$audit_cats = array(
+					'seo'           => array( 'label' => __( 'SEO', 'scalyn-qa-assistant' ),           'score' => $seo_score,  'icon' => 'dashicons-search' ),
+					'content'       => array( 'label' => __( 'Content', 'scalyn-qa-assistant' ),       'score' => $cont_score, 'icon' => 'dashicons-edit-page' ),
+					'functionality' => array( 'label' => __( 'Functionality', 'scalyn-qa-assistant' ), 'score' => $func_score, 'icon' => 'dashicons-admin-plugins' ),
+				);
+				foreach ( $audit_cats as $ac_key => $ac ) :
+					$ac_status = \Scalyn\QA\Models\Score::calculate_status( $ac['score'] );
+					$ac_c      = $cat_counts[ $ac_key ];
+					$ac_desc   = sprintf( '%d/%d passed', $ac_c['pass'], $ac_c['total'] );
+				?>
+					<div class="scalyn-category-score" title="<?php echo esc_attr( $ac_desc ); ?>">
+						<div class="scalyn-category-score__header">
+							<span class="dashicons <?php echo esc_attr( $ac['icon'] ); ?>" aria-hidden="true"></span>
+							<span class="scalyn-category-score__label"><?php echo esc_html( $ac['label'] ); ?></span>
+						</div>
+						<div class="scalyn-category-score__bar">
+							<div class="scalyn-category-score__fill scalyn-category-score__fill--<?php echo esc_attr( $ac_status ); ?>" style="width:<?php echo esc_attr( (string) $ac['score'] ); ?>%"></div>
+						</div>
+						<span class="scalyn-category-score__value"><?php echo esc_html( (string) $ac['score'] ); ?>%</span>
+						<span class="scalyn-category-score__desc"><?php echo esc_html( $ac_desc ); ?></span>
+					</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
 
 		<!-- SEO Checks Section -->
+		<?php $sc = $cat_counts['seo']; ?>
 		<div class="scalyn-card" id="scalyn-section-seo">
-			<h2 class="scalyn-card-title">
-				<?php esc_html_e( 'SEO Checks', 'scalyn-qa-assistant' ); ?>
-				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $seo_score ) ); ?>">
-					<?php echo esc_html( (string) $seo_score ); ?>
-				</span>
-			</h2>
+			<div class="scalyn-launch-card-header">
+				<h2 class="scalyn-card-title" style="margin:0;">
+					<?php esc_html_e( 'SEO Checks', 'scalyn-qa-assistant' ); ?>
+					<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $seo_score ) ); ?>">
+						<?php echo esc_html( (string) $seo_score ); ?>
+					</span>
+				</h2>
+				<?php if ( $sc['total'] > 0 ) : ?>
+				<div class="scalyn-launch-card-progress">
+					<div class="scalyn-launch-card-progress__bar">
+						<?php if ( $sc['pass'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--pass" style="width:<?php echo esc_attr( (string) round( $sc['pass'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+						<?php if ( $sc['warning'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--warning" style="width:<?php echo esc_attr( (string) round( $sc['warning'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+						<?php if ( $sc['fail'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--fail" style="width:<?php echo esc_attr( (string) round( $sc['fail'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+					</div>
+					<span class="scalyn-launch-card-progress__label"><?php printf( esc_html__( '%1$d passed, %2$d warning, %3$d failed', 'scalyn-qa-assistant' ), $sc['pass'], $sc['warning'], $sc['fail'] ); ?></span>
+				</div>
+				<?php endif; ?>
+			</div>
 			<div class="scalyn-check-list">
 				<?php if ( empty( $seo_checks ) ) : ?>
 					<p class="scalyn-empty"><?php esc_html_e( 'No SEO checks available.', 'scalyn-qa-assistant' ); ?></p>
@@ -314,13 +355,26 @@ $permalink     = get_permalink( $post_id );
 		</div>
 
 		<!-- Content Checks Section -->
+		<?php $sc = $cat_counts['content']; ?>
 		<div class="scalyn-card" id="scalyn-section-content">
-			<h2 class="scalyn-card-title">
-				<?php esc_html_e( 'Content Checks', 'scalyn-qa-assistant' ); ?>
-				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $cont_score ) ); ?>">
-					<?php echo esc_html( (string) $cont_score ); ?>
-				</span>
-			</h2>
+			<div class="scalyn-launch-card-header">
+				<h2 class="scalyn-card-title" style="margin:0;">
+					<?php esc_html_e( 'Content Checks', 'scalyn-qa-assistant' ); ?>
+					<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $cont_score ) ); ?>">
+						<?php echo esc_html( (string) $cont_score ); ?>
+					</span>
+				</h2>
+				<?php if ( $sc['total'] > 0 ) : ?>
+				<div class="scalyn-launch-card-progress">
+					<div class="scalyn-launch-card-progress__bar">
+						<?php if ( $sc['pass'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--pass" style="width:<?php echo esc_attr( (string) round( $sc['pass'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+						<?php if ( $sc['warning'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--warning" style="width:<?php echo esc_attr( (string) round( $sc['warning'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+						<?php if ( $sc['fail'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--fail" style="width:<?php echo esc_attr( (string) round( $sc['fail'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+					</div>
+					<span class="scalyn-launch-card-progress__label"><?php printf( esc_html__( '%1$d passed, %2$d warning, %3$d failed', 'scalyn-qa-assistant' ), $sc['pass'], $sc['warning'], $sc['fail'] ); ?></span>
+				</div>
+				<?php endif; ?>
+			</div>
 			<div class="scalyn-check-list">
 				<?php if ( empty( $content_checks ) ) : ?>
 					<p class="scalyn-empty"><?php esc_html_e( 'No content checks available.', 'scalyn-qa-assistant' ); ?></p>
@@ -376,13 +430,26 @@ $permalink     = get_permalink( $post_id );
 		</div>
 
 		<!-- Functionality Checks Section -->
+		<?php $sc = $cat_counts['functionality']; ?>
 		<div class="scalyn-card" id="scalyn-section-functionality">
-			<h2 class="scalyn-card-title">
-				<?php esc_html_e( 'Functionality Checks', 'scalyn-qa-assistant' ); ?>
-				<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $func_score ) ); ?>">
-					<?php echo esc_html( (string) $func_score ); ?>
-				</span>
-			</h2>
+			<div class="scalyn-launch-card-header">
+				<h2 class="scalyn-card-title" style="margin:0;">
+					<?php esc_html_e( 'Functionality Checks', 'scalyn-qa-assistant' ); ?>
+					<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( \Scalyn\QA\Models\Score::calculate_status( $func_score ) ); ?>">
+						<?php echo esc_html( (string) $func_score ); ?>
+					</span>
+				</h2>
+				<?php if ( $sc['total'] > 0 ) : ?>
+				<div class="scalyn-launch-card-progress">
+					<div class="scalyn-launch-card-progress__bar">
+						<?php if ( $sc['pass'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--pass" style="width:<?php echo esc_attr( (string) round( $sc['pass'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+						<?php if ( $sc['warning'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--warning" style="width:<?php echo esc_attr( (string) round( $sc['warning'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+						<?php if ( $sc['fail'] > 0 ) : ?><div class="scalyn-launch-card-progress__fill scalyn-launch-card-progress__fill--fail" style="width:<?php echo esc_attr( (string) round( $sc['fail'] / $sc['total'] * 100 ) ); ?>%"></div><?php endif; ?>
+					</div>
+					<span class="scalyn-launch-card-progress__label"><?php printf( esc_html__( '%1$d passed, %2$d warning, %3$d failed', 'scalyn-qa-assistant' ), $sc['pass'], $sc['warning'], $sc['fail'] ); ?></span>
+				</div>
+				<?php endif; ?>
+			</div>
 			<div class="scalyn-check-list">
 				<?php if ( empty( $func_checks ) ) : ?>
 					<p class="scalyn-empty"><?php esc_html_e( 'No functionality checks available.', 'scalyn-qa-assistant' ); ?></p>
