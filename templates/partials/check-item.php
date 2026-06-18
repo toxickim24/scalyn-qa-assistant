@@ -65,17 +65,45 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 		<?php endif; ?>
 	</div>
 
+	<?php
+	// Determine generate vs regenerate based on existing AI data.
+	$has_ai_data_map = array();
+	if ( $post_id > 0 ) {
+		$has_ai_data_map = array(
+			'generate_ai_meta'           => ! empty( get_post_meta( $post_id, '_scalyn_qa_ai_drafts', true ) ),
+			'regenerate_ai_meta'         => true, // pass state already has content
+			'generate_ai_alt'            => ! empty( get_post_meta( $post_id, '_scalyn_qa_ai_alt_texts', true ) ),
+			'generate_ai_keyword'        => ! empty( get_post_meta( $post_id, '_scalyn_qa_ai_keywords', true ) ),
+			'regenerate_ai_keyword'      => true,
+			'generate_ai_featured_image' => ! empty( get_post_meta( $post_id, '_scalyn_qa_ai_featured_images', true ) ),
+			'regenerate_ai_featured_image' => true,
+		);
+	}
+
+	// Swap generate → regenerate if AI data already exists.
+	$swap_map = array(
+		'generate_ai_meta'           => 'regenerate_ai_meta',
+		'generate_ai_alt'            => 'regenerate_ai_alt',
+		'generate_ai_keyword'        => 'regenerate_ai_keyword',
+		'generate_ai_featured_image' => 'regenerate_ai_featured_image',
+	);
+
+	$resolved_quick_fix = $quick_fix;
+	if ( ! empty( $quick_fix ) && isset( $swap_map[ $quick_fix ] ) && ! empty( $has_ai_data_map[ $quick_fix ] ) ) {
+		$resolved_quick_fix = $swap_map[ $quick_fix ];
+	}
+	?>
 	<div class="scalyn-check-actions">
-		<?php if ( ! empty( $quick_fix ) ) : ?>
+		<?php if ( ! empty( $resolved_quick_fix ) ) : ?>
 			<?php
-			$action = $quick_fix;
+			$action = $resolved_quick_fix;
 			include SCALYN_QA_PLUGIN_DIR . 'templates/partials/quick-fix-button.php';
 			?>
 		<?php endif; ?>
 
 		<?php if ( 'image_alt_text' === $item_id && 'pass' !== $status ) : ?>
 			<?php
-			$action = 'generate_ai_alt';
+			$action = ! empty( $has_ai_data_map['generate_ai_alt'] ) ? 'regenerate_ai_alt' : 'generate_ai_alt';
 			include SCALYN_QA_PLUGIN_DIR . 'templates/partials/quick-fix-button.php';
 			?>
 		<?php endif; ?>

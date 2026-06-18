@@ -1436,6 +1436,28 @@
         return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    /**
+     * Switch a quick-fix button from Generate to Regenerate style.
+     */
+    function switchBtnToRegenerate(btn) {
+        if (!btn) return;
+        btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+        btn.classList.remove('scalyn-btn--ai');
+        btn.classList.add('scalyn-btn--ghost');
+    }
+
+    function switchAllGenerateToRegenerate() {
+        var selectors = [
+            '.scalyn-quick-fix[data-action="generate-ai-meta"]',
+            '.scalyn-quick-fix[data-action="generate-ai-alt"]',
+            '.scalyn-quick-fix[data-action="generate-ai-keyword"]',
+            '.scalyn-quick-fix[data-action="generate-ai-featured-image"]',
+        ];
+        selectors.forEach(function (sel) {
+            document.querySelectorAll(sel).forEach(switchBtnToRegenerate);
+        });
+    }
+
     function initGenerateAllAi() {
         var btn = document.getElementById('scalyn-generate-all-ai');
         if (!btn) return;
@@ -1534,6 +1556,9 @@
                             }
                         }
                     }
+
+                    // Switch all Generate buttons to Regenerate.
+                    switchAllGenerateToRegenerate();
 
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.toast('AI analysis complete');
@@ -2106,6 +2131,7 @@
                 }
                 if (response.success && response.data) {
                     displayAiResults(response.data);
+                    document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-meta"]').forEach(switchBtnToRegenerate);
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.toast('AI suggestions generated');
                     }
@@ -2144,6 +2170,7 @@
                 Swal.close();
                 if (response.success && response.data && response.data.results) {
                     displayAltTextResults(response.data.results);
+                    document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-alt"]').forEach(switchBtnToRegenerate);
                     ScalynAlert.toast('Alt text generated for ' + response.data.results.length + ' images');
                 } else {
                     ScalynAlert.error('No Results', 'AI returned no alt text suggestions. Check your OpenAI provider settings.');
