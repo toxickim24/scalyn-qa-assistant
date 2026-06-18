@@ -716,12 +716,16 @@ $total_pass   = $cat_counts['seo']['pass'] + $cat_counts['content']['pass'] + $c
 						<th><?php esc_html_e( 'Fail', 'scalyn-qa-assistant' ); ?></th>
 					</tr>
 				</thead>
+				<?php
+				$snapshots_reversed = array_reverse( $snapshots );
+				$snap_limit         = 5;
+				$snap_total         = count( $snapshots_reversed );
+				$snap_has_more      = $snap_total > $snap_limit;
+				$snap_index         = 0;
+				?>
 				<tbody>
-					<?php
-					// Show snapshots in reverse chronological order.
-					$snapshots_reversed = array_reverse( $snapshots );
-
-					foreach ( $snapshots_reversed as $snapshot ) :
+					<?php foreach ( $snapshots_reversed as $snapshot ) :
+						++$snap_index;
 						$snap_scores  = $snapshot->scores;
 						$snap_summary = $snapshot->summary;
 						$snap_date    = $snapshot->created_at;
@@ -731,7 +735,6 @@ $total_pass   = $cat_counts['seo']['pass'] + $cat_counts['content']['pass'] + $c
 							$snap_timestamp = strtotime( $snap_date );
 							if ( false !== $snap_timestamp ) {
 								$snap_time_display = sprintf(
-									/* translators: %s: Human-readable time difference. */
 									esc_html__( '%s ago', 'scalyn-qa-assistant' ),
 									human_time_diff( $snap_timestamp, time() )
 								);
@@ -741,8 +744,9 @@ $total_pass   = $cat_counts['seo']['pass'] + $cat_counts['content']['pass'] + $c
 						$snap_pass    = isset( $snap_summary['pass'] ) ? (int) $snap_summary['pass'] : 0;
 						$snap_warning = isset( $snap_summary['warning'] ) ? (int) $snap_summary['warning'] : 0;
 						$snap_fail    = isset( $snap_summary['fail'] ) ? (int) $snap_summary['fail'] : 0;
+						$snap_hidden  = $snap_has_more && $snap_index > $snap_limit;
 						?>
-						<tr>
+						<tr<?php echo $snap_hidden ? ' class="scalyn-snapshot-hidden" style="display:none;"' : ''; ?>>
 							<td>
 								<span title="<?php echo esc_attr( $snap_date ); ?>">
 									<?php echo esc_html( $snap_time_display ); ?>
@@ -775,6 +779,17 @@ $total_pass   = $cat_counts['seo']['pass'] + $cat_counts['content']['pass'] + $c
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+			<?php if ( $snap_has_more ) : ?>
+				<button type="button" id="scalyn-show-all-snapshots" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost" style="margin-top:0.5rem;">
+					<?php printf( esc_html__( 'Show all %d snapshots', 'scalyn-qa-assistant' ), $snap_total ); ?>
+				</button>
+				<script>
+				document.getElementById('scalyn-show-all-snapshots').addEventListener('click', function() {
+					document.querySelectorAll('.scalyn-snapshot-hidden').forEach(function(r) { r.style.display = ''; });
+					this.style.display = 'none';
+				});
+				</script>
+			<?php endif; ?>
 		<?php endif; ?>
 
 	</div>
