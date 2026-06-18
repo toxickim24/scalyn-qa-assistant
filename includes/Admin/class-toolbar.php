@@ -95,12 +95,17 @@ final class Toolbar {
 		$icon_color = $icon_colors[ $status ] ?? '#94a3b8';
 
 		// Single toolbar node: QA Inspector toggle.
+		$svg_icon = sprintf(
+			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%s" style="width:18px;height:18px;vertical-align:middle;display:inline-block;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>',
+			esc_attr( $icon_color ),
+		);
+
 		$wp_admin_bar->add_node(
 			array(
 				'id'    => 'scalyn-qa-score',
 				'title' => sprintf(
-					'<span class="dashicons dashicons-visibility" style="font-size:18px;width:18px;height:18px;line-height:32px;color:%s;"></span> <span class="scalyn-qa-toolbar-label">%s</span>',
-					esc_attr( $icon_color ),
+					'%s <span class="scalyn-qa-toolbar-label">%s</span>',
+					$svg_icon,
 					esc_html__( 'QA Inspector', 'scalyn-qa-assistant' ),
 				),
 				'href'  => '#',
