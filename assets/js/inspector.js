@@ -928,8 +928,18 @@
         // Annotate headings with level badges.
         annotateHeadings();
 
-        // Annotate images missing alt text.
+        // Annotate images (alt text, lazy loading, dimensions, file size, broken).
         annotateImages();
+        annotateImageIssues();
+
+        // Annotate links (broken, placeholder).
+        annotateBrokenLinks();
+        annotatePlaceholderLinks();
+
+        // Annotate buttons/forms.
+        annotateEmptyButtons();
+        annotateEmptyHeadings();
+        annotateFormsWithoutSubmit();
 
         // Highlight writing issues from AI content review.
         highlightReviewIssues();
@@ -1033,6 +1043,293 @@
                     annotationBadges.push(badge);
                 });
             } catch (e) { /* invalid selector */ }
+        });
+    }
+
+    /**
+     * Helper: find a check by ID across all categories.
+     */
+    function findCheck(checkId) {
+        if (!data.results || !data.results.results) return null;
+        var cats = ['seo', 'content', 'functionality'];
+        for (var i = 0; i < cats.length; i++) {
+            var checks = data.results.results[cats[i]] || [];
+            for (var j = 0; j < checks.length; j++) {
+                if (checks[j].id === checkId) return checks[j];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Helper: create a badge on an element.
+     */
+    function addBadge(el, text, cssClass, tooltipData) {
+        var badge = document.createElement('span');
+        badge.className = 'sqi-element-badge ' + cssClass;
+        badge.textContent = text;
+
+        if (tooltipData) {
+            badge.addEventListener('mouseenter', function () { showTooltip(el, tooltipData); });
+            badge.addEventListener('mouseleave', clearTooltip);
+        }
+
+        el.style.position = el.style.position || 'relative';
+        el.appendChild(badge);
+        annotationBadges.push(badge);
+    }
+
+    /**
+     * Helper: find images by src filename on the page.
+     */
+    function findImagesBySrc(src) {
+        var filename = (src || '').split('/').pop().split('?')[0];
+        if (!filename) return [];
+        try {
+            var imgs = document.querySelectorAll('img[src*="' + CSS.escape(filename) + '"]');
+            var result = [];
+            imgs.forEach(function (img) { if (!isInInspector(img)) result.push(img); });
+            return result;
+        } catch (e) { return []; }
+    }
+
+    /**
+     * Annotate images: lazy loading, dimensions, file size, broken.
+     */
+    function annotateImageIssues() {
+        if (!data.results || !data.results.results) return;
+
+        // Lazy loading.
+        var lazyCheck = findCheck('image_lazy_loading');
+        if (lazyCheck && lazyCheck.status !== 'pass' && lazyCheck.details && lazyCheck.details.missing_lazy) {
+            lazyCheck.details.missing_lazy.forEach(function (src) {
+                findImagesBySrc(src).forEach(function (img) {
+                    var wrapper = img.parentElement;
+                    if (wrapper) wrapper.style.position = wrapper.style.position || 'relative';
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-img-badge sqi-img-badge--warning';
+                    badge.textContent = 'NO LAZY';
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(img, { id: 'image_lazy_loading', status: 'warning', label: 'Missing Lazy Loading', message: 'Add loading="lazy" to defer offscreen images.', tooltip: lazyCheck.tooltip || '' });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+                    if (wrapper) wrapper.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            });
+        }
+
+        // Missing dimensions.
+        var dimCheck = findCheck('image_dimensions');
+        if (dimCheck && dimCheck.status !== 'pass' && dimCheck.details && dimCheck.details.missing_dimensions) {
+            dimCheck.details.missing_dimensions.forEach(function (src) {
+                findImagesBySrc(src).forEach(function (img) {
+                    var wrapper = img.parentElement;
+                    if (wrapper) wrapper.style.position = wrapper.style.position || 'relative';
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-img-badge sqi-img-badge--warning';
+                    badge.style.top = 'auto';
+                    badge.style.bottom = '4px';
+                    badge.textContent = 'NO SIZE';
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(img, { id: 'image_dimensions', status: 'warning', label: 'Missing Dimensions', message: 'Add width and height attributes to prevent layout shifts (CLS).', tooltip: dimCheck.tooltip || '' });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+                    if (wrapper) wrapper.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            });
+        }
+
+        // Oversized images.
+        var sizeCheck = findCheck('image_file_size');
+        if (sizeCheck && sizeCheck.status !== 'pass' && sizeCheck.details && sizeCheck.details.oversized_images) {
+            sizeCheck.details.oversized_images.forEach(function (entry) {
+                // Format: "filename.jpg (2400KB)"
+                var match = entry.match(/^(.+?)\s*\((\d+)KB\)$/);
+                if (!match) return;
+                var src = match[1].replace(/\.\.\.$/,'');
+                var sizeKb = match[2];
+                findImagesBySrc(src).forEach(function (img) {
+                    var wrapper = img.parentElement;
+                    if (wrapper) wrapper.style.position = wrapper.style.position || 'relative';
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-img-badge sqi-img-badge--warning';
+                    badge.style.left = 'auto';
+                    badge.style.right = '4px';
+                    badge.textContent = sizeKb + 'KB';
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(img, { id: 'image_file_size', status: 'warning', label: 'Oversized Image', message: 'This image is ' + sizeKb + 'KB. Compress or resize to improve load speed.', tooltip: sizeCheck.tooltip || '' });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+                    if (wrapper) wrapper.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            });
+        }
+
+        // Broken images.
+        var brokenMediaCheck = findCheck('broken_media');
+        if (brokenMediaCheck && brokenMediaCheck.status !== 'pass' && brokenMediaCheck.details && brokenMediaCheck.details.broken_images) {
+            brokenMediaCheck.details.broken_images.forEach(function (src) {
+                findImagesBySrc(src).forEach(function (img) {
+                    var wrapper = img.parentElement;
+                    if (wrapper) wrapper.style.position = wrapper.style.position || 'relative';
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-img-badge sqi-img-badge--error';
+                    badge.textContent = 'BROKEN';
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(img, { id: 'broken_media', status: 'fail', label: 'Broken Image', message: 'Image source not found: ' + src, tooltip: 'Re-upload or fix the image URL.' });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+                    if (wrapper) wrapper.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            });
+        }
+    }
+
+    /**
+     * Annotate broken links with status code badges.
+     */
+    function annotateBrokenLinks() {
+        if (!data.results || !data.results.results) return;
+        var checks = data.results.results.functionality || [];
+        checks.forEach(function (item) {
+            if (item.id !== 'broken_links' || item.status === 'pass') return;
+            var url = (item.details && item.details.url) || '';
+            var statusCode = (item.details && item.details.status_code) || '?';
+            if (!url) return;
+
+            try {
+                var links = document.querySelectorAll('a[href*="' + CSS.escape(url) + '"]');
+                links.forEach(function (link) {
+                    if (isInInspector(link)) return;
+                    link.style.position = link.style.position || 'relative';
+
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-link-badge sqi-link-badge--error';
+                    badge.textContent = statusCode;
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(link, { id: 'broken_links', status: 'fail', label: 'Broken Link (' + statusCode + ')', message: 'URL: ' + url, tooltip: 'Update or remove this broken link.' });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+                    link.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            } catch (e) {}
+        });
+    }
+
+    /**
+     * Annotate placeholder links (href="#", javascript:void).
+     */
+    function annotatePlaceholderLinks() {
+        var check = findCheck('placeholder_links');
+        if (!check || check.status === 'pass') return;
+
+        // Find all placeholder links in the DOM.
+        var selectors = ['a[href="#"]', 'a[href="javascript:void(0)"]', 'a[href="javascript:void(0);"]', 'a[href="javascript:;"]'];
+        selectors.forEach(function (sel) {
+            try {
+                document.querySelectorAll(sel).forEach(function (link) {
+                    if (isInInspector(link)) return;
+                    link.style.position = link.style.position || 'relative';
+
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-link-badge sqi-link-badge--warning';
+                    badge.textContent = '#';
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(link, { id: 'placeholder_links', status: 'warning', label: 'Placeholder Link', message: 'This link points to "' + link.getAttribute('href') + '".', tooltip: 'Replace with a real URL or convert to a button element.' });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+                    link.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            } catch (e) {}
+        });
+    }
+
+    /**
+     * Annotate empty buttons (no text, no aria-label).
+     */
+    function annotateEmptyButtons() {
+        var check = findCheck('empty_buttons');
+        if (!check || check.status === 'pass') return;
+
+        document.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]').forEach(function (btn) {
+            if (isInInspector(btn)) return;
+            var text = (btn.textContent || '').trim();
+            var aria = (btn.getAttribute('aria-label') || '').trim();
+            var title = (btn.getAttribute('title') || '').trim();
+            var value = (btn.getAttribute('value') || '').trim();
+
+            if (text || aria || title || value) return; // Has accessible text.
+
+            btn.style.position = btn.style.position || 'relative';
+            var badge = document.createElement('span');
+            badge.className = 'sqi-element-badge sqi-element-badge--error';
+            badge.textContent = 'EMPTY';
+            badge.addEventListener('mouseenter', function () {
+                showTooltip(btn, { id: 'empty_buttons', status: 'fail', label: 'Empty Button', message: 'This button has no visible text or aria-label.', tooltip: 'Add text content or an aria-label for accessibility.' });
+            });
+            badge.addEventListener('mouseleave', clearTooltip);
+            btn.appendChild(badge);
+            annotationBadges.push(badge);
+        });
+    }
+
+    /**
+     * Annotate empty headings.
+     */
+    function annotateEmptyHeadings() {
+        var check = findCheck('empty_headings');
+        if (!check || check.status === 'pass') return;
+
+        document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (el) {
+            if (isInInspector(el)) return;
+            if ((el.textContent || '').trim() !== '') return; // Has text.
+
+            el.style.position = el.style.position || 'relative';
+            el.style.minHeight = el.style.minHeight || '24px';
+            var tag = el.tagName.toUpperCase();
+            var badge = document.createElement('span');
+            badge.className = 'sqi-heading-badge sqi-heading-badge--red';
+            badge.textContent = tag + ' EMPTY';
+            badge.addEventListener('mouseenter', function () {
+                showTooltip(el, { id: 'empty_headings', status: 'fail', label: 'Empty Heading', message: 'This ' + tag + ' heading has no text content.', tooltip: 'Add text or remove the empty heading element.' });
+            });
+            badge.addEventListener('mouseleave', clearTooltip);
+            el.appendChild(badge);
+            annotationBadges.push(badge);
+        });
+    }
+
+    /**
+     * Annotate forms without submit buttons.
+     */
+    function annotateFormsWithoutSubmit() {
+        var check = findCheck('form_has_submit');
+        if (!check || check.status === 'pass') return;
+
+        document.querySelectorAll('form').forEach(function (form) {
+            if (isInInspector(form)) return;
+            var hasSubmit = form.querySelector('input[type="submit"], button[type="submit"], button:not([type])');
+            if (hasSubmit) return;
+
+            form.style.position = form.style.position || 'relative';
+            var badge = document.createElement('span');
+            badge.className = 'sqi-element-badge sqi-element-badge--warning';
+            badge.textContent = 'NO SUBMIT';
+            badge.style.position = 'absolute';
+            badge.style.top = '4px';
+            badge.style.right = '4px';
+            badge.addEventListener('mouseenter', function () {
+                showTooltip(form, { id: 'form_has_submit', status: 'warning', label: 'Missing Submit Button', message: 'This form has no submit button.', tooltip: 'Add a submit button so users can submit the form.' });
+            });
+            badge.addEventListener('mouseleave', clearTooltip);
+            form.appendChild(badge);
+            annotationBadges.push(badge);
         });
     }
 
