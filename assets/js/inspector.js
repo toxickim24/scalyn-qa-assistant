@@ -30,10 +30,12 @@
     // Issue-to-DOM selector mapping.
     var DOM_SELECTORS = {
         image_alt_text:      function (d) { return (d.missing_alt_images || []).map(function (src) { return 'img[src*="' + CSS.escape(src.split('/').pop()) + '"]'; }); },
-        heading_hierarchy:   function () { return ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']; },
         internal_links:      function (d) { return (d.internal_links || []).map(function (l) { return 'a[href*="' + CSS.escape(typeof l === 'string' ? l : l.url || '') + '"]'; }); },
         external_links:      function (d) { return (d.external_links || []).map(function (l) { return 'a[href*="' + CSS.escape(typeof l === 'string' ? l : l.url || '') + '"]'; }); },
     };
+
+    // Track heading badges and image badges for cleanup.
+    var annotationBadges = [];
 
     // -------------------------------------------------------------------------
     // Helpers
@@ -872,8 +874,115 @@
             });
         });
 
+        // Annotate headings with level badges.
+        annotateHeadings();
+
+        // Annotate images missing alt text.
+        annotateImages();
+
         // Highlight writing issues from AI content review.
         highlightReviewIssues();
+    }
+
+    /**
+     * Add heading level badges (H1, H2, H3...) to all headings on the page.
+     * Color-coded: green = correct order, red = skipped level or duplicate H1, yellow = warning.
+     */
+    function annotateHeadings() {
+        var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        if (headings.length === 0) return;
+
+        var prevLevel = 0;
+        var h1Count = 0;
+
+        headings.forEach(function (el) {
+            if (isInInspector(el)) return;
+
+            var tag = el.tagName.toLowerCase();
+            var level = parseInt(tag.charAt(1), 10);
+            var badgeColor = 'green'; // default: good
+            var issue = '';
+
+            if (level === 1) {
+                h1Count++;
+                if (h1Count > 1) {
+                    badgeColor = 'red';
+                    issue = 'Multiple H1 tags — use only one H1 per page';
+                }
+            } else if (prevLevel > 0 && level > prevLevel + 1) {
+                badgeColor = 'red';
+                issue = 'Skipped level: ' + 'H' + prevLevel + ' \u2192 H' + level + ' (expected H' + (prevLevel + 1) + ')';
+            }
+
+            prevLevel = level;
+
+            var badge = document.createElement('span');
+            badge.className = 'sqi-heading-badge sqi-heading-badge--' + badgeColor;
+            badge.textContent = tag.toUpperCase();
+            if (issue) badge.title = issue;
+
+            // Tooltip on hover.
+            if (issue) {
+                badge.addEventListener('mouseenter', function () {
+                    showTooltip(el, {
+                        id: 'heading_hierarchy',
+                        status: 'fail',
+                        label: 'Heading Hierarchy: ' + tag.toUpperCase(),
+                        message: issue,
+                        tooltip: 'Use a logical heading order (H1 \u2192 H2 \u2192 H3). Don\'t skip levels.',
+                    });
+                });
+                badge.addEventListener('mouseleave', clearTooltip);
+            }
+
+            el.style.position = el.style.position || 'relative';
+            el.appendChild(badge);
+            annotationBadges.push(badge);
+        });
+    }
+
+    /**
+     * Add "No Alt" badges to images missing alt text.
+     */
+    function annotateImages() {
+        if (!data.results || !data.results.results) return;
+
+        var seoChecks = data.results.results.seo || [];
+        var altCheck = null;
+        seoChecks.forEach(function (c) { if (c.id === 'image_alt_text') altCheck = c; });
+        if (!altCheck || altCheck.status === 'pass') return;
+
+        var missingSrcs = (altCheck.details && altCheck.details.missing_alt_images) || [];
+        missingSrcs.forEach(function (src) {
+            var filename = src.split('/').pop();
+            try {
+                var imgs = document.querySelectorAll('img[src*="' + CSS.escape(filename) + '"]');
+                imgs.forEach(function (img) {
+                    if (isInInspector(img)) return;
+
+                    var wrapper = img.parentElement;
+                    if (wrapper) wrapper.style.position = wrapper.style.position || 'relative';
+
+                    var badge = document.createElement('span');
+                    badge.className = 'sqi-img-badge';
+                    badge.textContent = 'No Alt';
+
+                    badge.addEventListener('mouseenter', function () {
+                        showTooltip(img, {
+                            id: 'image_alt_text',
+                            status: 'fail',
+                            label: 'Missing Alt Text',
+                            message: 'This image has no alt text: ' + filename,
+                            tooltip: 'Add descriptive alt text for accessibility and SEO.',
+                        });
+                    });
+                    badge.addEventListener('mouseleave', clearTooltip);
+
+                    if (wrapper) wrapper.appendChild(badge);
+                    annotationBadges.push(badge);
+                });
+            } catch (e) { /* invalid selector */ }
+        });
     }
 
     function highlightReviewIssues() {
@@ -970,17 +1079,6 @@
             });
         }
 
-        // Special case: multiple H1 check.
-        if (item.id === 'heading_hierarchy' || (item.id === 'meta_title_exists' && item.status !== 'pass')) {
-            // Only highlight h1 if there are multiple.
-            var h1s = document.querySelectorAll('h1');
-            if (h1s.length > 1) {
-                h1s.forEach(function (el) {
-                    if (!isInInspector(el)) elements.push(el);
-                });
-            }
-        }
-
         return elements;
     }
 
@@ -1025,10 +1123,15 @@
             if (!mark.parentNode) return;
             var text = document.createTextNode(mark.textContent);
             mark.parentNode.replaceChild(text, mark);
-            // Merge adjacent text nodes.
             text.parentNode.normalize();
         });
         textMarks = [];
+
+        // Remove annotation badges (headings, images).
+        annotationBadges.forEach(function (badge) {
+            if (badge.parentNode) badge.parentNode.removeChild(badge);
+        });
+        annotationBadges = [];
 
         clearTooltip();
     }
