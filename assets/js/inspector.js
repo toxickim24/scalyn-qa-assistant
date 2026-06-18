@@ -117,6 +117,10 @@
             totalAll += c.total;
         });
 
+        // Check if Generate All has already been run (any AI data exists).
+        var hasAnyAiData = aiDrafts || data.aiAltTexts || data.aiKeywords || data.aiFeatured || data.contentReview;
+        var generateAllRun = false;
+
         // Overview
         var html = '<div class="sqi-overview">' +
             '<div class="sqi-overview__score">' +
@@ -127,8 +131,14 @@
             (totalFail > 0 ? ' &middot; <span style="color:var(--sqi-red)">' + totalFail + ' failed</span>' : '') +
             (totalWarn > 0 ? ' &middot; <span style="color:var(--sqi-yellow)">' + totalWarn + ' warnings</span>' : '') +
             '</span></div></div>' +
-            '<div class="sqi-overview__bar"><div class="sqi-overview__bar-fill sqi-overview__bar-fill--' + status + '" style="width:' + overall + '%"></div></div>' +
-            '</div>';
+            '<div class="sqi-overview__bar"><div class="sqi-overview__bar-fill sqi-overview__bar-fill--' + status + '" style="width:' + overall + '%"></div></div>';
+
+        // Generate All with AI button — only if not already run.
+        if (!hasAnyAiData && totalFail > 0) {
+            html += '<button class="sqi-footer__btn" id="sqi-btn-generate-all" style="width:100%;margin-top:8px;">Generate All with AI</button>';
+        }
+
+        html += '</div>';
 
         // Categories
         categories.forEach(function (cat) {
@@ -469,6 +479,47 @@
                 .catch(function () {
                     rescanBtn.disabled = false;
                     rescanBtn.textContent = 'Rescan';
+                });
+            };
+        }
+
+        // Generate All with AI button.
+        var genAllBtn = document.getElementById('sqi-btn-generate-all');
+        if (genAllBtn) {
+            genAllBtn.onclick = function () {
+                if (generateAllRun) return;
+                generateAllRun = true;
+                genAllBtn.disabled = true;
+                genAllBtn.textContent = 'Generating...';
+
+                var apiCalls = [
+                    fetch(scalynQA.restUrl + 'ai/generate/' + data.postId, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce }, credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+                    fetch(scalynQA.restUrl + 'ai/review/' + data.postId, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce }, credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+                    fetch(scalynQA.restUrl + 'ai/generate-keywords/' + data.postId, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce }, credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+                ];
+
+                Promise.allSettled(apiCalls).then(function (settled) {
+                    var responses = settled.map(function (s) { return s.status === 'fulfilled' ? s.value : null; });
+
+                    // Store results.
+                    if (responses[0] && responses[0].success && responses[0].data) {
+                        aiDrafts = aiDrafts || {};
+                        if (responses[0].data.title) aiDrafts.title = responses[0].data.title;
+                        if (responses[0].data.description) aiDrafts.description = responses[0].data.description;
+                        aiGenerated['meta_title_exists'] = true;
+                        aiGenerated['meta_description_exists'] = true;
+                    }
+
+                    if (responses[1] && responses[1].success && responses[1].data) {
+                        data.contentReview = responses[1].data;
+                    }
+
+                    if (responses[2] && responses[2].success && responses[2].data) {
+                        data.aiKeywords = responses[2].data;
+                        aiGenerated['focus_keyword'] = true;
+                    }
+
+                    refreshPanel();
                 });
             };
         }
