@@ -342,6 +342,72 @@ body.sqi-docked {
   text-overflow: ellipsis;
 }
 
+.sqi-check__result {
+  font-size: 11px;
+  color: var(--sqi-green);
+  margin-top: 3px;
+  padding: 3px 6px;
+  background: rgba(166, 227, 161, 0.1);
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sqi-check__actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.sqi-action-btn {
+  background: var(--sqi-bg-hover);
+  border: 1px solid var(--sqi-border);
+  color: var(--sqi-text-muted);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sqi-action-btn:hover {
+  background: var(--sqi-border);
+  color: var(--sqi-text);
+}
+
+.sqi-action-btn--ai {
+  background: rgba(137, 180, 250, 0.15);
+  border-color: var(--sqi-blue);
+  color: var(--sqi-blue);
+}
+
+.sqi-action-btn--ai:hover {
+  background: rgba(137, 180, 250, 0.3);
+}
+
+.sqi-action-btn--apply {
+  background: rgba(166, 227, 161, 0.15);
+  border-color: var(--sqi-green);
+  color: var(--sqi-green);
+}
+
+.sqi-action-btn--apply:hover {
+  background: rgba(166, 227, 161, 0.3);
+}
+
+.sqi-action-btn--done {
+  background: rgba(166, 227, 161, 0.2);
+  color: var(--sqi-green);
+  border-color: var(--sqi-green);
+  cursor: default;
+}
+
+.sqi-action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ==========================================================================
    Panel Footer
    ========================================================================== */

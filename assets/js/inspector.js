@@ -152,6 +152,18 @@
                 html += '<div class="sqi-check__content">';
                 html += '<span class="sqi-check__label">' + esc(item.label) + '</span>';
                 if (item.message) html += '<span class="sqi-check__message">' + esc(item.message) + '</span>';
+
+                // Inline AI result (if exists from generation).
+                var inlineResult = getInlineResult(item);
+                if (inlineResult) {
+                    html += '<div class="sqi-check__result">' + esc(inlineResult) + '</div>';
+                }
+
+                // Action buttons for non-pass checks.
+                if (item.status !== 'pass') {
+                    html += buildCheckActions(item);
+                }
+
                 html += '</div></div>';
             });
             html += '</div></div>';
@@ -161,6 +173,59 @@
         html += buildContentReview();
 
         return html;
+    }
+
+    /**
+     * Get inline AI result text for a check (from saved drafts).
+     */
+    function getInlineResult(item) {
+        if (!data.results) return null;
+
+        // Meta title/description: read from saved AI drafts passed via localized data.
+        if (item.id === 'meta_title_exists' && aiDrafts && aiDrafts.title) {
+            return aiDrafts.title;
+        }
+        if (item.id === 'meta_description_exists' && aiDrafts && aiDrafts.description) {
+            return aiDrafts.description;
+        }
+        return null;
+    }
+
+    // Load saved AI drafts from the results data.
+    var aiDrafts = null;
+    var aiGenerated = {}; // Track which checks have been generated this session.
+
+    /**
+     * Build action buttons for a failing check.
+     */
+    function buildCheckActions(item) {
+        var actions = [];
+        var checkId = item.id;
+
+        // Determine which checks support AI generation.
+        var aiChecks = {
+            'meta_title_exists': 'ai/generate/',
+            'meta_description_exists': 'ai/generate/',
+            'image_alt_text': 'ai/generate-alt/',
+            'focus_keyword': 'ai/generate-keywords/',
+            'featured_image_exists': 'ai/generate-featured-image/',
+        };
+
+        if (aiChecks[checkId]) {
+            var isRegen = !!aiGenerated[checkId] || !!getInlineResult(item);
+            var genLabel = isRegen ? 'Regenerate' : 'Generate';
+            actions.push('<button class="sqi-action-btn sqi-action-btn--ai sqi-gen-btn" data-check-id="' + esc(checkId) + '" data-endpoint="' + aiChecks[checkId] + '">' + genLabel + '</button>');
+        }
+
+        // Copy button for checks with inline results.
+        var result = getInlineResult(item);
+        if (result) {
+            actions.push('<button class="sqi-action-btn sqi-copy-btn" data-text="' + esc(result) + '">Copy</button>');
+            actions.push('<button class="sqi-action-btn sqi-action-btn--apply sqi-apply-btn" data-check-id="' + esc(checkId) + '" data-text="' + esc(result) + '">Apply</button>');
+        }
+
+        if (actions.length === 0) return '';
+        return '<div class="sqi-check__actions">' + actions.join('') + '</div>';
     }
 
     function buildContentReview() {
@@ -336,6 +401,114 @@
                 });
             };
         }
+
+        // Generate/Regenerate AI buttons per check.
+        panel.querySelectorAll('.sqi-gen-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var checkId = btn.getAttribute('data-check-id');
+                var endpoint = btn.getAttribute('data-endpoint');
+                if (!checkId || !endpoint) return;
+
+                btn.disabled = true;
+                btn.textContent = 'Generating...';
+
+                fetch(scalynQA.restUrl + endpoint + data.postId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success && response.data) {
+                        aiGenerated[checkId] = true;
+
+                        // Store results for inline display.
+                        if (checkId === 'meta_title_exists' || checkId === 'meta_description_exists') {
+                            aiDrafts = aiDrafts || {};
+                            if (response.data.title) aiDrafts.title = response.data.title;
+                            if (response.data.description) aiDrafts.description = response.data.description;
+                            // Mark both as generated.
+                            aiGenerated['meta_title_exists'] = true;
+                            aiGenerated['meta_description_exists'] = true;
+                        }
+
+                        refreshPanel();
+                    }
+                    btn.disabled = false;
+                    btn.textContent = 'Regenerate';
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Regenerate';
+                });
+            };
+        });
+
+        // Copy buttons.
+        panel.querySelectorAll('.sqi-copy-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var text = btn.getAttribute('data-text');
+                if (text && navigator.clipboard) {
+                    navigator.clipboard.writeText(text);
+                    btn.textContent = 'Copied!';
+                    setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+                }
+            };
+        });
+
+        // Apply buttons (meta title/description to SEO plugin).
+        panel.querySelectorAll('.sqi-apply-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var checkId = btn.getAttribute('data-check-id');
+                var text = btn.getAttribute('data-text');
+                if (!checkId || !text) return;
+
+                var applyData = {};
+                if (checkId === 'meta_title_exists') applyData.title = text;
+                if (checkId === 'meta_description_exists') applyData.description = text;
+
+                btn.disabled = true;
+                btn.textContent = 'Applying...';
+
+                fetch(scalynQA.restUrl + 'ai/apply/' + data.postId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(applyData),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success) {
+                        btn.textContent = 'Applied!';
+                        btn.classList.add('sqi-action-btn--done');
+                        // Rescan to update scores.
+                        fetch(scalynQA.restUrl + 'scan/' + data.postId, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                            credentials: 'same-origin',
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (scanResp) {
+                            if (scanResp.success && scanResp.data) {
+                                data.hasScan = true;
+                                data.results = scanResp.data;
+                                refreshPanel();
+                            }
+                        });
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = 'Apply';
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Apply';
+                });
+            };
+        });
 
         // Review Current button — recheck existing issues.
         var reviewBtn = document.getElementById('sqi-btn-review-current');
