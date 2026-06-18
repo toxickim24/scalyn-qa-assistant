@@ -191,9 +191,18 @@
         return null;
     }
 
-    // Load saved AI drafts from the results data.
-    var aiDrafts = null;
+    // Load saved AI drafts from PHP-localized data.
+    var aiDrafts = data.aiDrafts || null;
     var aiGenerated = {}; // Track which checks have been generated this session.
+
+    // Pre-populate aiGenerated from existing server-side AI data.
+    if (aiDrafts) {
+        if (aiDrafts.title) aiGenerated['meta_title_exists'] = true;
+        if (aiDrafts.description) aiGenerated['meta_description_exists'] = true;
+    }
+    if (data.aiAltTexts) aiGenerated['image_alt_text'] = true;
+    if (data.aiKeywords) aiGenerated['focus_keyword'] = true;
+    if (data.aiFeatured) aiGenerated['featured_image_exists'] = true;
 
     /**
      * Build action buttons for a failing check.

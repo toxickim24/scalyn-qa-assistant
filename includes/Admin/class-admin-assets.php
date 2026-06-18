@@ -172,11 +172,21 @@ final class Admin_Assets {
 			$inspector_post_id = get_queried_object_id();
 			$scan_result       = \Scalyn\QA\Models\Scan_Result::load( $inspector_post_id );
 			$content_review    = get_post_meta( $inspector_post_id, '_scalyn_qa_content_review', true );
+			$ai_drafts_raw     = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_drafts', true );
+			$ai_drafts         = is_array( $ai_drafts_raw ) && ! empty( $ai_drafts_raw ) ? end( $ai_drafts_raw ) : null;
+			$ai_alt_texts      = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_alt_texts', true );
+			$ai_keywords       = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_keywords', true );
+			$ai_featured       = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_featured_images', true );
+
 			$inspector_data    = array(
 				'postId'        => $inspector_post_id,
 				'hasScan'       => null !== $scan_result,
 				'results'       => null !== $scan_result ? $scan_result->to_array() : null,
 				'contentReview' => is_array( $content_review ) ? $content_review : null,
+				'aiDrafts'      => is_array( $ai_drafts ) ? $ai_drafts : null,
+				'aiAltTexts'    => is_array( $ai_alt_texts ) && ! empty( $ai_alt_texts['results'] ) ? true : false,
+				'aiKeywords'    => is_array( $ai_keywords ) && ! empty( $ai_keywords ) ? true : false,
+				'aiFeatured'    => is_array( $ai_featured ) && ! empty( $ai_featured ) ? true : false,
 			);
 
 			wp_localize_script(
