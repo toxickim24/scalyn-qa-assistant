@@ -950,9 +950,6 @@
      * Color-coded: green = correct order, red = skipped level or duplicate H1, yellow = warning.
      */
     function annotateHeadings() {
-        var check = findCheck('heading_hierarchy');
-        if (!check || check.status === 'pass') return;
-
         var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
         if (headings.length === 0) return;
 
@@ -965,36 +962,38 @@
 
             var tag = el.tagName.toLowerCase();
             var level = parseInt(tag.charAt(1), 10);
+            var badgeColor = 'green';
             var issue = '';
 
             if (level === 1) {
                 h1Count++;
                 if (h1Count > 1) {
+                    badgeColor = 'red';
                     issue = 'Multiple H1 tags \u2014 use only one H1 per page';
                 }
             } else if (prevLevel > 0 && level > prevLevel + 1) {
+                badgeColor = 'red';
                 issue = 'Skipped level: H' + prevLevel + ' \u2192 H' + level + ' (expected H' + (prevLevel + 1) + ')';
             }
 
             prevLevel = level;
 
-            // Only show badge if there's a problem.
-            if (!issue) return;
-
             var badge = document.createElement('span');
-            badge.className = 'sqi-heading-badge sqi-heading-badge--red';
+            badge.className = 'sqi-heading-badge sqi-heading-badge--' + badgeColor;
             badge.textContent = tag.toUpperCase();
 
-            badge.addEventListener('mouseenter', function () {
-                showTooltip(el, {
-                    id: 'heading_hierarchy',
-                    status: 'fail',
-                    label: 'Heading Hierarchy: ' + tag.toUpperCase(),
-                    message: issue,
-                    tooltip: 'Use a logical heading order (H1 \u2192 H2 \u2192 H3). Don\'t skip levels.',
+            if (issue) {
+                badge.addEventListener('mouseenter', function () {
+                    showTooltip(el, {
+                        id: 'heading_hierarchy',
+                        status: 'fail',
+                        label: 'Heading Hierarchy: ' + tag.toUpperCase(),
+                        message: issue,
+                        tooltip: 'Use a logical heading order (H1 \u2192 H2 \u2192 H3). Don\'t skip levels.',
+                    });
                 });
-            });
-            badge.addEventListener('mouseleave', clearTooltip);
+                badge.addEventListener('mouseleave', clearTooltip);
+            }
 
             el.style.position = el.style.position || 'relative';
             el.appendChild(badge);
