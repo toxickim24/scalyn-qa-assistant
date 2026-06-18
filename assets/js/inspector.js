@@ -245,6 +245,13 @@
         mode = newMode || 'docked';
         panel.style.display = '';
 
+        // Clear any inline styles from floating/dragging/resizing.
+        panel.style.width = '';
+        panel.style.height = '';
+        panel.style.left = '';
+        panel.style.top = '';
+        panel.style.right = '';
+
         if (mode === 'docked') {
             panel.className = 'sqi-panel sqi-panel--docked';
             document.body.classList.add('sqi-docked');
