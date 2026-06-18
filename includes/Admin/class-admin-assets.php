@@ -176,17 +176,32 @@ final class Admin_Assets {
 			$ai_drafts         = is_array( $ai_drafts_raw ) && ! empty( $ai_drafts_raw ) ? end( $ai_drafts_raw ) : null;
 			$ai_alt_texts      = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_alt_texts', true );
 			$ai_keywords       = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_keywords', true );
-			$ai_featured       = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_featured_images', true );
+			$ai_featured_ids   = get_post_meta( $inspector_post_id, '_scalyn_qa_ai_featured_images', true );
+			$ai_featured_ids   = is_array( $ai_featured_ids ) ? $ai_featured_ids : array();
+			$ai_featured_opts  = array();
+			foreach ( $ai_featured_ids as $fid ) {
+				$fid = (int) $fid;
+				$url = wp_get_attachment_image_url( $fid, 'thumbnail' );
+				if ( $url ) {
+					$ai_featured_opts[] = array(
+						'id'       => $fid,
+						'url'      => $url,
+						'filename' => basename( get_attached_file( $fid ) ?: '' ),
+					);
+				}
+			}
+			$current_thumb_id = (int) get_post_thumbnail_id( $inspector_post_id );
 
 			$inspector_data    = array(
-				'postId'        => $inspector_post_id,
-				'hasScan'       => null !== $scan_result,
-				'results'       => null !== $scan_result ? $scan_result->to_array() : null,
-				'contentReview' => is_array( $content_review ) ? $content_review : null,
-				'aiDrafts'      => is_array( $ai_drafts ) ? $ai_drafts : null,
-				'aiAltTexts'    => is_array( $ai_alt_texts ) && ! empty( $ai_alt_texts['results'] ) ? true : false,
-				'aiKeywords'    => is_array( $ai_keywords ) && ! empty( $ai_keywords ) ? true : false,
-				'aiFeatured'    => is_array( $ai_featured ) && ! empty( $ai_featured ) ? true : false,
+				'postId'           => $inspector_post_id,
+				'hasScan'          => null !== $scan_result,
+				'results'          => null !== $scan_result ? $scan_result->to_array() : null,
+				'contentReview'    => is_array( $content_review ) ? $content_review : null,
+				'aiDrafts'         => is_array( $ai_drafts ) ? $ai_drafts : null,
+				'aiAltTexts'       => is_array( $ai_alt_texts ) && ! empty( $ai_alt_texts['results'] ) ? true : false,
+				'aiKeywords'       => is_array( $ai_keywords ) && ! empty( $ai_keywords ) ? true : false,
+				'aiFeatured'       => ! empty( $ai_featured_opts ) ? $ai_featured_opts : false,
+				'currentThumbnail' => $current_thumb_id,
 			);
 
 			wp_localize_script(

@@ -408,6 +408,59 @@ body.sqi-docked {
   cursor: default;
 }
 
+/* Featured Image Options in Inspector */
+.sqi-fi-options {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.sqi-fi-opt {
+  position: relative;
+  cursor: pointer;
+  border: 2px solid var(--sqi-border);
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.sqi-fi-opt img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+}
+
+.sqi-fi-opt input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sqi-fi-opt--selected,
+.sqi-fi-opt:hover {
+  border-color: var(--sqi-blue);
+}
+
+.sqi-fi-opt--current {
+  border-color: var(--sqi-green);
+}
+
+.sqi-fi-opt__badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(166, 227, 161, 0.85);
+  color: #1e1e2e;
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 1px 0;
+}
+
 /* ==========================================================================
    Panel Footer
    ========================================================================== */

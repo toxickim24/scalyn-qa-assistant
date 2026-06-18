@@ -226,15 +226,37 @@
             actions.push('<button class="sqi-action-btn sqi-action-btn--ai sqi-gen-btn" data-check-id="' + esc(checkId) + '" data-endpoint="' + aiChecks[checkId] + '">' + genLabel + '</button>');
         }
 
-        // Copy button for checks with inline results.
+        // Copy + Apply for meta title/description.
         var result = getInlineResult(item);
         if (result) {
             actions.push('<button class="sqi-action-btn sqi-copy-btn" data-text="' + esc(result) + '">Copy</button>');
             actions.push('<button class="sqi-action-btn sqi-action-btn--apply sqi-apply-btn" data-check-id="' + esc(checkId) + '" data-text="' + esc(result) + '">Apply</button>');
         }
 
+        // Apply for featured image (from existing AI options).
+        if (checkId === 'featured_image_exists' && data.aiFeatured && data.aiFeatured.length > 0) {
+            actions.push('<button class="sqi-action-btn sqi-action-btn--apply sqi-apply-fi-btn" data-attachment-id="' + data.aiFeatured[0].id + '">Apply</button>');
+        }
+
         if (actions.length === 0) return '';
-        return '<div class="sqi-check__actions">' + actions.join('') + '</div>';
+
+        var html = '<div class="sqi-check__actions">' + actions.join('') + '</div>';
+
+        // Show featured image thumbnails if available.
+        if (checkId === 'featured_image_exists' && data.aiFeatured && data.aiFeatured.length > 0) {
+            html += '<div class="sqi-fi-options">';
+            data.aiFeatured.forEach(function (fi, idx) {
+                var isCurrent = fi.id === data.currentThumbnail;
+                html += '<label class="sqi-fi-opt' + (isCurrent ? ' sqi-fi-opt--current' : (idx === 0 ? ' sqi-fi-opt--selected' : '')) + '">';
+                html += '<input type="radio" name="sqi-fi" value="' + fi.id + '"' + (isCurrent || (!data.currentThumbnail && idx === 0) ? ' checked' : '') + '>';
+                html += '<img src="' + esc(fi.url) + '" alt="' + esc(fi.filename) + '" title="' + esc(fi.filename) + '">';
+                if (isCurrent) html += '<span class="sqi-fi-opt__badge">current</span>';
+                html += '</label>';
+            });
+            html += '</div>';
+        }
+
+        return html;
     }
 
     function buildContentReview() {
@@ -516,6 +538,67 @@
                     btn.disabled = false;
                     btn.textContent = 'Apply';
                 });
+            };
+        });
+
+        // Featured image Apply button.
+        panel.querySelectorAll('.sqi-apply-fi-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                // Get selected radio value.
+                var selected = panel.querySelector('input[name="sqi-fi"]:checked');
+                var attachmentId = selected ? parseInt(selected.value, 10) : parseInt(btn.getAttribute('data-attachment-id'), 10);
+                if (!attachmentId) return;
+
+                btn.disabled = true;
+                btn.textContent = 'Applying...';
+
+                fetch(scalynQA.restUrl + 'ai/apply-featured-image/' + data.postId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ attachment_id: attachmentId }),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success) {
+                        btn.textContent = 'Applied!';
+                        btn.classList.add('sqi-action-btn--done');
+                        data.currentThumbnail = attachmentId;
+                        // Rescan to update.
+                        fetch(scalynQA.restUrl + 'scan/' + data.postId, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                            credentials: 'same-origin',
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (scanResp) {
+                            if (scanResp.success && scanResp.data) {
+                                data.hasScan = true;
+                                data.results = scanResp.data;
+                                refreshPanel();
+                            }
+                        });
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = 'Apply';
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Apply';
+                });
+            };
+        });
+
+        // Featured image radio selection highlight.
+        panel.querySelectorAll('input[name="sqi-fi"]').forEach(function (radio) {
+            radio.onchange = function () {
+                panel.querySelectorAll('.sqi-fi-opt').forEach(function (opt) { opt.classList.remove('sqi-fi-opt--selected'); });
+                radio.closest('.sqi-fi-opt').classList.add('sqi-fi-opt--selected');
+                // Update Apply button attachment ID.
+                var applyBtn = panel.querySelector('.sqi-apply-fi-btn');
+                if (applyBtn) applyBtn.setAttribute('data-attachment-id', radio.value);
             };
         });
 
