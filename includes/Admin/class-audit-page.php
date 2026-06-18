@@ -155,6 +155,16 @@ class Audit_Page {
 			$items = array_values( $items );
 		}
 
+		// Compute summary stats across ALL items (before status filter).
+		$status_summary = array( 'green' => 0, 'yellow' => 0, 'red' => 0, 'unscanned' => 0 );
+		foreach ( $items as $it ) {
+			if ( null === $it['score'] ) {
+				++$status_summary['unscanned'];
+			} elseif ( isset( $it['status'] ) && isset( $status_summary[ $it['status'] ] ) ) {
+				++$status_summary[ $it['status'] ];
+			}
+		}
+
 		$data = array(
 			'items'          => $items,
 			'total_posts'    => $query->found_posts,
@@ -165,6 +175,7 @@ class Audit_Page {
 			'current_type'   => $post_type,
 			'current_status' => $status_filter,
 			'base_url'       => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['audits'] ),
+			'status_summary' => $status_summary,
 		);
 
 		$this->load_template( 'audit/list.php', $data );

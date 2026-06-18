@@ -31,6 +31,12 @@ $post_types     = isset( $post_types ) && is_array( $post_types ) ? $post_types 
 $current_type   = isset( $current_type ) ? $current_type : '';
 $current_status = isset( $current_status ) ? $current_status : '';
 $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=scalyn-qa-audits' );
+$status_summary = isset( $status_summary ) && is_array( $status_summary ) ? $status_summary : array();
+$sum_green      = (int) ( $status_summary['green'] ?? 0 );
+$sum_yellow     = (int) ( $status_summary['yellow'] ?? 0 );
+$sum_red        = (int) ( $status_summary['red'] ?? 0 );
+$sum_unscanned  = (int) ( $status_summary['unscanned'] ?? 0 );
+$sum_total      = $sum_green + $sum_yellow + $sum_red + $sum_unscanned;
 ?>
 <div class="scalyn-wrap">
 	<div class="scalyn-page-header">
@@ -40,7 +46,8 @@ $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=sc
 		</div>
 		<div class="scalyn-page-header__actions">
 			<button type="button" id="scalyn-scan-all" class="scalyn-btn">
-				<?php esc_html_e( 'Scan All', 'scalyn-qa-assistant' ); ?>
+				<span class="dashicons dashicons-update" aria-hidden="true"></span>
+				<?php printf( esc_html__( 'Scan All Pages (%d)', 'scalyn-qa-assistant' ), $total_posts ); ?>
 			</button>
 
 			<select id="scalyn-filter-status" class="scalyn-select" data-base-url="<?php echo esc_attr( $base_url ); ?>">
@@ -80,6 +87,28 @@ $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=sc
 		</div>
 	</div>
 
+	<!-- Summary Stats -->
+	<?php if ( $sum_total > 0 ) : ?>
+	<div class="scalyn-grid scalyn-grid--4" style="margin-bottom:0;">
+		<div class="scalyn-card scalyn-audit-stat">
+			<span class="scalyn-audit-stat__value scalyn-text--green"><?php echo esc_html( (string) $sum_green ); ?></span>
+			<span class="scalyn-audit-stat__label"><?php esc_html_e( 'Passed', 'scalyn-qa-assistant' ); ?></span>
+		</div>
+		<div class="scalyn-card scalyn-audit-stat">
+			<span class="scalyn-audit-stat__value scalyn-text--yellow"><?php echo esc_html( (string) $sum_yellow ); ?></span>
+			<span class="scalyn-audit-stat__label"><?php esc_html_e( 'Need Review', 'scalyn-qa-assistant' ); ?></span>
+		</div>
+		<div class="scalyn-card scalyn-audit-stat">
+			<span class="scalyn-audit-stat__value scalyn-text--red"><?php echo esc_html( (string) $sum_red ); ?></span>
+			<span class="scalyn-audit-stat__label"><?php esc_html_e( 'Issues Found', 'scalyn-qa-assistant' ); ?></span>
+		</div>
+		<div class="scalyn-card scalyn-audit-stat">
+			<span class="scalyn-audit-stat__value" style="color:var(--scalyn-text-muted);"><?php echo esc_html( (string) $sum_unscanned ); ?></span>
+			<span class="scalyn-audit-stat__label"><?php esc_html_e( 'Not Scanned', 'scalyn-qa-assistant' ); ?></span>
+		</div>
+	</div>
+	<?php endif; ?>
+
 	<!-- Progress bar (hidden by default, shown during scan all) -->
 	<div id="scalyn-scan-progress" class="scalyn-card" style="display:none;">
 		<div class="scalyn-progress scalyn-progress--large">
@@ -112,8 +141,10 @@ $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=sc
 			<tbody>
 				<?php if ( empty( $items ) ) : ?>
 					<tr>
-						<td colspan="9" class="scalyn-table__empty">
-							<?php esc_html_e( 'No pages found matching your criteria.', 'scalyn-qa-assistant' ); ?>
+						<td colspan="9" style="text-align:center;padding:2rem;">
+							<span class="dashicons dashicons-search" style="font-size:32px;width:32px;height:32px;color:var(--scalyn-text-faint);display:block;margin:0 auto 0.5rem;" aria-hidden="true"></span>
+							<strong style="display:block;margin-bottom:0.25rem;"><?php esc_html_e( 'No pages found', 'scalyn-qa-assistant' ); ?></strong>
+							<span style="color:var(--scalyn-text-muted);font-size:0.8125rem;"><?php esc_html_e( 'Try adjusting your filters or run a scan to get started.', 'scalyn-qa-assistant' ); ?></span>
 						</td>
 					</tr>
 				<?php else : ?>
@@ -223,11 +254,6 @@ $base_url       = isset( $base_url ) ? $base_url : admin_url( 'admin.php?page=sc
 									>
 										<?php esc_html_e( 'Rescan', 'scalyn-qa-assistant' ); ?>
 									</button>
-									<?php if ( ! empty( $edit_url ) ) : ?>
-										<a href="<?php echo esc_url( $edit_url ); ?>" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary" target="_blank" rel="noopener noreferrer">
-											<?php esc_html_e( 'Edit Post', 'scalyn-qa-assistant' ); ?>
-										</a>
-									<?php endif; ?>
 								</div>
 							</td>
 						</tr>

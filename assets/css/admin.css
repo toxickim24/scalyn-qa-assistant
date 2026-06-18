@@ -1510,6 +1510,27 @@ a.scalyn-btn--ghost:visited {
   text-align: right;
 }
 
+/* Audit List Summary Stats */
+.scalyn-audit-stat {
+  text-align: center;
+  padding: 1rem !important;
+}
+
+.scalyn-audit-stat__value {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.scalyn-audit-stat__label {
+  font-size: 0.75rem;
+  color: var(--scalyn-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Check-item list container */
 .scalyn-check-list {
   border: 1px solid var(--scalyn-border);
