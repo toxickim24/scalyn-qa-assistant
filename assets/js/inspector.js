@@ -23,6 +23,7 @@
     var activeTooltip = null;
     var highlightsEnabled = true;
     var dragState = null;
+    var ignoredChecks = (data.ignoredChecks || []).slice(); // mutable copy
 
     // Status icons (unicode).
     var STATUS_ICONS = { pass: '\u2713', warning: '!', fail: '\u2717' };
@@ -107,7 +108,9 @@
         ];
 
         categories.forEach(function (cat) {
-            var checks = results[cat.key] || [];
+            var checks = (results[cat.key] || []).filter(function (item) {
+                return ignoredChecks.indexOf(item.id) === -1;
+            });
             var c = countIssues(checks);
             cat.counts = c;
             cat.checks = checks;
@@ -525,6 +528,10 @@
                 })
                 .then(function (scanResp) {
                     if (scanResp && scanResp.success && scanResp.data) {
+                        // Add to local ignored list so it's filtered out.
+                        if (ignoredChecks.indexOf(checkId) === -1) {
+                            ignoredChecks.push(checkId);
+                        }
                         data.hasScan = true;
                         data.results = scanResp.data;
                         refreshPanel();

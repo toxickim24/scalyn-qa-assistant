@@ -192,6 +192,19 @@ final class Admin_Assets {
 			}
 			$current_thumb_id = (int) get_post_thumbnail_id( $inspector_post_id );
 
+			// Collect ignored check IDs for this post.
+			$ignored_ids = array();
+			$post_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_post( $inspector_post_id );
+			foreach ( $post_ignores as $rule ) {
+				$ignored_ids[] = $rule->check_id;
+			}
+			$audit_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'audit' );
+			foreach ( $audit_ignores as $rule ) {
+				if ( 'global' === $rule->type || null === $rule->post_id || 0 === $rule->post_id ) {
+					$ignored_ids[] = $rule->check_id;
+				}
+			}
+
 			$inspector_data    = array(
 				'postId'           => $inspector_post_id,
 				'hasScan'          => null !== $scan_result,
@@ -202,6 +215,7 @@ final class Admin_Assets {
 				'aiKeywords'       => is_array( $ai_keywords ) && ! empty( $ai_keywords ) ? $ai_keywords : false,
 				'aiFeatured'       => ! empty( $ai_featured_opts ) ? $ai_featured_opts : false,
 				'currentThumbnail' => $current_thumb_id,
+				'ignoredChecks'    => array_values( array_unique( $ignored_ids ) ),
 			);
 
 			wp_localize_script(
