@@ -145,7 +145,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 					),
 					category:  'seo',
 					severity:  'warning',
-					quick_fix: null,
+					quick_fix: 'generate_ai_meta',
 					tooltip:   $tooltip,
 					details:   array(
 						'title'       => $post_title,
@@ -159,10 +159,10 @@ class SEO_Analyzer implements Analyzer_Interface {
 				id:        'meta_title_exists',
 				label:     __( 'Meta Title', 'scalyn-qa-assistant' ),
 				status:    'fail',
-				message:   __( 'No meta title found. Open the post editor and set a title in your SEO plugin panel, or use "Generate with AI" above.', 'scalyn-qa-assistant' ),
+				message:   __( 'No meta title found. Use Generate with AI or set one in your SEO plugin panel.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'critical',
-				quick_fix: null,
+				quick_fix: 'generate_ai_meta',
 				tooltip:   $tooltip,
 			);
 		}
@@ -236,10 +236,10 @@ class SEO_Analyzer implements Analyzer_Interface {
 				id:        'meta_description_exists',
 				label:     __( 'Meta Description', 'scalyn-qa-assistant' ),
 				status:    'fail',
-				message:   __( 'No meta description found. Open the post editor and add one in your SEO plugin panel, or use "Generate with AI" above.', 'scalyn-qa-assistant' ),
+				message:   __( 'No meta description found. Use Generate with AI or add one in your SEO plugin panel.', 'scalyn-qa-assistant' ),
 				category:  'seo',
 				severity:  'critical',
-				quick_fix: null,
+				quick_fix: 'generate_ai_meta',
 				tooltip:   $tooltip,
 			);
 		}
