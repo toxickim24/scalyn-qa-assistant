@@ -1436,6 +1436,39 @@
         return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    /**
+     * Switch all "Generate with AI" quick-fix buttons to "Regenerate with AI"
+     * after content has been generated.
+     */
+    function switchGenerateToRegenerate() {
+        document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-meta"]').forEach(function (btn) {
+            btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+            btn.classList.remove('scalyn-btn--ai');
+            btn.classList.add('scalyn-btn--ghost');
+        });
+        document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-alt"]').forEach(function (btn) {
+            btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+            btn.classList.remove('scalyn-btn--ai');
+            btn.classList.add('scalyn-btn--ghost');
+        });
+        document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-keyword"]').forEach(function (btn) {
+            btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+            btn.classList.remove('scalyn-btn--ai');
+            btn.classList.add('scalyn-btn--ghost');
+        });
+        document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-featured-image"]').forEach(function (btn) {
+            btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+            btn.classList.remove('scalyn-btn--ai');
+            btn.classList.add('scalyn-btn--ghost');
+        });
+
+        // Update the main button too.
+        var mainBtn = document.getElementById('scalyn-generate-all-ai');
+        if (mainBtn) {
+            mainBtn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate All with AI';
+        }
+    }
+
     function initGenerateAllAi() {
         var btn = document.getElementById('scalyn-generate-all-ai');
         if (!btn) return;
@@ -1533,12 +1566,12 @@
                         }
                     }
 
+                    // Switch "Generate with AI" buttons to "Regenerate with AI".
+                    switchGenerateToRegenerate();
+
                     if (typeof ScalynAlert !== 'undefined') {
-                        ScalynAlert.toast('AI analysis complete — rescanning…');
+                        ScalynAlert.toast('AI analysis complete');
                     }
-                    // Trigger rescan to reflect changes.
-                    var rescanBtn = document.querySelector('#scalyn-rescan') || document.querySelector('.scalyn-rescan');
-                    if (rescanBtn) rescanBtn.click();
                 })
                 .catch(function (err) {
                     if (typeof ScalynAlert !== 'undefined') {
