@@ -342,6 +342,34 @@ body.sqi-docked {
   text-overflow: ellipsis;
 }
 
+.sqi-ignore-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--sqi-text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.sqi-check:hover .sqi-ignore-btn {
+  opacity: 1;
+}
+
+.sqi-ignore-btn:hover {
+  color: var(--sqi-red);
+  background: rgba(243, 139, 168, 0.15);
+}
+
+.sqi-check {
+  position: relative;
+}
+
 .sqi-check__result {
   font-size: 11px;
   color: var(--sqi-green);

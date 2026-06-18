@@ -177,6 +177,11 @@
                     html += buildCheckActions(item);
                 }
 
+                // Ignore button for non-pass checks.
+                if (item.status !== 'pass') {
+                    html += '<button class="sqi-ignore-btn" data-check-id="' + esc(item.id) + '" title="Ignore this check">\u2715</button>';
+                }
+
                 html += '</div></div>';
             });
             html += '</div></div>';
@@ -482,6 +487,55 @@
                 });
             };
         }
+
+        // Ignore check buttons.
+        panel.querySelectorAll('.sqi-ignore-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var checkId = btn.getAttribute('data-check-id');
+                if (!checkId) return;
+
+                var reason = prompt('Reason for ignoring (optional):') || '';
+
+                btn.disabled = true;
+                btn.textContent = '...';
+
+                fetch(scalynQA.restUrl + 'ignore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        type: 'check',
+                        check_id: checkId,
+                        post_id: data.postId,
+                        reason: reason,
+                        context: 'audit',
+                    }),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success) {
+                        // Rescan to recalculate scores.
+                        return fetch(scalynQA.restUrl + 'scan/' + data.postId, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                            credentials: 'same-origin',
+                        }).then(function (r) { return r.json(); });
+                    }
+                })
+                .then(function (scanResp) {
+                    if (scanResp && scanResp.success && scanResp.data) {
+                        data.hasScan = true;
+                        data.results = scanResp.data;
+                        refreshPanel();
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = '\u2715';
+                });
+            };
+        });
 
         // Generate All with AI button.
         var genAllBtn = document.getElementById('sqi-btn-generate-all');
