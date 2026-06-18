@@ -90,12 +90,10 @@ final class Toolbar {
 			array(
 				'id'    => 'scalyn-qa-score',
 				'title' => sprintf(
-					'<span class="scalyn-qa-toolbar-badge %s">%s</span> <span class="scalyn-qa-toolbar-label">%s</span>',
+					'<span class="scalyn-qa-toolbar-badge %s">%s</span> <span class="dashicons dashicons-visibility" style="font-size:16px;width:16px;height:16px;line-height:16px;vertical-align:middle;margin-right:2px;"></span><span class="scalyn-qa-toolbar-label">%s</span>',
 					esc_attr( $color_class ),
 					esc_html( $icon ),
-					null !== $scan_result
-						? sprintf( esc_html__( 'QA Inspector', 'scalyn-qa-assistant' ) )
-						: esc_html__( 'QA Inspector', 'scalyn-qa-assistant' ),
+					esc_html__( 'QA Inspector', 'scalyn-qa-assistant' ),
 				),
 				'href'  => '#',
 				'meta'  => array(
