@@ -82,6 +82,7 @@
         return '<div class="sqi-header">' +
             '<span class="sqi-header__title">QA Inspector</span>' +
             '<div class="sqi-header__actions">' +
+            '<button class="sqi-header__btn" id="sqi-btn-rescan" title="Rescan page">\u21BB</button>' +
             '<button class="sqi-header__btn" id="sqi-btn-mode" title="Toggle dock/float">\u25a1</button>' +
             '<button class="sqi-header__btn" id="sqi-btn-close" title="Close">\u2715</button>' +
             '</div></div>';
@@ -384,9 +385,8 @@
         return '<div class="sqi-footer">' +
             '<div class="sqi-footer__row">' +
             '<label class="sqi-footer__toggle"><input type="checkbox" id="sqi-highlight-toggle" checked> Highlight issues</label>' +
-            '<button class="sqi-footer__btn" id="sqi-btn-rescan">Rescan</button>' +
+            (scannedAt ? '<span class="sqi-footer__meta">' + esc(scannedAt) + '</span>' : '') +
             '</div>' +
-            (scannedAt ? '<div class="sqi-footer__meta" style="margin-top:4px;">Last scan: ' + esc(scannedAt) + '</div>' : '') +
             '</div>';
     }
 
