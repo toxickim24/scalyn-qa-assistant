@@ -123,11 +123,12 @@ class Launch_Page {
 		}
 
 		$data = array(
-			'results'         => $results,
-			'counts'          => $counts,
-			'last_scan'       => $last_scan ? (int) $last_scan : null,
-			'score'           => $this->calculate_score( $counts ),
-			'category_scores' => $category_scores,
+			'results'          => $results,
+			'counts'           => $counts,
+			'last_scan'        => $last_scan ? (int) $last_scan : null,
+			'score'            => $this->calculate_score( $counts ),
+			'category_scores'  => $category_scores,
+			'category_counts'  => $category_counts,
 		);
 
 		$this->load_template( 'launch/checklist.php', $data );

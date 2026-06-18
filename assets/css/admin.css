@@ -1461,6 +1461,55 @@ a.scalyn-btn--ghost:visited {
   margin-top: 0.5rem;
 }
 
+/* Launch Card Header with Progress */
+.scalyn-launch-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scalyn-launch-card-progress {
+  flex: 1;
+  max-width: 280px;
+  min-width: 150px;
+}
+
+.scalyn-launch-card-progress__bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--scalyn-border-light, #eee);
+  overflow: hidden;
+}
+
+.scalyn-launch-card-progress__fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.scalyn-launch-card-progress__fill--pass {
+  background: var(--scalyn-success, #28a745);
+}
+
+.scalyn-launch-card-progress__fill--warning {
+  background: var(--scalyn-warning, #ffc107);
+}
+
+.scalyn-launch-card-progress__fill--fail {
+  background: var(--scalyn-danger, #dc3545);
+}
+
+.scalyn-launch-card-progress__label {
+  font-size: 0.6875rem;
+  color: var(--scalyn-text-faint);
+  margin-top: 0.25rem;
+  display: block;
+  text-align: right;
+}
+
 /* Check-item list container */
 .scalyn-check-list {
   border: 1px solid var(--scalyn-border);

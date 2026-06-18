@@ -470,30 +470,117 @@
      */
     function initLaunchScan() {
         var btn = document.getElementById('scalyn-launch-scan');
+        if (btn) btn.addEventListener('click', runLaunchScan);
+
+        var emptyBtn = document.getElementById('scalyn-launch-scan-empty');
+        if (emptyBtn) emptyBtn.addEventListener('click', runLaunchScan);
+    }
+
+    function runLaunchScan() {
+        var btn = document.getElementById('scalyn-launch-scan') || document.getElementById('scalyn-launch-scan-empty');
+        if (btn) btn.disabled = true;
+
+        if (typeof ScalynAlert !== 'undefined') ScalynAlert.loading('Running launch check…');
+
+        fetchApi('launch/scan', { method: 'POST' })
+            .then(function (response) {
+                if (response.success) {
+                    if (typeof ScalynAlert !== 'undefined') ScalynAlert.toast('Launch check complete');
+                    window.location.reload();
+                }
+            })
+            .catch(function (err) {
+                if (typeof ScalynAlert !== 'undefined') {
+                    ScalynAlert.close();
+                    ScalynAlert.error('Error', err.message || 'Launch check failed.');
+                }
+                if (btn) btn.disabled = false;
+            });
+    }
+
+    /**
+     * Handle "Auto Fix All" button — runs all auto-fixable checks sequentially.
+     */
+    function initAutoFixAll() {
+        var btn = document.getElementById('scalyn-launch-auto-fix-all');
         if (!btn) return;
 
         btn.addEventListener('click', function () {
-            btn.disabled = true;
-            var origText = btn.textContent;
-            btn.textContent = 'Checking...';
+            var fixBtns = document.querySelectorAll('.scalyn-launch-auto-fix');
+            var checkIds = [];
+            fixBtns.forEach(function (b) {
+                var id = b.getAttribute('data-check-id');
+                if (id) checkIds.push(id);
+            });
 
-            fetchApi('launch/scan', { method: 'POST' })
-                .then(function (response) {
-                    if (response.success) {
+            if (checkIds.length === 0) {
+                if (typeof ScalynAlert !== 'undefined') ScalynAlert.warning('Nothing to Fix', 'No auto-fixable issues found.');
+                return;
+            }
+
+            if (typeof ScalynAlert !== 'undefined') {
+                ScalynAlert.confirm(
+                    'Auto Fix All',
+                    'This will automatically fix ' + checkIds.length + ' issues. Continue?',
+                    'Fix All'
+                ).then(function (result) {
+                    if (!result.isConfirmed) return;
+                    executeAutoFixAll(btn, checkIds);
+                });
+            } else {
+                executeAutoFixAll(btn, checkIds);
+            }
+        });
+    }
+
+    function executeAutoFixAll(btn, checkIds) {
+        btn.disabled = true;
+        var completed = 0;
+        var total = checkIds.length;
+
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Fixing issues…',
+                text: '0/' + total + ' completed',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: function () { Swal.showLoading(); },
+                customClass: { popup: 'scalyn-swal-popup' },
+            });
+        }
+
+        function fixNext(index) {
+            if (index >= checkIds.length) {
+                if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+                    Swal.update({ title: 'Rescanning…', text: 'Verifying fixes.' });
+                }
+                fetchApi('launch/scan', { method: 'POST' })
+                    .then(function () {
                         if (typeof ScalynAlert !== 'undefined') {
-                            ScalynAlert.toast('Launch check complete');
+                            ScalynAlert.close();
+                            ScalynAlert.toast('Fixed ' + completed + ' issues');
                         }
                         window.location.reload();
-                    }
-                })
-                .catch(function (err) {
-                    if (typeof ScalynAlert !== 'undefined') {
-                        ScalynAlert.error('Error', err.message || 'Launch check failed.');
-                    }
-                    btn.disabled = false;
-                    btn.textContent = origText;
-                });
-        });
+                    });
+                return;
+            }
+
+            fetchApi('launch/auto-fix', {
+                method: 'POST',
+                body: JSON.stringify({ check_id: checkIds[index] }),
+            })
+            .then(function () { ++completed; })
+            .catch(function () { ++completed; })
+            .finally(function () {
+                if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+                    Swal.update({ text: completed + '/' + total + ' completed' });
+                }
+                fixNext(index + 1);
+            });
+        }
+
+        fixNext(0);
     }
 
     /**
@@ -1090,6 +1177,7 @@
         initRescanButtons();
         initTooltips();
         initLaunchScan();
+        initAutoFixAll();
         initIgnoreCheck();
         initRemoveIgnore();
         initLaunchAutoFix();
