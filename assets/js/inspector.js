@@ -238,9 +238,37 @@
             actions.push('<button class="sqi-action-btn sqi-action-btn--apply sqi-apply-fi-btn" data-attachment-id="' + data.aiFeatured[0].id + '">Apply</button>');
         }
 
+        // Copy + Apply for focus keyword.
+        if (checkId === 'focus_keyword' && data.aiKeywords && data.aiKeywords.primary) {
+            var kw = data.aiKeywords.primary;
+            actions.push('<button class="sqi-action-btn sqi-copy-btn" data-text="' + esc(kw) + '">Copy</button>');
+            actions.push('<button class="sqi-action-btn sqi-action-btn--apply sqi-apply-kw-btn" data-primary="' + esc(kw) + '">Apply</button>');
+        }
+
         if (actions.length === 0) return '';
 
         var html = '<div class="sqi-check__actions">' + actions.join('') + '</div>';
+
+        // Show keyword suggestions if available.
+        if (checkId === 'focus_keyword' && data.aiKeywords) {
+            var kwData = data.aiKeywords;
+            var kwList = kwData.keywords || [];
+            if (kwData.primary && kwList.length === 0) {
+                kwList = [kwData.primary].concat(kwData.secondary || []);
+            }
+            if (kwList.length > 0) {
+                html += '<div class="sqi-kw-options">';
+                kwList.forEach(function (kw, idx) {
+                    var isPrimary = idx === 0 && kwData.has_pro;
+                    html += '<label class="sqi-kw-opt' + (idx === 0 ? ' sqi-kw-opt--selected' : '') + '">';
+                    html += '<input type="radio" name="sqi-kw" value="' + esc(kw) + '"' + (idx === 0 ? ' checked' : '') + '>';
+                    html += '<span>' + esc(kw) + '</span>';
+                    if (isPrimary) html += '<span class="sqi-kw-opt__badge">primary</span>';
+                    html += '</label>';
+                });
+                html += '</div>';
+            }
+        }
 
         // Show featured image thumbnails if available.
         if (checkId === 'featured_image_exists' && data.aiFeatured && data.aiFeatured.length > 0) {
@@ -538,6 +566,74 @@
                     btn.disabled = false;
                     btn.textContent = 'Apply';
                 });
+            };
+        });
+
+        // Keyword Apply button.
+        panel.querySelectorAll('.sqi-apply-kw-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+                e.stopPropagation();
+                var selected = panel.querySelector('input[name="sqi-kw"]:checked');
+                var primary = selected ? selected.value : btn.getAttribute('data-primary');
+                if (!primary) return;
+
+                // Collect secondary keywords if pro.
+                var secondary = [];
+                if (data.aiKeywords && data.aiKeywords.has_pro && data.aiKeywords.secondary) {
+                    secondary = data.aiKeywords.secondary;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Applying...';
+
+                fetch(scalynQA.restUrl + 'ai/apply-keyword/' + data.postId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ primary: primary, secondary: secondary }),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success) {
+                        btn.textContent = 'Applied!';
+                        btn.classList.add('sqi-action-btn--done');
+                        // Rescan.
+                        fetch(scalynQA.restUrl + 'scan/' + data.postId, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                            credentials: 'same-origin',
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (scanResp) {
+                            if (scanResp.success && scanResp.data) {
+                                data.hasScan = true;
+                                data.results = scanResp.data;
+                                refreshPanel();
+                            }
+                        });
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = 'Apply';
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Apply';
+                });
+            };
+        });
+
+        // Keyword radio selection.
+        panel.querySelectorAll('input[name="sqi-kw"]').forEach(function (radio) {
+            radio.onchange = function () {
+                panel.querySelectorAll('.sqi-kw-opt').forEach(function (opt) { opt.classList.remove('sqi-kw-opt--selected'); });
+                radio.closest('.sqi-kw-opt').classList.add('sqi-kw-opt--selected');
+                // Update Apply button primary value.
+                var applyBtn = panel.querySelector('.sqi-apply-kw-btn');
+                if (applyBtn) applyBtn.setAttribute('data-primary', radio.value);
+                // Update Copy button text.
+                var copyBtn = panel.querySelector('.sqi-check[data-check-id="focus_keyword"] .sqi-copy-btn');
+                if (copyBtn) copyBtn.setAttribute('data-text', radio.value);
             };
         });
 

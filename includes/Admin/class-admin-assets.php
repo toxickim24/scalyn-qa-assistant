@@ -199,7 +199,7 @@ final class Admin_Assets {
 				'contentReview'    => is_array( $content_review ) ? $content_review : null,
 				'aiDrafts'         => is_array( $ai_drafts ) ? $ai_drafts : null,
 				'aiAltTexts'       => is_array( $ai_alt_texts ) && ! empty( $ai_alt_texts['results'] ) ? true : false,
-				'aiKeywords'       => is_array( $ai_keywords ) && ! empty( $ai_keywords ) ? true : false,
+				'aiKeywords'       => is_array( $ai_keywords ) && ! empty( $ai_keywords ) ? $ai_keywords : false,
 				'aiFeatured'       => ! empty( $ai_featured_opts ) ? $ai_featured_opts : false,
 				'currentThumbnail' => $current_thumb_id,
 			);

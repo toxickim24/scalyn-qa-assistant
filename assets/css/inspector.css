@@ -447,6 +447,50 @@ body.sqi-docked {
   border-color: var(--sqi-green);
 }
 
+/* Keyword Options in Inspector */
+.sqi-kw-options {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.sqi-kw-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--sqi-border);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--sqi-text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sqi-kw-opt input[type="radio"] {
+  margin: 0;
+  accent-color: var(--sqi-blue);
+}
+
+.sqi-kw-opt:hover {
+  border-color: var(--sqi-blue);
+  background: var(--sqi-bg-hover);
+}
+
+.sqi-kw-opt--selected {
+  border-color: var(--sqi-blue);
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.sqi-kw-opt__badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--sqi-green);
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
 .sqi-fi-opt__badge {
   position: absolute;
   bottom: 0;
