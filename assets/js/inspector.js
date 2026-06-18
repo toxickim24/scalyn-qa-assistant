@@ -156,6 +156,62 @@
             html += '</div></div>';
         });
 
+        // AI Content Review section.
+        html += buildContentReview();
+
+        return html;
+    }
+
+    function buildContentReview() {
+        var review = data.contentReview;
+        if (!review || !review.summary) return '';
+
+        var score = review.score || 0;
+        var reviewStatus = score >= 80 ? 'green' : (score >= 50 ? 'yellow' : 'red');
+        var issues = review.issues || [];
+        var activeIssues = issues.filter(function (i) { return i.status !== 'resolved' && i.status !== 'ignored'; });
+        var hasIssues = activeIssues.length > 0;
+
+        var html = '<div class="sqi-category' + (hasIssues ? ' sqi-category--open' : '') + '" data-category="ai-review">';
+        html += '<div class="sqi-category__header">';
+        html += '<span class="sqi-category__title"><span class="sqi-category__arrow">\u25B6</span> Writing Quality';
+        if (hasIssues) {
+            html += ' <span class="sqi-category__badge sqi-category__badge--' + reviewStatus + '">' + activeIssues.length + '</span>';
+        }
+        html += '</span>';
+        html += '<span class="sqi-category__score">' + score + '/100</span>';
+        html += '</div>';
+
+        html += '<div class="sqi-category__list">';
+
+        // Summary.
+        html += '<div style="padding:4px 8px;margin-bottom:6px;font-size:11px;color:var(--sqi-text-muted);line-height:1.5;">' + esc(review.summary) + '</div>';
+
+        if (hasIssues) {
+            activeIssues.forEach(function (issue) {
+                var sevIcon = issue.severity === 'error' ? '\u2717' : (issue.severity === 'warning' ? '!' : '\u2139');
+                var sevClass = issue.severity === 'error' ? 'fail' : (issue.severity === 'warning' ? 'warning' : 'pass');
+                var typeLabel = (issue.type || 'issue').replace(/_/g, ' ');
+                typeLabel = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+
+                html += '<div class="sqi-check sqi-review-issue" data-issue-text="' + esc(issue.text || '') + '">';
+                html += '<span class="sqi-check__icon sqi-check__icon--' + sevClass + '">' + sevIcon + '</span>';
+                html += '<div class="sqi-check__content">';
+                html += '<span class="sqi-check__label">' + esc(typeLabel) + '</span>';
+                if (issue.text) html += '<span class="sqi-check__message" style="color:var(--sqi-red);text-decoration:line-through;">' + esc(issue.text) + '</span>';
+                if (issue.suggestion) html += '<span class="sqi-check__message" style="color:var(--sqi-green);">\u2192 ' + esc(issue.suggestion) + '</span>';
+                html += '</div></div>';
+            });
+        } else {
+            html += '<div style="padding:4px 8px;font-size:11px;color:var(--sqi-green);">\u2713 No writing issues found.</div>';
+        }
+
+        // Provider info.
+        if (review.provider) {
+            html += '<div style="padding:4px 8px;font-size:10px;color:var(--sqi-text-muted);opacity:0.7;">' + esc(review.provider) + (review.model ? ' / ' + esc(review.model) : '') + '</div>';
+        }
+
+        html += '</div></div>';
         return html;
     }
 
@@ -277,15 +333,26 @@
         });
 
         // Check item click — scroll to element + highlight.
-        panel.querySelectorAll('.sqi-check').forEach(function (check) {
+        panel.querySelectorAll('.sqi-check[data-check-id]').forEach(function (check) {
             check.onclick = function () {
-                // Deselect previous.
                 panel.querySelectorAll('.sqi-check--active').forEach(function (c) { c.classList.remove('sqi-check--active'); });
                 check.classList.add('sqi-check--active');
 
                 var checkId = check.getAttribute('data-check-id');
                 var status = check.getAttribute('data-status');
                 scrollToIssueElement(checkId, status);
+            };
+        });
+
+        // Writing issue click — find text in page and scroll to it.
+        panel.querySelectorAll('.sqi-review-issue').forEach(function (issue) {
+            issue.onclick = function () {
+                panel.querySelectorAll('.sqi-check--active').forEach(function (c) { c.classList.remove('sqi-check--active'); });
+                issue.classList.add('sqi-check--active');
+
+                var text = issue.getAttribute('data-issue-text');
+                if (!text) return;
+                scrollToTextInPage(text);
             };
         });
 
@@ -547,6 +614,48 @@
                     lastH.overlay.classList.remove('sqi-highlight--active');
                 }, 2000);
             }
+        }
+    }
+
+    /**
+     * Find text in the page content and scroll to it with a highlight.
+     */
+    function scrollToTextInPage(searchText) {
+        if (!searchText || searchText.length < 3) return;
+
+        // Use TreeWalker to find text nodes containing the issue text.
+        var walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: function (node) {
+                    if (isInInspector(node.parentElement)) return NodeFilter.FILTER_REJECT;
+                    if (node.textContent.toLowerCase().indexOf(searchText.toLowerCase()) !== -1) return NodeFilter.FILTER_ACCEPT;
+                    return NodeFilter.FILTER_REJECT;
+                }
+            }
+        );
+
+        var found = walker.nextNode();
+        if (!found) return;
+
+        // Highlight the parent element.
+        var el = found.parentElement;
+        if (!el) return;
+
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        var fakeItem = { id: '_review_text', status: 'warning', label: 'Writing Issue', message: searchText, tooltip: '' };
+        createHighlight(el, fakeItem);
+
+        var lastH = highlights[highlights.length - 1];
+        if (lastH) {
+            lastH.overlay.classList.add('sqi-highlight--active');
+            showTooltip(el, fakeItem);
+            setTimeout(function () {
+                lastH.overlay.classList.remove('sqi-highlight--active');
+                clearTooltip();
+            }, 3000);
         }
     }
 

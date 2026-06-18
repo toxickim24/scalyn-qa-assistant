@@ -168,13 +168,15 @@ final class Admin_Assets {
 				true,
 			);
 
-			// Pass scan data for the inspector.
+			// Pass scan data + AI review for the inspector.
 			$inspector_post_id = get_queried_object_id();
 			$scan_result       = \Scalyn\QA\Models\Scan_Result::load( $inspector_post_id );
+			$content_review    = get_post_meta( $inspector_post_id, '_scalyn_qa_content_review', true );
 			$inspector_data    = array(
-				'postId'  => $inspector_post_id,
-				'hasScan' => null !== $scan_result,
-				'results' => null !== $scan_result ? $scan_result->to_array() : null,
+				'postId'        => $inspector_post_id,
+				'hasScan'       => null !== $scan_result,
+				'results'       => null !== $scan_result ? $scan_result->to_array() : null,
+				'contentReview' => is_array( $content_review ) ? $content_review : null,
 			);
 
 			wp_localize_script(
