@@ -206,10 +206,14 @@
             html += '<div style="padding:4px 8px;font-size:11px;color:var(--sqi-green);">\u2713 No writing issues found.</div>';
         }
 
-        // Provider info.
+        // Actions row.
+        html += '<div style="padding:6px 8px;display:flex;gap:6px;align-items:center;">';
+        html += '<button class="sqi-footer__btn" id="sqi-btn-review-current" style="font-size:10px;padding:3px 8px;">Review Current</button>';
+        html += '<button class="sqi-footer__btn" id="sqi-btn-review-regenerate" style="font-size:10px;padding:3px 8px;background:var(--sqi-border);color:var(--sqi-text);">Regenerate</button>';
         if (review.provider) {
-            html += '<div style="padding:4px 8px;font-size:10px;color:var(--sqi-text-muted);opacity:0.7;">' + esc(review.provider) + (review.model ? ' / ' + esc(review.model) : '') + '</div>';
+            html += '<span style="font-size:10px;color:var(--sqi-text-muted);opacity:0.7;margin-left:auto;">' + esc(review.provider) + '</span>';
         }
+        html += '</div>';
 
         html += '</div></div>';
         return html;
@@ -325,6 +329,66 @@
             };
         }
 
+        // Review Current button — recheck existing issues.
+        var reviewBtn = document.getElementById('sqi-btn-review-current');
+        if (reviewBtn) {
+            reviewBtn.onclick = function () {
+                reviewBtn.disabled = true;
+                reviewBtn.textContent = 'Checking...';
+
+                fetch(scalynQA.restUrl + 'ai/review/' + data.postId + '/recheck', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success && response.data) {
+                        // Update local data with new review state.
+                        data.contentReview = data.contentReview || {};
+                        data.contentReview.issues = response.data.issues || [];
+                        data.contentReview.score = response.data.score || data.contentReview.score;
+                        data.contentReview.summary = response.data.summary || data.contentReview.summary;
+                        refreshPanel();
+                    }
+                    reviewBtn.disabled = false;
+                    reviewBtn.textContent = 'Review Current';
+                })
+                .catch(function () {
+                    reviewBtn.disabled = false;
+                    reviewBtn.textContent = 'Review Current';
+                });
+            };
+        }
+
+        // Regenerate button — full AI re-review.
+        var regenBtn = document.getElementById('sqi-btn-review-regenerate');
+        if (regenBtn) {
+            regenBtn.onclick = function () {
+                regenBtn.disabled = true;
+                regenBtn.textContent = 'Reviewing...';
+
+                fetch(scalynQA.restUrl + 'ai/review/' + data.postId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': scalynQA.nonce },
+                    credentials: 'same-origin',
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success && response.data) {
+                        data.contentReview = response.data;
+                        refreshPanel();
+                    }
+                    regenBtn.disabled = false;
+                    regenBtn.textContent = 'Regenerate';
+                })
+                .catch(function () {
+                    regenBtn.disabled = false;
+                    regenBtn.textContent = 'Regenerate';
+                });
+            };
+        }
+
         // Category collapse/expand.
         panel.querySelectorAll('.sqi-category__header').forEach(function (header) {
             header.onclick = function () {
@@ -414,6 +478,53 @@
                 });
             });
         });
+
+        // Highlight writing issues from AI content review.
+        highlightReviewIssues();
+    }
+
+    function highlightReviewIssues() {
+        var review = data.contentReview;
+        if (!review || !review.issues) return;
+
+        var issues = review.issues.filter(function (i) { return i.status !== 'resolved' && i.status !== 'ignored' && i.text; });
+
+        issues.forEach(function (issue) {
+            var el = findTextElement(issue.text);
+            if (!el) return;
+
+            var sevClass = issue.severity === 'error' ? 'fail' : 'warning';
+            var typeLabel = (issue.type || 'issue').replace(/_/g, ' ');
+            typeLabel = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+
+            var fakeItem = {
+                id: '_review_' + typeLabel,
+                status: sevClass,
+                label: typeLabel + ': ' + issue.text,
+                message: issue.suggestion ? 'Suggestion: ' + issue.suggestion : '',
+                tooltip: issue.context || '',
+            };
+            createHighlight(el, fakeItem);
+        });
+    }
+
+    function findTextElement(searchText) {
+        if (!searchText || searchText.length < 3) return null;
+
+        var walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: function (node) {
+                    if (isInInspector(node.parentElement)) return NodeFilter.FILTER_REJECT;
+                    if (node.textContent.toLowerCase().indexOf(searchText.toLowerCase()) !== -1) return NodeFilter.FILTER_ACCEPT;
+                    return NodeFilter.FILTER_REJECT;
+                }
+            }
+        );
+
+        var found = walker.nextNode();
+        return found ? found.parentElement : null;
     }
 
     function findDomElements(item) {
