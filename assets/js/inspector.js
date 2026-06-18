@@ -19,6 +19,7 @@
     var panel     = null;
     var mode      = 'closed'; // closed | docked | floating
     var highlights = [];
+    var textMarks = [];
     var activeTooltip = null;
     var highlightsEnabled = true;
     var dragState = null;
@@ -490,26 +491,19 @@
         var issues = review.issues.filter(function (i) { return i.status !== 'resolved' && i.status !== 'ignored' && i.text; });
 
         issues.forEach(function (issue) {
-            var el = findTextElement(issue.text);
-            if (!el) return;
-
-            var sevClass = issue.severity === 'error' ? 'fail' : 'warning';
-            var typeLabel = (issue.type || 'issue').replace(/_/g, ' ');
-            typeLabel = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
-
-            var fakeItem = {
-                id: '_review_' + typeLabel,
-                status: sevClass,
-                label: typeLabel + ': ' + issue.text,
-                message: issue.suggestion ? 'Suggestion: ' + issue.suggestion : '',
-                tooltip: issue.context || '',
-            };
-            createHighlight(el, fakeItem);
+            var mark = wrapTextWithMark(issue.text, issue);
+            if (mark) {
+                textMarks.push(mark);
+            }
         });
     }
 
-    function findTextElement(searchText) {
-        if (!searchText || searchText.length < 3) return null;
+    /**
+     * Find a text string in the page and wrap it with a <mark> highlight.
+     * Returns the mark element or null.
+     */
+    function wrapTextWithMark(searchText, issue) {
+        if (!searchText || searchText.length < 2) return null;
 
         var walker = document.createTreeWalker(
             document.body,
@@ -517,14 +511,56 @@
             {
                 acceptNode: function (node) {
                     if (isInInspector(node.parentElement)) return NodeFilter.FILTER_REJECT;
-                    if (node.textContent.toLowerCase().indexOf(searchText.toLowerCase()) !== -1) return NodeFilter.FILTER_ACCEPT;
+                    if (node.parentElement.closest('.sqi-text-highlight')) return NodeFilter.FILTER_REJECT;
+                    var idx = node.textContent.toLowerCase().indexOf(searchText.toLowerCase());
+                    if (idx !== -1) return NodeFilter.FILTER_ACCEPT;
                     return NodeFilter.FILTER_REJECT;
                 }
             }
         );
 
-        var found = walker.nextNode();
-        return found ? found.parentElement : null;
+        var textNode = walker.nextNode();
+        if (!textNode) return null;
+
+        var idx = textNode.textContent.toLowerCase().indexOf(searchText.toLowerCase());
+        if (idx === -1) return null;
+
+        // Split the text node and wrap the matched portion.
+        var before = textNode.textContent.substring(0, idx);
+        var matched = textNode.textContent.substring(idx, idx + searchText.length);
+        var after = textNode.textContent.substring(idx + searchText.length);
+
+        var sevClass = issue.severity === 'error' ? 'sqi-text-highlight--error' : 'sqi-text-highlight--warning';
+        var typeLabel = (issue.type || 'issue').replace(/_/g, ' ');
+        typeLabel = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+
+        var mark = document.createElement('mark');
+        mark.className = 'sqi-text-highlight ' + sevClass;
+        mark.textContent = matched;
+        mark.setAttribute('data-sqi-issue', typeLabel);
+        mark.setAttribute('data-sqi-suggestion', issue.suggestion || '');
+        mark.setAttribute('data-sqi-text', issue.text || '');
+
+        // Tooltip on hover.
+        mark.addEventListener('mouseenter', function () {
+            showTooltip(mark, {
+                id: '_review',
+                status: issue.severity === 'error' ? 'fail' : 'warning',
+                label: typeLabel,
+                message: issue.suggestion ? 'Suggestion: ' + issue.suggestion : '',
+                tooltip: issue.context || '',
+            });
+        });
+        mark.addEventListener('mouseleave', clearTooltip);
+
+        var parent = textNode.parentNode;
+        var frag = document.createDocumentFragment();
+        if (before) frag.appendChild(document.createTextNode(before));
+        frag.appendChild(mark);
+        if (after) frag.appendChild(document.createTextNode(after));
+        parent.replaceChild(frag, textNode);
+
+        return mark;
     }
 
     function findDomElements(item) {
@@ -591,6 +627,17 @@
             if (h.overlay.parentNode) h.overlay.parentNode.removeChild(h.overlay);
         });
         highlights = [];
+
+        // Unwrap text marks — restore original text nodes.
+        textMarks.forEach(function (mark) {
+            if (!mark.parentNode) return;
+            var text = document.createTextNode(mark.textContent);
+            mark.parentNode.replaceChild(text, mark);
+            // Merge adjacent text nodes.
+            text.parentNode.normalize();
+        });
+        textMarks = [];
+
         clearTooltip();
     }
 
@@ -729,44 +776,43 @@
     }
 
     /**
-     * Find text in the page content and scroll to it with a highlight.
+     * Find text in the page and scroll to its highlighted mark.
      */
     function scrollToTextInPage(searchText) {
-        if (!searchText || searchText.length < 3) return;
+        if (!searchText || searchText.length < 2) return;
 
-        // Use TreeWalker to find text nodes containing the issue text.
-        var walker = document.createTreeWalker(
-            document.body,
-            NodeFilter.SHOW_TEXT,
-            {
-                acceptNode: function (node) {
-                    if (isInInspector(node.parentElement)) return NodeFilter.FILTER_REJECT;
-                    if (node.textContent.toLowerCase().indexOf(searchText.toLowerCase()) !== -1) return NodeFilter.FILTER_ACCEPT;
-                    return NodeFilter.FILTER_REJECT;
-                }
+        // Find existing mark for this text.
+        var mark = null;
+        textMarks.forEach(function (m) {
+            if (!mark && m.getAttribute('data-sqi-text') === searchText) {
+                mark = m;
             }
-        );
+        });
 
-        var found = walker.nextNode();
-        if (!found) return;
+        if (mark) {
+            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            mark.classList.add('sqi-text-highlight--active');
+            setTimeout(function () { mark.classList.remove('sqi-text-highlight--active'); }, 2500);
+            return;
+        }
 
-        // Highlight the parent element.
-        var el = found.parentElement;
-        if (!el) return;
+        // No existing mark — try to create one on the fly.
+        var review = data.contentReview;
+        var issue = null;
+        if (review && review.issues) {
+            review.issues.forEach(function (i) {
+                if (!issue && i.text === searchText) issue = i;
+            });
+        }
 
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-        var fakeItem = { id: '_review_text', status: 'warning', label: 'Writing Issue', message: searchText, tooltip: '' };
-        createHighlight(el, fakeItem);
-
-        var lastH = highlights[highlights.length - 1];
-        if (lastH) {
-            lastH.overlay.classList.add('sqi-highlight--active');
-            showTooltip(el, fakeItem);
-            setTimeout(function () {
-                lastH.overlay.classList.remove('sqi-highlight--active');
-                clearTooltip();
-            }, 3000);
+        if (issue) {
+            var newMark = wrapTextWithMark(searchText, issue);
+            if (newMark) {
+                textMarks.push(newMark);
+                newMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                newMark.classList.add('sqi-text-highlight--active');
+                setTimeout(function () { newMark.classList.remove('sqi-text-highlight--active'); }, 2500);
+            }
         }
     }
 

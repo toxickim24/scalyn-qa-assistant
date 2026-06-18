@@ -422,6 +422,40 @@ body.sqi-docked {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
 }
 
+/* Inline Text Highlights (writing issues) */
+.sqi-text-highlight {
+  background: rgba(245, 158, 11, 0.25);
+  border-bottom: 2px wavy #f59e0b;
+  padding: 0 1px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sqi-text-highlight--error {
+  background: rgba(239, 68, 68, 0.2);
+  border-bottom-color: #ef4444;
+}
+
+.sqi-text-highlight--warning {
+  background: rgba(245, 158, 11, 0.2);
+  border-bottom-color: #f59e0b;
+}
+
+.sqi-text-highlight:hover {
+  background: rgba(245, 158, 11, 0.4);
+}
+
+.sqi-text-highlight--error:hover {
+  background: rgba(239, 68, 68, 0.35);
+}
+
+.sqi-text-highlight--active {
+  background: rgba(245, 158, 11, 0.5) !important;
+  outline: 2px solid #f59e0b;
+  outline-offset: 1px;
+}
+
 /* ==========================================================================
    Tooltips
    ========================================================================== */
