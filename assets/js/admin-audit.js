@@ -1526,18 +1526,20 @@
                 callMap.featuredImage = nextIdx++;
             }
 
-            Promise.all(apiCalls)
-                .then(function (responses) {
+            Promise.allSettled(apiCalls)
+                .then(function (settled) {
                     if (typeof ScalynAlert !== 'undefined') ScalynAlert.close();
 
-                    var metaResponse = responses[callMap.meta];
-                    var reviewResponse = responses[callMap.review];
+                    // Extract fulfilled results (rejected ones are skipped gracefully).
+                    var responses = settled.map(function (s) { return s.status === 'fulfilled' ? s.value : null; });
 
-                    if (metaResponse.success && metaResponse.data) {
+                    var metaResponse = responses[callMap.meta];
+                    if (metaResponse && metaResponse.success && metaResponse.data) {
                         displayAiResults(metaResponse.data);
                     }
 
-                    if (reviewResponse.success && reviewResponse.data) {
+                    var reviewResponse = responses[callMap.review];
+                    if (reviewResponse && reviewResponse.success && reviewResponse.data) {
                         displayReviewResults(reviewResponse.data);
                     }
 
@@ -1566,19 +1568,12 @@
                         }
                     }
 
-                    // Switch "Generate with AI" buttons to "Regenerate with AI".
+                    // Always switch buttons to "Regenerate" after generation.
                     switchGenerateToRegenerate();
 
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.toast('AI analysis complete');
                     }
-                })
-                .catch(function (err) {
-                    if (typeof ScalynAlert !== 'undefined') {
-                        ScalynAlert.close();
-                        ScalynAlert.error('AI Analysis Failed', err.message || 'An error occurred.');
-                    }
-                    hasRun = false;
                 })
                 .finally(function () {
                     btn.disabled = false;
@@ -2147,6 +2142,12 @@
                 }
                 if (response.success && response.data) {
                     displayAiResults(response.data);
+                    // Switch all meta Generate buttons to Regenerate.
+                    document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-meta"]').forEach(function (btn) {
+                        btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+                        btn.classList.remove('scalyn-btn--ai');
+                        btn.classList.add('scalyn-btn--ghost');
+                    });
                     if (typeof ScalynAlert !== 'undefined') {
                         ScalynAlert.toast('AI suggestions generated');
                     }
@@ -2185,6 +2186,12 @@
                 Swal.close();
                 if (response.success && response.data && response.data.results) {
                     displayAltTextResults(response.data.results);
+                    // Switch alt Generate button to Regenerate.
+                    document.querySelectorAll('.scalyn-quick-fix[data-action="generate-ai-alt"]').forEach(function (btn) {
+                        btn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI';
+                        btn.classList.remove('scalyn-btn--ai');
+                        btn.classList.add('scalyn-btn--ghost');
+                    });
                     ScalynAlert.toast('Alt text generated for ' + response.data.results.length + ' images');
                 } else {
                     ScalynAlert.error('No Results', 'AI returned no alt text suggestions. Check your OpenAI provider settings.');
