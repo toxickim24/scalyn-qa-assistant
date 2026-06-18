@@ -78,13 +78,18 @@
         return el;
     }
 
+    var ICON_RESCAN = '<svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px;"><path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24L10 6h6V0l-2.35 2.35z"/></svg>';
+    var ICON_DOCK   = '<svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px;"><path d="M2 2h12v12H2V2zm1 3v8h10V5H3z"/></svg>';
+    var ICON_UNDOCK = '<svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px;"><path d="M1 1h10v3h-1V2H2v8h3v1H1V1zm4 4h10v10H5V5zm1 1v8h8V6H6z"/></svg>';
+    var ICON_CLOSE  = '<svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px;"><path d="M3.46 2.05L8 6.59l4.54-4.54 1.41 1.41L9.41 8l4.54 4.54-1.41 1.41L8 9.41l-4.54 4.54-1.41-1.41L6.59 8 2.05 3.46l1.41-1.41z"/></svg>';
+
     function buildHeader() {
         return '<div class="sqi-header">' +
             '<span class="sqi-header__title">QA Inspector</span>' +
             '<div class="sqi-header__actions">' +
-            '<button class="sqi-header__btn" id="sqi-btn-rescan" title="Rescan page">\u21BB</button>' +
-            '<button class="sqi-header__btn" id="sqi-btn-mode" title="Toggle dock/float">\u25a1</button>' +
-            '<button class="sqi-header__btn" id="sqi-btn-close" title="Close">\u2715</button>' +
+            '<button class="sqi-header__btn" id="sqi-btn-rescan" title="Rescan page">' + ICON_RESCAN + '</button>' +
+            '<button class="sqi-header__btn" id="sqi-btn-mode" title="Toggle dock/float">' + ICON_UNDOCK + '</button>' +
+            '<button class="sqi-header__btn" id="sqi-btn-close" title="Close">' + ICON_CLOSE + '</button>' +
             '</div></div>';
     }
 
@@ -462,12 +467,12 @@
             panel.className = 'sqi-panel sqi-panel--docked';
             document.body.classList.add('sqi-docked');
             document.getElementById('sqi-btn-mode').title = 'Undock to floating';
-            document.getElementById('sqi-btn-mode').textContent = '\u25a1';
+            document.getElementById('sqi-btn-mode').innerHTML = ICON_UNDOCK;
         } else {
             panel.className = 'sqi-panel sqi-panel--floating';
             document.body.classList.remove('sqi-docked');
             document.getElementById('sqi-btn-mode').title = 'Dock to sidebar';
-            document.getElementById('sqi-btn-mode').textContent = '\u25eb';
+            document.getElementById('sqi-btn-mode').innerHTML = ICON_DOCK;
         }
 
         bindPanelEvents();
