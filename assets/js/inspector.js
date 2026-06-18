@@ -257,13 +257,22 @@
                 kwList = [kwData.primary].concat(kwData.secondary || []);
             }
             if (kwList.length > 0) {
+                var isPro = !!kwData.has_pro;
+                var inputType = isPro ? 'checkbox' : 'radio';
+                var inputName = isPro ? 'sqi-kw[]' : 'sqi-kw';
+
                 html += '<div class="sqi-kw-options">';
                 kwList.forEach(function (kw, idx) {
-                    var isPrimary = idx === 0 && kwData.has_pro;
-                    html += '<label class="sqi-kw-opt' + (idx === 0 ? ' sqi-kw-opt--selected' : '') + '">';
-                    html += '<input type="radio" name="sqi-kw" value="' + esc(kw) + '"' + (idx === 0 ? ' checked' : '') + '>';
+                    var isPrimary = isPro && idx === 0;
+                    var isSecondary = isPro && idx > 0;
+                    // Pro: primary always checked, secondary unchecked. Free: first checked.
+                    var isChecked = isPro ? isPrimary : (idx === 0);
+
+                    html += '<label class="sqi-kw-opt' + (isChecked ? ' sqi-kw-opt--selected' : '') + '">';
+                    html += '<input type="' + inputType + '" name="' + inputName + '" value="' + esc(kw) + '"' + (isChecked ? ' checked' : '') + '>';
                     html += '<span>' + esc(kw) + '</span>';
                     if (isPrimary) html += '<span class="sqi-kw-opt__badge">primary</span>';
+                    if (isSecondary) html += '<span class="sqi-kw-opt__badge" style="color:var(--sqi-text-muted);">secondary</span>';
                     html += '</label>';
                 });
                 html += '</div>';
@@ -573,15 +582,24 @@
         panel.querySelectorAll('.sqi-apply-kw-btn').forEach(function (btn) {
             btn.onclick = function (e) {
                 e.stopPropagation();
-                var selected = panel.querySelector('input[name="sqi-kw"]:checked');
-                var primary = selected ? selected.value : btn.getAttribute('data-primary');
-                if (!primary) return;
-
-                // Collect secondary keywords if pro.
+                var isPro = data.aiKeywords && data.aiKeywords.has_pro;
+                var primary = '';
                 var secondary = [];
-                if (data.aiKeywords && data.aiKeywords.has_pro && data.aiKeywords.secondary) {
-                    secondary = data.aiKeywords.secondary;
+
+                if (isPro) {
+                    // Checkbox mode: collect all checked values. First checked = primary, rest = secondary.
+                    var checked = panel.querySelectorAll('input[name="sqi-kw[]"]:checked');
+                    checked.forEach(function (cb, idx) {
+                        if (idx === 0) primary = cb.value;
+                        else secondary.push(cb.value);
+                    });
+                } else {
+                    // Radio mode: single selected keyword.
+                    var selected = panel.querySelector('input[name="sqi-kw"]:checked');
+                    primary = selected ? selected.value : btn.getAttribute('data-primary');
                 }
+
+                if (!primary) return;
 
                 btn.disabled = true;
                 btn.textContent = 'Applying...';
@@ -623,17 +641,22 @@
             };
         });
 
-        // Keyword radio selection.
-        panel.querySelectorAll('input[name="sqi-kw"]').forEach(function (radio) {
-            radio.onchange = function () {
-                panel.querySelectorAll('.sqi-kw-opt').forEach(function (opt) { opt.classList.remove('sqi-kw-opt--selected'); });
-                radio.closest('.sqi-kw-opt').classList.add('sqi-kw-opt--selected');
-                // Update Apply button primary value.
-                var applyBtn = panel.querySelector('.sqi-apply-kw-btn');
-                if (applyBtn) applyBtn.setAttribute('data-primary', radio.value);
-                // Update Copy button text.
-                var copyBtn = panel.querySelector('.sqi-check[data-check-id="focus_keyword"] .sqi-copy-btn');
-                if (copyBtn) copyBtn.setAttribute('data-text', radio.value);
+        // Keyword radio/checkbox selection.
+        panel.querySelectorAll('input[name="sqi-kw"], input[name="sqi-kw[]"]').forEach(function (input) {
+            input.onchange = function () {
+                if (input.type === 'radio') {
+                    // Radio: single selection highlight.
+                    panel.querySelectorAll('.sqi-kw-opt').forEach(function (opt) { opt.classList.remove('sqi-kw-opt--selected'); });
+                    input.closest('.sqi-kw-opt').classList.add('sqi-kw-opt--selected');
+                    // Update Copy button.
+                    var copyBtn = panel.querySelector('.sqi-check[data-check-id="focus_keyword"] .sqi-copy-btn');
+                    if (copyBtn) copyBtn.setAttribute('data-text', input.value);
+                } else {
+                    // Checkbox: toggle highlight per item.
+                    var opt = input.closest('.sqi-kw-opt');
+                    if (input.checked) opt.classList.add('sqi-kw-opt--selected');
+                    else opt.classList.remove('sqi-kw-opt--selected');
+                }
             };
         });
 
