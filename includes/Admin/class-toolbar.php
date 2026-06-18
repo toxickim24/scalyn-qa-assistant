@@ -85,14 +85,22 @@ final class Toolbar {
 		$color_class = $this->get_color_class( $status );
 		$icon        = $this->get_status_icon( $status );
 
-		// Single toolbar node: QA Inspector toggle with score badge.
+		// Color for the icon.
+		$icon_colors = array(
+			'green'  => '#10B981',
+			'yellow' => '#F59E0B',
+			'red'    => '#EF4444',
+			'gray'   => '#94a3b8',
+		);
+		$icon_color = $icon_colors[ $status ] ?? '#94a3b8';
+
+		// Single toolbar node: QA Inspector toggle.
 		$wp_admin_bar->add_node(
 			array(
 				'id'    => 'scalyn-qa-score',
 				'title' => sprintf(
-					'<span class="scalyn-qa-toolbar-badge %s">%s</span> <span class="dashicons dashicons-visibility" style="font-size:16px;width:16px;height:16px;line-height:16px;vertical-align:middle;margin-right:2px;"></span><span class="scalyn-qa-toolbar-label">%s</span>',
-					esc_attr( $color_class ),
-					esc_html( $icon ),
+					'<span class="dashicons dashicons-visibility" style="font-size:18px;width:18px;height:18px;line-height:32px;color:%s;"></span> <span class="scalyn-qa-toolbar-label">%s</span>',
+					esc_attr( $icon_color ),
 					esc_html__( 'QA Inspector', 'scalyn-qa-assistant' ),
 				),
 				'href'  => '#',
