@@ -159,8 +159,9 @@
                     html += '<div class="sqi-check__result">' + esc(inlineResult) + '</div>';
                 }
 
-                // Action buttons for non-pass checks.
-                if (item.status !== 'pass') {
+                // Action buttons — show for failing checks AND for pass checks that have AI data.
+                var hasAiForCheck = !!aiGenerated[item.id];
+                if (item.status !== 'pass' || hasAiForCheck) {
                     html += buildCheckActions(item);
                 }
 
