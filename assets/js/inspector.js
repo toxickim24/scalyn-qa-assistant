@@ -265,8 +265,8 @@
                 kwList.forEach(function (kw, idx) {
                     var isPrimary = isPro && idx === 0;
                     var isSecondary = isPro && idx > 0;
-                    // Pro: primary always checked, secondary unchecked. Free: first checked.
-                    var isChecked = isPro ? isPrimary : (idx === 0);
+                    // Pro: all checked by default. Free: first checked.
+                    var isChecked = isPro ? true : (idx === 0);
 
                     html += '<label class="sqi-kw-opt' + (isChecked ? ' sqi-kw-opt--selected' : '') + '">';
                     html += '<input type="' + inputType + '" name="' + inputName + '" value="' + esc(kw) + '"' + (isChecked ? ' checked' : '') + '>';
