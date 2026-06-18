@@ -247,6 +247,105 @@ class OpenAI_Provider extends AI_Provider {
 	}
 
 	/**
+	 * Generate an image using OpenAI's image generation API.
+	 *
+	 * Tries gpt-image-1 first (b64_json), then dall-e-3 (URL download).
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param string $prompt The image generation prompt.
+	 * @return string Base64-encoded image data (PNG).
+	 */
+	public function generate_image( string $prompt ): string {
+		$models = array(
+			array(
+				'params' => array(
+					'model'         => 'gpt-image-1',
+					'prompt'        => $prompt,
+					'n'             => 1,
+					'size'          => '1536x1024',
+					'output_format' => 'png',
+				),
+				'extract' => 'b64_json',
+			),
+			array(
+				'params' => array(
+					'model'   => 'dall-e-3',
+					'prompt'  => $prompt,
+					'n'       => 1,
+					'size'    => '1792x1024',
+					'quality' => 'standard',
+				),
+				'extract' => 'url',
+			),
+		);
+
+		$last_error = '';
+
+		foreach ( $models as $entry ) {
+			$body = wp_json_encode( $entry['params'] );
+
+			if ( false === $body ) {
+				throw new \RuntimeException( 'Failed to encode request body for image generation.' );
+			}
+
+			$response = wp_remote_post(
+				'https://api.openai.com/v1/images/generations',
+				array(
+					'headers' => array(
+						'Authorization' => 'Bearer ' . $this->api_key,
+						'Content-Type'  => 'application/json',
+					),
+					'body'    => $body,
+					'timeout' => 120,
+				)
+			);
+
+			if ( is_wp_error( $response ) ) {
+				$last_error = 'Image generation request failed: ' . $response->get_error_message();
+				continue;
+			}
+
+			$status = wp_remote_retrieve_response_code( $response );
+			$raw    = wp_remote_retrieve_body( $response );
+			$data   = json_decode( $raw, true );
+
+			if ( $status < 200 || $status >= 300 ) {
+				$last_error = sprintf(
+					'%s error (%d): %s',
+					$entry['params']['model'],
+					$status,
+					$data['error']['message'] ?? 'Unknown error'
+				);
+				continue;
+			}
+
+			// gpt-image-1 returns base64 directly.
+			if ( 'b64_json' === $entry['extract'] ) {
+				$b64 = $data['data'][0]['b64_json'] ?? '';
+				if ( '' !== $b64 ) {
+					return $b64;
+				}
+			}
+
+			// dall-e-3 returns a URL — download and convert to base64.
+			if ( 'url' === $entry['extract'] ) {
+				$image_url = $data['data'][0]['url'] ?? '';
+				if ( '' !== $image_url ) {
+					$download = wp_remote_get( $image_url, array( 'timeout' => 60 ) );
+					if ( ! is_wp_error( $download ) && 200 === wp_remote_retrieve_response_code( $download ) ) {
+						return base64_encode( wp_remote_retrieve_body( $download ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+					}
+				}
+			}
+
+			$last_error = $entry['params']['model'] . ' returned no image data.';
+		}
+
+		throw new \RuntimeException( $last_error );
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	public function test(): array {

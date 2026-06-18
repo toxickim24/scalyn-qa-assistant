@@ -1825,6 +1825,18 @@ HTML;
 			'wp-simple-firewall/icwp-wpsf.php'            => 'Shield Security',
 			'defender-security/wp-defender.php'            => 'Defender',
 			'jetpack/jetpack.php'                         => 'Jetpack',
+			'malcare-security/malcare.php'                => 'MalCare',
+			'secupress/secupress.php'                     => 'SecuPress',
+			'bulletproof-security/bulletproof-security.php' => 'BulletProof Security',
+			'wp-cerber/wp-cerber.php'                     => 'WP Cerber',
+			'gotmls/index.php'                            => 'Anti-Malware Security (GOTMLS)',
+			'ninjafirewall/ninjafirewall.php'             => 'NinjaFirewall',
+			'security-ninja/security-ninja.php'           => 'Security Ninja',
+			'patchstack/patchstack.php'                   => 'Patchstack',
+			'bbq-firewall/bbq-firewall.php'              => 'BBQ Firewall',
+			'loginizer/loginizer.php'                     => 'Loginizer',
+			'wp-fail2ban/wp-fail2ban.php'                 => 'WP fail2ban',
+			'cleantalk-spam-protect/cleantalk.php'        => 'CleanTalk Security',
 			'limit-login-attempts-reloaded/limit-login-attempts-reloaded.php' => 'Limit Login Attempts',
 		);
 
@@ -2584,18 +2596,41 @@ HTML;
 	 * @since 1.3.0
 	 */
 	private function check_404_page(): Check_Item {
+		$tooltip  = __( 'A custom 404 page helps visitors find what they need when they hit a broken link.', 'scalyn-qa-assistant' );
 		$template = get_stylesheet_directory() . '/404.php';
+		$has_custom_404 = file_exists( $template );
+		$source         = __( 'Theme has a custom 404 page template.', 'scalyn-qa-assistant' );
 
-		if ( file_exists( $template ) ) {
+		// Elementor Theme Builder: check for a published 404 template.
+		if ( ! $has_custom_404 && did_action( 'elementor/loaded' ) ) {
+			$elementor_404 = get_posts( array(
+				'post_type'      => 'elementor_library',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'meta_query'     => array(
+					array(
+						'key'   => '_elementor_template_type',
+						'value' => 'error-404',
+					),
+				),
+				'fields'         => 'ids',
+			) );
+			if ( ! empty( $elementor_404 ) ) {
+				$has_custom_404 = true;
+				$source         = __( 'Custom 404 page built with Elementor Theme Builder.', 'scalyn-qa-assistant' );
+			}
+		}
+
+		if ( $has_custom_404 ) {
 			return new Check_Item(
 				id:        'four_oh_four_page',
 				label:     __( '404 Page', 'scalyn-qa-assistant' ),
 				status:    'pass',
-				message:   __( 'Theme has a custom 404 page template.', 'scalyn-qa-assistant' ),
+				message:   $source,
 				category:  'content',
 				severity:  'info',
 				quick_fix: null,
-				tooltip:   __( 'A custom 404 page helps visitors find what they need when they hit a broken link.', 'scalyn-qa-assistant' ),
+				tooltip:   $tooltip,
 			);
 		}
 
@@ -2603,11 +2638,11 @@ HTML;
 			id:        'four_oh_four_page',
 			label:     __( '404 Page', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No custom 404.php template found in the theme. Visitors hitting broken links will see a generic error page.', 'scalyn-qa-assistant' ),
+			message:   __( 'No custom 404 page found. Visitors hitting broken links will see a generic error page.', 'scalyn-qa-assistant' ),
 			category:  'content',
 			severity:  'info',
 			quick_fix: null,
-			tooltip:   __( 'A custom 404 page improves user experience by guiding lost visitors back to useful content.', 'scalyn-qa-assistant' ),
+			tooltip:   $tooltip,
 		);
 	}
 

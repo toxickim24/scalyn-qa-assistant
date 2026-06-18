@@ -755,6 +755,7 @@
         initIgnoreCheck();
         initRemoveIgnore();
         initQuickFixes();
+        initFeaturedImageInline();
         initKeywordAiActions();
     }
 
@@ -1927,6 +1928,10 @@
                     triggerAiGeneration(postId, btn);
                     break;
 
+                case 'generate-ai-featured-image':
+                    generateAiFeaturedImage(postId, btn);
+                    break;
+
                 case 'upload-featured-image':
                     openMediaLibrary(postId);
                     break;
@@ -1980,6 +1985,152 @@
             .finally(function () {
                 if (triggerBtn) triggerBtn.disabled = false;
             });
+    }
+
+    /**
+     * Generate a featured image using AI (DALL-E) and set it on the post.
+     *
+     * @param {string|number} postId - Post ID.
+     * @param {Element} triggerBtn - The button that triggered the generation.
+     */
+    function generateAiFeaturedImage(postId, triggerBtn) {
+        if (!postId) return;
+
+        var panel = document.querySelector('.scalyn-ai-featured-image-results[data-post-id="' + postId + '"]');
+        if (!panel) return;
+
+        // Show the panel and add a loading state.
+        panel.style.display = '';
+        var loadingId = 'scalyn-fi-loading-' + Date.now();
+        var loadingHtml = '<div id="' + loadingId + '" style="text-align:center;padding:20px;">' +
+            '<span class="dashicons dashicons-update" style="animation:rotation 1s linear infinite;font-size:24px;width:24px;height:24px;"></span>' +
+            '<p style="margin:8px 0 0;color:var(--scalyn-text-muted);font-size:13px;">Generating image… This may take 15–30 seconds.</p>' +
+            '</div>';
+
+        // If no grid yet, set it up.
+        if (!panel.querySelector('.scalyn-fi-grid')) {
+            panel.innerHTML = '<div class="scalyn-ai-inline-result">' +
+                '<div class="scalyn-ai-inline-result__content" style="width:100%;">' +
+                '<span class="scalyn-ai-inline-result__label">AI Generated Images</span>' +
+                '<div class="scalyn-fi-grid"></div>' +
+                '<div class="scalyn-fi-actions" style="margin-top:8px;">' +
+                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--ai scalyn-fi-regenerate" data-post-id="' + postId + '">' +
+                '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate with AI</button>' +
+                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-fi-apply" data-post-id="' + postId + '" disabled>' +
+                '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply</button>' +
+                '<span class="scalyn-fi-meta"></span>' +
+                '</div></div></div>';
+        }
+
+        var grid = panel.querySelector('.scalyn-fi-grid');
+        grid.insertAdjacentHTML('beforeend', loadingHtml);
+
+        if (triggerBtn) triggerBtn.disabled = true;
+
+        fetchApi('ai/generate-featured-image/' + postId, { method: 'POST' })
+            .then(function (response) {
+                var loader = document.getElementById(loadingId);
+                if (loader) loader.remove();
+
+                if (response.success && response.data) {
+                    addFeaturedImageOption(panel, response.data, postId);
+                }
+            })
+            .catch(function (err) {
+                var loader = document.getElementById(loadingId);
+                if (loader) loader.remove();
+                ScalynAlert.error('Image Generation Failed', err.message || 'An error occurred.');
+            })
+            .finally(function () {
+                if (triggerBtn) triggerBtn.disabled = false;
+            });
+    }
+
+    /**
+     * Add a generated image option to the inline grid.
+     */
+    function addFeaturedImageOption(panel, data, postId) {
+        var grid = panel.querySelector('.scalyn-fi-grid');
+        if (!grid) return;
+
+        var count = grid.querySelectorAll('.scalyn-fi-option').length;
+        var isFirst = count === 0;
+        var filename = data.url.split('/').pop() || 'ai-featured-' + (count + 1) + '.png';
+
+        var option = document.createElement('label');
+        option.className = 'scalyn-fi-option' + (isFirst ? ' selected' : '');
+        option.innerHTML = '<img src="' + data.url + '" alt="AI generated option ' + (count + 1) + '" />' +
+            '<div class="scalyn-fi-option-footer">' +
+            '<input type="radio" name="scalyn-fi-select-' + postId + '" value="' + data.attachment_id + '"' + (isFirst ? ' checked' : '') + '>' +
+            '<span>' + filename + '</span></div>';
+
+        grid.appendChild(option);
+
+        // Update meta text.
+        var meta = panel.querySelector('.scalyn-fi-meta');
+        if (meta && data.provider) {
+            meta.textContent = data.provider;
+        }
+
+        // Enable apply button.
+        var applyBtn = panel.querySelector('.scalyn-fi-apply');
+        if (applyBtn) applyBtn.disabled = false;
+
+        // Handle radio selection and visual highlight.
+        var radio = option.querySelector('input[type="radio"]');
+        radio.addEventListener('change', function () {
+            grid.querySelectorAll('.scalyn-fi-option').forEach(function (opt) {
+                opt.classList.remove('selected');
+            });
+            option.classList.add('selected');
+        });
+    }
+
+    /**
+     * Handle inline featured image Regenerate and Apply clicks.
+     */
+    function initFeaturedImageInline() {
+        document.addEventListener('click', function (e) {
+            // Regenerate button.
+            var regenBtn = e.target.closest('.scalyn-fi-regenerate');
+            if (regenBtn) {
+                var postId = regenBtn.getAttribute('data-post-id');
+                generateAiFeaturedImage(postId, null);
+                return;
+            }
+
+            // Apply button.
+            var applyBtn = e.target.closest('.scalyn-fi-apply');
+            if (applyBtn) {
+                var postId = applyBtn.getAttribute('data-post-id');
+                var panel = applyBtn.closest('.scalyn-ai-featured-image-results');
+                var selected = panel ? panel.querySelector('input[type="radio"]:checked') : null;
+
+                if (!selected) {
+                    ScalynAlert.warning('No Image Selected', 'Please select an image first.');
+                    return;
+                }
+
+                applyBtn.disabled = true;
+                ScalynAlert.loading('Applying featured image…');
+
+                fetchApi('ai/apply-featured-image/' + postId, {
+                    method: 'POST',
+                    body: JSON.stringify({ attachment_id: parseInt(selected.value, 10) }),
+                })
+                .then(function () {
+                    ScalynAlert.close();
+                    ScalynAlert.toast('Featured image applied!');
+                    var rescanBtn = document.querySelector('#scalyn-rescan') || document.querySelector('.scalyn-rescan');
+                    if (rescanBtn) rescanBtn.click();
+                })
+                .catch(function (err) {
+                    ScalynAlert.close();
+                    ScalynAlert.error('Apply Failed', err.message || 'Failed to set featured image.');
+                    applyBtn.disabled = false;
+                });
+            }
+        });
     }
 
     /**

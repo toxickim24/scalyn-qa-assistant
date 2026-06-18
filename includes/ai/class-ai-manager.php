@@ -422,6 +422,96 @@ class AI_Manager {
 	}
 
 	/**
+	 * Generate a featured image for a post using DALL-E and set it as the post thumbnail.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param int $post_id The post ID.
+	 * @return array{attachment_id: int, url: string, provider: string}
+	 */
+	public function generate_featured_image( int $post_id ): array {
+		if ( ! $this->is_enabled() ) {
+			throw new \RuntimeException( __( 'AI features are not enabled.', 'scalyn-qa-assistant' ) );
+		}
+
+		if ( ! $this->check_rate_limit() ) {
+			throw new \RuntimeException( __( 'Daily AI request limit reached.', 'scalyn-qa-assistant' ) );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			throw new \RuntimeException( __( 'Post not found.', 'scalyn-qa-assistant' ) );
+		}
+
+		// Find an OpenAI provider (DALL-E requires OpenAI).
+		$chain    = $this->get_priority_chain();
+		$provider = null;
+
+		foreach ( $chain as $key ) {
+			$p = $this->build_provider_by_key( $key );
+			if ( $p instanceof \Scalyn\QA\AI\OpenAI_Provider ) {
+				$provider = $p;
+				break;
+			}
+		}
+
+		if ( null === $provider ) {
+			throw new \RuntimeException( __( 'AI image generation requires an OpenAI provider. Configure one in Settings → AI Providers.', 'scalyn-qa-assistant' ) );
+		}
+
+		// Build a prompt from the post content.
+		$title   = get_the_title( $post );
+		$content = wp_strip_all_tags( $post->post_content );
+		$words   = explode( ' ', $content );
+		$excerpt = implode( ' ', array_slice( $words, 0, 200 ) );
+
+		$prompt = "Create a professional, high-quality blog featured image for an article titled \"{$title}\". ";
+		$prompt .= "The image should be visually appealing, modern, and relevant to the topic. ";
+		$prompt .= "Content summary: {$excerpt}. ";
+		$prompt .= "Style: Clean, professional, suitable for a business website or blog. No text overlays.";
+
+		$start    = microtime( true );
+		$b64_data = $provider->generate_image( $prompt );
+		$elapsed  = ( microtime( true ) - $start ) * 1000;
+
+		AI_Health_Monitor::record_success( 'openai', $elapsed );
+		$this->log_request( $post_id, 'OpenAI', 'gpt-image-1', true, strlen( $prompt ) );
+
+		// Save base64 image data to the media library.
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$filename  = sanitize_file_name( sanitize_title( $title ) . '-ai-featured.png' );
+		$tmp       = wp_tempnam( $filename );
+		$decoded   = base64_decode( $b64_data ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+
+		if ( false === $decoded ) {
+			throw new \RuntimeException( __( 'Failed to decode generated image data.', 'scalyn-qa-assistant' ) );
+		}
+
+		file_put_contents( $tmp, $decoded ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+
+		$file_array = array(
+			'name'     => $filename,
+			'tmp_name' => $tmp,
+		);
+
+		$attachment_id = media_handle_sideload( $file_array, $post_id, $title );
+
+		if ( is_wp_error( $attachment_id ) ) {
+			@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			throw new \RuntimeException( 'Failed to save image: ' . $attachment_id->get_error_message() );
+		}
+
+		return array(
+			'attachment_id' => $attachment_id,
+			'url'           => wp_get_attachment_url( $attachment_id ),
+			'provider'      => 'OpenAI (GPT Image)',
+		);
+	}
+
+	/**
 	 * Test a provider connection by its key.
 	 *
 	 * @since 1.0.0

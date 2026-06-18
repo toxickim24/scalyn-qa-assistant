@@ -33,6 +33,12 @@ $button_config = array(
 		'class'    => 'scalyn-btn--ghost',
 		'data_key' => 'generate-ai-meta',
 	),
+	'generate_ai_featured_image' => array(
+		'label'    => __( 'Generate with AI', 'scalyn-qa-assistant' ),
+		'icon'     => 'dashicons-admin-customizer',
+		'class'    => 'scalyn-btn--ai',
+		'data_key' => 'generate-ai-featured-image',
+	),
 	'upload_featured_image' => array(
 		'label'    => __( 'Upload Image', 'scalyn-qa-assistant' ),
 		'icon'     => 'dashicons-format-image',
@@ -78,7 +84,7 @@ if ( ! isset( $button_config[ $action ] ) ) {
 }
 
 // Hide AI-related quick fix buttons when AI is disabled.
-$ai_actions = array( 'generate_ai_meta', 'regenerate_ai_meta', 'generate_ai_keyword', 'regenerate_ai_keyword' );
+$ai_actions = array( 'generate_ai_meta', 'regenerate_ai_meta', 'generate_ai_keyword', 'regenerate_ai_keyword', 'generate_ai_featured_image' );
 if ( in_array( $action, $ai_actions, true ) && ! ( new \Scalyn\QA\AI\AI_Manager() )->is_enabled() ) {
 	return;
 }

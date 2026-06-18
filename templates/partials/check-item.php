@@ -246,6 +246,12 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 	</div>
 	<?php endif; ?>
 
+	<?php if ( $check_item_ai_enabled && 'featured_image_exists' === $item_id && 'pass' !== $status ) : ?>
+	<!-- Inline AI featured image results -->
+	<div class="scalyn-ai-featured-image-results" data-check-id="featured_image_exists" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>" style="display:none;">
+	</div>
+	<?php endif; ?>
+
 	<?php if ( $check_item_ai_enabled && 'image_alt_text' === $item_id && 'pass' !== $status ) : ?>
 	<!-- Inline AI alt text results (hidden until generated) -->
 	<div class="scalyn-ai-alt-results" data-check-id="image_alt_text" data-post-id="<?php echo esc_attr( (string) $post_id ); ?>" style="display:none;">

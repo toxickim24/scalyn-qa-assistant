@@ -296,10 +296,10 @@ class SEO_Analyzer implements Analyzer_Interface {
 			id:        'featured_image_exists',
 			label:     __( 'Featured Image', 'scalyn-qa-assistant' ),
 			status:    'fail',
-			message:   __( 'No featured image set. Open the post editor and add one in the "Featured Image" panel on the right sidebar.', 'scalyn-qa-assistant' ),
+			message:   __( 'No featured image set. Use "Generate with AI" to create one, or open the post editor and add one manually.', 'scalyn-qa-assistant' ),
 			category:  'seo',
 			severity:  'critical',
-			quick_fix: null,
+			quick_fix: 'generate_ai_featured_image',
 			tooltip:   $tooltip,
 		);
 	}

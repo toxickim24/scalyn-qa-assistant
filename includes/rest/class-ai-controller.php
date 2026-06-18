@@ -197,6 +197,44 @@ class AI_Controller extends REST_Controller {
 			),
 		);
 
+		// POST /ai/generate-featured-image/{post_id} — generate featured image with DALL-E.
+		register_rest_route(
+			$this->namespace,
+			'/ai/generate-featured-image/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_featured_image' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
+		// POST /ai/apply-featured-image/{post_id} — set an attachment as the featured image.
+		register_rest_route(
+			$this->namespace,
+			'/ai/apply-featured-image/(?P<post_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'apply_featured_image' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'post_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'validate_callback' => static fn( $v ): bool => is_numeric( $v ) && absint( $v ) > 0,
+					),
+				),
+			),
+		);
+
 		// POST /ai/apply-alt/{post_id} — apply alt text to an image.
 		register_rest_route(
 			$this->namespace,
@@ -596,6 +634,66 @@ PROMPT;
 		}
 
 		return $this->success( $result );
+	}
+
+	/**
+	 * Generate a featured image using DALL-E and set it on the post.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function generate_featured_image( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission to edit this post.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		$ai_manager = new AI_Manager();
+
+		if ( ! $ai_manager->is_enabled() ) {
+			return $this->error( 'ai_not_enabled', __( 'AI features are not enabled.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		try {
+			$result = $ai_manager->generate_featured_image( $post_id );
+		} catch ( \Throwable $e ) {
+			return $this->error( 'image_generation_failed', $e->getMessage(), 500 );
+		}
+
+		return $this->success( $result );
+	}
+
+	/**
+	 * Apply a generated image as the post's featured image.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function apply_featured_image( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$post_id = absint( $request->get_param( 'post_id' ) );
+		$params  = $request->get_json_params();
+		$attachment_id = absint( $params['attachment_id'] ?? 0 );
+
+		if ( ! $this->can_edit_post( $post_id ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		if ( 0 === $attachment_id ) {
+			return $this->error( 'missing_attachment', __( 'Attachment ID is required.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		set_post_thumbnail( $post_id, $attachment_id );
+
+		return $this->success( array(
+			'applied'       => true,
+			'attachment_id' => $attachment_id,
+			'message'       => __( 'Featured image set successfully.', 'scalyn-qa-assistant' ),
+		) );
 	}
 
 	/**
