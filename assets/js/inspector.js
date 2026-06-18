@@ -556,9 +556,10 @@
 
     function initToolbarToggle() {
         document.addEventListener('click', function (e) {
-            var toggle = e.target.closest('#wp-admin-bar-scalyn-qa-inspector a, .scalyn-qa-inspector-toggle a');
+            var toggle = e.target.closest('#wp-admin-bar-scalyn-qa-score > a, .scalyn-qa-inspector-toggle > a, .scalyn-qa-inspector-toggle');
             if (!toggle) return;
             e.preventDefault();
+            e.stopPropagation();
 
             if (mode === 'closed') {
                 openInspector('docked');
