@@ -164,6 +164,22 @@ final class Toolbar {
 				),
 			),
 		);
+
+		// Child node: QA Inspector toggle.
+		if ( current_user_can( 'manage_options' ) ) {
+			$wp_admin_bar->add_node(
+				array(
+					'parent' => 'scalyn-qa-score',
+					'id'     => 'scalyn-qa-inspector',
+					'title'  => __( 'QA Inspector', 'scalyn-qa-assistant' ),
+					'href'   => '#',
+					'meta'   => array(
+						'class'   => 'scalyn-qa-inspector-toggle',
+						'onclick' => 'return false;',
+					),
+				),
+			);
+		}
 	}
 
 	/**

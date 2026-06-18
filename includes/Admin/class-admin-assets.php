@@ -150,6 +150,39 @@ final class Admin_Assets {
 			'scalynQA',
 			$this->get_localized_data(),
 		);
+
+		// Enqueue QA Inspector assets for administrators.
+		if ( current_user_can( 'manage_options' ) && is_singular() ) {
+			wp_enqueue_style(
+				'scalyn-qa-inspector',
+				$plugin_url . 'assets/css/inspector.css',
+				array(),
+				$version,
+			);
+
+			wp_enqueue_script(
+				'scalyn-qa-inspector',
+				$plugin_url . 'assets/js/inspector.js',
+				array( 'scalyn-qa-toolbar' ),
+				$version,
+				true,
+			);
+
+			// Pass scan data for the inspector.
+			$inspector_post_id = get_queried_object_id();
+			$scan_result       = \Scalyn\QA\Models\Scan_Result::load( $inspector_post_id );
+			$inspector_data    = array(
+				'postId'  => $inspector_post_id,
+				'hasScan' => null !== $scan_result,
+				'results' => null !== $scan_result ? $scan_result->to_array() : null,
+			);
+
+			wp_localize_script(
+				'scalyn-qa-inspector',
+				'scalynInspector',
+				$inspector_data,
+			);
+		}
 	}
 
 	/**
