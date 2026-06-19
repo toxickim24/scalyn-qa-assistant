@@ -266,6 +266,7 @@ class Launch_Checker {
 				'breeze/breeze.php'                          => 'Breeze',
 				'hummingbird-performance/wp-hummingbird.php'  => 'Hummingbird',
 				'nitropack/main.php'                         => 'NitroPack',
+				'searchpro/berqwp.php'                       => 'BerqWP',
 			),
 			'backup_plugin' => array(
 				'updraftplus/updraftplus.php'                => 'UpdraftPlus',
@@ -273,6 +274,8 @@ class Launch_Checker {
 				'duplicator/duplicator.php'                  => 'Duplicator',
 				'blogvault-real-time-backup/developer.php'   => 'BlogVault',
 				'all-in-one-wp-migration/all-in-one-wp-migration.php' => 'All-in-One WP Migration',
+				'jetpack/jetpack.php'                        => 'Jetpack',
+				'backup-backup/developer.php'                => 'Starter Templates',
 			),
 			'smtp_plugin' => array(
 				'wp-mail-smtp/wp_mail_smtp.php'              => 'WP Mail SMTP',
@@ -1207,7 +1210,7 @@ HTML;
 	 * @return Check_Item
 	 */
 	private function check_search_engine_visibility(): Check_Item {
-		$discouraged = '0' !== get_option( 'blog_public', '1' );
+		$discouraged = '0' === get_option( 'blog_public', '1' );
 
 		if ( $discouraged ) {
 			return new Check_Item(
@@ -2002,28 +2005,7 @@ HTML;
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$security_plugins = array(
-			'wordfence/wordfence.php'                     => 'Wordfence',
-			'sucuri-scanner/sucuri.php'                    => 'Sucuri',
-			'better-wp-security/better-wp-security.php'   => 'Solid Security (iThemes)',
-			'all-in-one-wp-security-and-firewall/wp-security.php' => 'All In One WP Security',
-			'wp-simple-firewall/icwp-wpsf.php'            => 'Shield Security',
-			'defender-security/wp-defender.php'            => 'Defender',
-			'jetpack/jetpack.php'                         => 'Jetpack',
-			'malcare-security/malcare.php'                => 'MalCare',
-			'secupress/secupress.php'                     => 'SecuPress',
-			'bulletproof-security/bulletproof-security.php' => 'BulletProof Security',
-			'wp-cerber/wp-cerber.php'                     => 'WP Cerber',
-			'gotmls/index.php'                            => 'Anti-Malware Security (GOTMLS)',
-			'ninjafirewall/ninjafirewall.php'             => 'NinjaFirewall',
-			'security-ninja/security-ninja.php'           => 'Security Ninja',
-			'patchstack/patchstack.php'                   => 'Patchstack',
-			'bbq-firewall/bbq-firewall.php'              => 'BBQ Firewall',
-			'loginizer/loginizer.php'                     => 'Loginizer',
-			'wp-fail2ban/wp-fail2ban.php'                 => 'WP fail2ban',
-			'cleantalk-spam-protect/cleantalk.php'        => 'CleanTalk Security',
-			'limit-login-attempts-reloaded/limit-login-attempts-reloaded.php' => 'Limit Login Attempts',
-		);
+		$security_plugins = $this->get_recommended_plugins( 'security_plugin' );
 
 		$found = array();
 		foreach ( $security_plugins as $file => $name ) {
@@ -2072,19 +2054,7 @@ HTML;
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$cache_plugins = array(
-			'wp-super-cache/wp-cache.php'                 => 'WP Super Cache',
-			'w3-total-cache/w3-total-cache.php'           => 'W3 Total Cache',
-			'wp-fastest-cache/wpFastestCache.php'         => 'WP Fastest Cache',
-			'litespeed-cache/litespeed-cache.php'         => 'LiteSpeed Cache',
-			'wp-rocket/wp-rocket.php'                     => 'WP Rocket',
-			'autoptimize/autoptimize.php'                 => 'Autoptimize',
-			'cache-enabler/cache-enabler.php'             => 'Cache Enabler',
-			'sg-cachepress/sg-cachepress.php'             => 'SG Optimizer',
-			'breeze/breeze.php'                           => 'Breeze',
-			'hummingbird-performance/wp-hummingbird.php'  => 'Hummingbird',
-			'nitropack/main.php'                          => 'NitroPack',
-		);
+		$cache_plugins = $this->get_recommended_plugins( 'cache_plugin' );
 
 		$found = array();
 		foreach ( $cache_plugins as $file => $name ) {
@@ -2525,14 +2495,7 @@ HTML;
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$smtp_plugins = array(
-			'wp-mail-smtp/wp_mail_smtp.php'              => 'WP Mail SMTP',
-			'fluent-smtp/fluent-smtp.php'                => 'FluentSMTP',
-			'post-smtp/postman-smtp.php'                 => 'Post SMTP',
-			'easy-wp-smtp/easy-wp-smtp.php'              => 'Easy WP SMTP',
-			'smtp-mailer/main.php'                       => 'SMTP Mailer',
-			'wp-smtp/wp-smtp.php'                        => 'WP SMTP',
-		);
+		$smtp_plugins = $this->get_recommended_plugins( 'smtp_plugin' );
 
 		$found = array();
 		foreach ( $smtp_plugins as $file => $name ) {
@@ -2583,15 +2546,7 @@ HTML;
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$backup_plugins = array(
-			'updraftplus/updraftplus.php'                => 'UpdraftPlus',
-			'backwpup/backwpup.php'                     => 'BackWPup',
-			'duplicator/duplicator.php'                  => 'Duplicator',
-			'blogvault-real-time-backup/developer.php'   => 'BlogVault',
-			'jetpack/jetpack.php'                        => 'Jetpack',
-			'all-in-one-wp-migration/all-in-one-wp-migration.php' => 'All-in-One WP Migration',
-			'backup-backup/developer.php'                => 'Starter Templates',
-		);
+		$backup_plugins = $this->get_recommended_plugins( 'backup_plugin' );
 
 		$found = array();
 		foreach ( $backup_plugins as $file => $name ) {
@@ -2642,14 +2597,7 @@ HTML;
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$img_plugins = array(
-			'wp-smushit/wp-smush.php'                    => 'Smush',
-			'imagify/imagify.php'                        => 'Imagify',
-			'shortpixel-image-optimiser/wp-shortpixel.php' => 'ShortPixel',
-			'ewww-image-optimizer/ewww-image-optimizer.php' => 'EWWW Image Optimizer',
-			'tiny-compress-images/tiny-compress-images.php' => 'TinyPNG',
-			'optimole-wp/optimole-wp.php'                => 'Optimole',
-		);
+		$img_plugins = $this->get_recommended_plugins( 'image_optimization_plugin' );
 
 		$found = array();
 		foreach ( $img_plugins as $file => $name ) {
