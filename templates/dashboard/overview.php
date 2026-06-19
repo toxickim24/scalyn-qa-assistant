@@ -35,6 +35,8 @@ $ai_enabled  = ! empty( $ai_status['enabled'] );
 $ai_provider = $ai_status['provider'] ?? '';
 $ai_health   = $ai_status['status'] ?? 'not_configured';
 
+$onboarding = isset( $onboarding ) && is_array( $onboarding ) ? $onboarding : array();
+
 // Overall status
 $overall_status = \Scalyn\QA\Models\Score::calculate_status( $overall );
 $overall_label  = match ( $overall_status ) {
@@ -59,6 +61,17 @@ $overall_label  = match ( $overall_status ) {
 		<span class="scalyn-version"><?php echo esc_html( 'v' . SCALYN_QA_VERSION ); ?></span>
 	</div>
 
+	<?php if ( ! empty( $onboarding ) && empty( $onboarding['dismissed'] ) ) : ?>
+		<?php include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/getting-started.php'; ?>
+	<?php elseif ( ! empty( $onboarding['dismissed'] ) ) : ?>
+		<div id="scalyn-onboarding-reset-bar" style="text-align:right;margin-bottom:0.25rem;">
+			<button type="button" id="scalyn-show-onboarding" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost" style="font-size:0.75rem;">
+				<span class="dashicons dashicons-info-outline" aria-hidden="true" style="font-size:14px;width:14px;height:14px;margin-right:2px;"></span>
+				<?php esc_html_e( 'Show Getting Started guide', 'scalyn-qa-assistant' ); ?>
+			</button>
+		</div>
+	<?php endif; ?>
+
 	<!-- Hero: Overall Score + Category Scores + Scan All -->
 	<div class="scalyn-dashboard-hero">
 		<div class="scalyn-dashboard-hero__main">
@@ -82,6 +95,10 @@ $overall_label  = match ( $overall_status ) {
 						);
 						?>
 					</button>
+					<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=scalyn_qa_generate_report' ), 'scalyn_qa_report' ) ); ?>" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary" target="_blank">
+						<span class="dashicons dashicons-media-document" aria-hidden="true"></span>
+						<?php esc_html_e( 'Generate Report', 'scalyn-qa-assistant' ); ?>
+					</a>
 				</div>
 			</div>
 		</div>

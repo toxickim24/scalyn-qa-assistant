@@ -98,6 +98,35 @@ class Settings_Controller extends REST_Controller {
 			)
 		);
 
+		// POST /wizard/activate.
+		register_rest_route(
+			$this->namespace,
+			'/wizard/activate',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'wizard_activate' ),
+				'permission_callback' => array( $this, 'check_manage_permission' ),
+			)
+		);
+
+		// POST|DELETE /settings/onboarding-dismiss.
+		register_rest_route(
+			$this->namespace,
+			'/settings/onboarding-dismiss',
+			array(
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'dismiss_onboarding' ),
+					'permission_callback' => array( $this, 'check_manage_permission' ),
+				),
+				array(
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => array( $this, 'reset_onboarding' ),
+					'permission_callback' => array( $this, 'check_manage_permission' ),
+				),
+			)
+		);
+
 		// GET /settings/export.
 		register_rest_route(
 			$this->namespace,
@@ -350,6 +379,19 @@ class Settings_Controller extends REST_Controller {
 			$settings['enable_ai'] = (bool) $params['enable_ai'];
 		}
 
+		// Handle report settings.
+		if ( array_key_exists( 'report_settings', $params ) && is_array( $params['report_settings'] ) ) {
+			$rs = $params['report_settings'];
+			$report_data = array(
+				'include_page_scores' => (bool) ( $rs['include_page_scores'] ?? true ),
+				'include_launch'      => (bool) ( $rs['include_launch'] ?? true ),
+				'include_top_issues'  => (bool) ( $rs['include_top_issues'] ?? true ),
+				'max_pages'           => max( 10, min( 1000, (int) ( $rs['max_pages'] ?? 500 ) ) ),
+				'company_logo_id'     => absint( $rs['company_logo_id'] ?? 0 ),
+			);
+			update_option( 'scalyn_qa_report_settings', $report_data, false );
+		}
+
 		// Save general settings.
 		update_option( self::SETTINGS_OPTION, $settings, false );
 
@@ -489,6 +531,82 @@ class Settings_Controller extends REST_Controller {
 	}
 
 	/**
+	 * POST /wizard/activate — activate installed SEO plugin(s).
+	 *
+	 * Accepts a plugin key and activates both the free and pro versions
+	 * if they are installed, so the user doesn't need multiple clicks.
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The request object.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function wizard_activate( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$params = $request->get_json_params();
+		$plugin = isset( $params['plugin'] ) ? sanitize_key( $params['plugin'] ) : '';
+
+		$plugin_files = array(
+			'rank-math' => array(
+				'free' => 'seo-by-rank-math/rank-math.php',
+				'pro'  => 'seo-by-rank-math-pro/rank-math-pro.php',
+				'name' => 'Rank Math SEO',
+			),
+			'yoast' => array(
+				'free' => 'wordpress-seo/wp-seo.php',
+				'pro'  => 'wordpress-seo-premium/wp-seo-premium.php',
+				'name' => 'Yoast SEO',
+			),
+		);
+
+		if ( ! isset( $plugin_files[ $plugin ] ) ) {
+			return $this->error( 'invalid_plugin', __( 'Invalid plugin choice.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+		$info      = $plugin_files[ $plugin ];
+		$activated = array();
+		$errors    = array();
+
+		// Activate free version first (pro depends on it).
+		if ( file_exists( WP_PLUGIN_DIR . '/' . $info['free'] ) && ! is_plugin_active( $info['free'] ) ) {
+			$result = activate_plugin( $info['free'] );
+			if ( is_wp_error( $result ) ) {
+				$errors[] = $result->get_error_message();
+			} else {
+				$activated[] = $info['name'];
+			}
+		}
+
+		// Activate pro version if installed.
+		if ( file_exists( WP_PLUGIN_DIR . '/' . $info['pro'] ) && ! is_plugin_active( $info['pro'] ) ) {
+			$result = activate_plugin( $info['pro'] );
+			if ( is_wp_error( $result ) ) {
+				$errors[] = $result->get_error_message();
+			} else {
+				$activated[] = $info['name'] . ' Pro';
+			}
+		}
+
+		if ( ! empty( $errors ) ) {
+			return $this->error( 'activation_failed', implode( ' ', $errors ), 500 );
+		}
+
+		if ( empty( $activated ) ) {
+			return $this->success( array( 'message' => __( 'Plugins are already active.', 'scalyn-qa-assistant' ) ) );
+		}
+
+		return $this->success( array(
+			'activated' => $activated,
+			'message'   => sprintf(
+				/* translators: %s: comma-separated list of activated plugins */
+				__( '%s activated successfully.', 'scalyn-qa-assistant' ),
+				implode( ' & ', $activated ),
+			),
+		) );
+	}
+
+	/**
 	 * POST /wizard/dismiss — dismiss the setup wizard.
 	 *
 	 * @since 1.0.0
@@ -500,6 +618,29 @@ class Settings_Controller extends REST_Controller {
 		update_option( self::WIZARD_DISMISSED_OPTION, true, false );
 
 		return $this->success( array( 'dismissed' => true ) );
+	}
+
+	/**
+	 * POST /settings/onboarding-dismiss — dismiss the Getting Started guide (per-user).
+	 *
+	 * @since 1.4.0
+	 *
+	 * @param \WP_REST_Request $request The request object.
+	 * @return \WP_REST_Response
+	 */
+	public function dismiss_onboarding( \WP_REST_Request $request ): \WP_REST_Response {
+		update_user_meta( get_current_user_id(), 'scalyn_qa_onboarding_dismissed', true );
+		return $this->success( array( 'dismissed' => true ) );
+	}
+
+	/**
+	 * DELETE /settings/onboarding-dismiss — reset (show again) the Getting Started guide.
+	 *
+	 * @since 1.4.0
+	 */
+	public function reset_onboarding( \WP_REST_Request $request ): \WP_REST_Response {
+		delete_user_meta( get_current_user_id(), 'scalyn_qa_onboarding_dismissed' );
+		return $this->success( array( 'reset' => true ) );
 	}
 
 	/**

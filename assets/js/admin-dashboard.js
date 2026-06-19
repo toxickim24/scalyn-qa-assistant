@@ -1164,6 +1164,51 @@
         });
     }
 
+    /**
+     * Handle Getting Started onboarding dismiss.
+     */
+    function initOnboardingDismiss() {
+        var dismissBtn = document.querySelector('.scalyn-onboarding__dismiss');
+        if (!dismissBtn) return;
+
+        dismissBtn.addEventListener('click', function () {
+            var card = document.getElementById('scalyn-onboarding');
+            if (!card) return;
+
+            // Animate out.
+            card.style.transition = 'opacity 0.3s ease, max-height 0.4s ease, margin 0.4s ease, padding 0.4s ease';
+            card.style.opacity = '0';
+
+            setTimeout(function () {
+                card.style.maxHeight = '0';
+                card.style.overflow = 'hidden';
+                card.style.padding = '0';
+                card.style.marginBottom = '0';
+                card.style.border = 'none';
+            }, 300);
+
+            // Persist via REST.
+            fetchApi('settings/onboarding-dismiss', { method: 'POST' })
+                .catch(function (err) {
+                    console.error('Scalyn QA: Failed to dismiss onboarding.', err);
+                });
+        });
+
+        // Reset (show again) button.
+        var showBtn = document.getElementById('scalyn-show-onboarding');
+        if (showBtn) {
+            showBtn.addEventListener('click', function () {
+                fetchApi('settings/onboarding-dismiss', { method: 'DELETE' })
+                    .then(function () {
+                        window.location.reload();
+                    })
+                    .catch(function (err) {
+                        console.error('Scalyn QA: Failed to reset onboarding.', err);
+                    });
+            });
+        }
+    }
+
     function init() {
         // Animate existing score circles rendered server-side.
         animateAllScoreCircles();
@@ -1187,6 +1232,7 @@
         initLaunchAiApply();
         initLaunchAiCopy();
         initLaunchAiRegenerate();
+        initOnboardingDismiss();
 
         // Start auto-refresh.
         startAutoRefresh();

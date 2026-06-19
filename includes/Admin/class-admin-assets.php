@@ -107,6 +107,11 @@ final class Admin_Assets {
 			);
 		}
 
+		// Enqueue WP media uploader on the settings page (for report logo upload).
+		if ( 'settings' === $page_key ) {
+			wp_enqueue_media();
+		}
+
 		// Localize with the scalynQA object.
 		$localize_handle = isset( $script_handle ) ? $script_handle : 'scalyn-qa-sweetalert2';
 
@@ -192,13 +197,11 @@ final class Admin_Assets {
 			}
 			$current_thumb_id = (int) get_post_thumbnail_id( $inspector_post_id );
 
-			// Collect ignored check IDs for this post.
-			$ignored_ids = array();
-			$audit_ignores = \Scalyn\QA\Models\Ignore_Rule::get_by_context( 'audit' );
+			// Collect ignored check IDs for this post (global + post-specific).
+			$ignored_ids   = array();
+			$audit_ignores = \Scalyn\QA\Models\Ignore_Rule::get_for_post( $inspector_post_id );
 			foreach ( $audit_ignores as $rule ) {
-				if ( 'global' === $rule->type || null === $rule->post_id || 0 === $rule->post_id || $inspector_post_id === $rule->post_id ) {
-					$ignored_ids[] = $rule->check_id;
-				}
+				$ignored_ids[] = $rule->check_id;
 			}
 
 			$inspector_data    = array(

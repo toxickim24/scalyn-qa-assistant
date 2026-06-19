@@ -14,6 +14,7 @@ namespace Scalyn\QA\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use Scalyn\QA\Launch\Launch_Checker;
 use Scalyn\QA\Models\Check_Item;
 use Scalyn\QA\Models\Ignore_Rule;
 
@@ -152,6 +153,12 @@ class Launch_Page {
 
 		foreach ( $stored as $item_data ) {
 			if ( ! is_array( $item_data ) ) {
+				continue;
+			}
+
+			// Skip pro-locked checks from previously stored results.
+			$id = $item_data['id'] ?? '';
+			if ( Launch_Checker::is_check_pro_locked( $id ) ) {
 				continue;
 			}
 

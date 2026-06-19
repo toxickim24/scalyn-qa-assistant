@@ -105,14 +105,16 @@ class SEO_Analyzer implements Analyzer_Interface {
 		$title   = '';
 
 		// Rank Math.
-		$rank_math_title = get_post_meta( $post_id, 'rank_math_title', true );
-		if ( is_string( $rank_math_title ) && '' !== $rank_math_title ) {
-			$title  = $rank_math_title;
-			$source = 'Rank Math';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rank_math_title = get_post_meta( $post_id, 'rank_math_title', true );
+			if ( is_string( $rank_math_title ) && '' !== $rank_math_title ) {
+				$title  = $rank_math_title;
+				$source = 'Rank Math';
+			}
 		}
 
 		// Yoast.
-		if ( '' === $title ) {
+		if ( '' === $title && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_title = get_post_meta( $post_id, '_yoast_wpseo_title', true );
 			if ( is_string( $yoast_title ) && '' !== $yoast_title ) {
 				$title  = $yoast_title;
@@ -121,7 +123,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// AIOSEO.
-		if ( '' === $title ) {
+		if ( '' === $title && defined( 'AIOSEO_VERSION' ) ) {
 			$aioseo_title = get_post_meta( $post_id, '_aioseo_title', true );
 			if ( is_string( $aioseo_title ) && '' !== $aioseo_title ) {
 				$title  = $aioseo_title;
@@ -207,14 +209,16 @@ class SEO_Analyzer implements Analyzer_Interface {
 		$description = '';
 
 		// Rank Math.
-		$rank_math_desc = get_post_meta( $post_id, 'rank_math_description', true );
-		if ( is_string( $rank_math_desc ) && '' !== $rank_math_desc ) {
-			$description = $rank_math_desc;
-			$source      = 'Rank Math';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rank_math_desc = get_post_meta( $post_id, 'rank_math_description', true );
+			if ( is_string( $rank_math_desc ) && '' !== $rank_math_desc ) {
+				$description = $rank_math_desc;
+				$source      = 'Rank Math';
+			}
 		}
 
 		// Yoast.
-		if ( '' === $description ) {
+		if ( '' === $description && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_desc = get_post_meta( $post_id, '_yoast_wpseo_metadesc', true );
 			if ( is_string( $yoast_desc ) && '' !== $yoast_desc ) {
 				$description = $yoast_desc;
@@ -223,7 +227,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// AIOSEO.
-		if ( '' === $description ) {
+		if ( '' === $description && defined( 'AIOSEO_VERSION' ) ) {
 			$aioseo_desc = get_post_meta( $post_id, '_aioseo_description', true );
 			if ( is_string( $aioseo_desc ) && '' !== $aioseo_desc ) {
 				$description = $aioseo_desc;
@@ -630,14 +634,16 @@ class SEO_Analyzer implements Analyzer_Interface {
 		$source    = '';
 
 		// Rank Math.
-		$rm_canonical = get_post_meta( $post_id, 'rank_math_canonical_url', true );
-		if ( is_string( $rm_canonical ) && '' !== $rm_canonical ) {
-			$canonical = $rm_canonical;
-			$source    = 'Rank Math';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rm_canonical = get_post_meta( $post_id, 'rank_math_canonical_url', true );
+			if ( is_string( $rm_canonical ) && '' !== $rm_canonical ) {
+				$canonical = $rm_canonical;
+				$source    = 'Rank Math';
+			}
 		}
 
 		// Yoast.
-		if ( '' === $canonical ) {
+		if ( '' === $canonical && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_canonical = get_post_meta( $post_id, '_yoast_wpseo_canonical', true );
 			if ( is_string( $yoast_canonical ) && '' !== $yoast_canonical ) {
 				$canonical = $yoast_canonical;
@@ -646,7 +652,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// AIOSEO.
-		if ( '' === $canonical ) {
+		if ( '' === $canonical && defined( 'AIOSEO_VERSION' ) ) {
 			$aioseo_canonical = get_post_meta( $post_id, '_aioseo_canonical_url', true );
 			if ( is_string( $aioseo_canonical ) && '' !== $aioseo_canonical ) {
 				$canonical = $aioseo_canonical;
@@ -734,17 +740,19 @@ class SEO_Analyzer implements Analyzer_Interface {
 		$source      = '';
 
 		// Rank Math — stores robots as a serialized array.
-		$rm_robots = get_post_meta( $post_id, 'rank_math_robots', true );
-		if ( is_array( $rm_robots ) ) {
-			$is_noindex  = in_array( 'noindex', $rm_robots, true );
-			$is_nofollow = in_array( 'nofollow', $rm_robots, true );
-			if ( $is_noindex || $is_nofollow ) {
-				$source = 'Rank Math';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rm_robots = get_post_meta( $post_id, 'rank_math_robots', true );
+			if ( is_array( $rm_robots ) ) {
+				$is_noindex  = in_array( 'noindex', $rm_robots, true );
+				$is_nofollow = in_array( 'nofollow', $rm_robots, true );
+				if ( $is_noindex || $is_nofollow ) {
+					$source = 'Rank Math';
+				}
 			}
 		}
 
 		// Yoast.
-		if ( '' === $source ) {
+		if ( '' === $source && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_noindex  = get_post_meta( $post_id, '_yoast_wpseo_meta-robots-noindex', true );
 			$yoast_nofollow = get_post_meta( $post_id, '_yoast_wpseo_meta-robots-nofollow', true );
 			if ( '1' === $yoast_noindex || '1' === $yoast_nofollow ) {
@@ -755,7 +763,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// AIOSEO.
-		if ( '' === $source ) {
+		if ( '' === $source && defined( 'AIOSEO_VERSION' ) ) {
 			$aioseo_noindex  = get_post_meta( $post_id, '_aioseo_noindex', true );
 			$aioseo_nofollow = get_post_meta( $post_id, '_aioseo_nofollow', true );
 			if ( '1' === $aioseo_noindex || '1' === $aioseo_nofollow ) {
@@ -940,19 +948,21 @@ class SEO_Analyzer implements Analyzer_Interface {
 	private function check_focus_keyword( int $post_id, HTML_Parser $parser, string $content ): Check_Item {
 		$tooltip = __( 'A focus keyword tells search engines what your page is about. Set it in your SEO plugin and use it in the title, H1, first paragraph, URL, and meta description.', 'scalyn-qa-assistant' );
 
-		// Read focus keyword from any SEO plugin.
+		// Read focus keyword from the active SEO plugin.
 		$keyword = '';
 		$source  = '';
 
 		// Rank Math.
-		$rm_kw = get_post_meta( $post_id, 'rank_math_focus_keyword', true );
-		if ( is_string( $rm_kw ) && '' !== $rm_kw ) {
-			$keyword = explode( ',', $rm_kw )[0]; // First keyword.
-			$source  = 'Rank Math';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rm_kw = get_post_meta( $post_id, 'rank_math_focus_keyword', true );
+			if ( is_string( $rm_kw ) && '' !== $rm_kw ) {
+				$keyword = explode( ',', $rm_kw )[0]; // First keyword.
+				$source  = 'Rank Math';
+			}
 		}
 
 		// Yoast.
-		if ( '' === $keyword ) {
+		if ( '' === $keyword && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_kw = get_post_meta( $post_id, '_yoast_wpseo_focuskw', true );
 			if ( is_string( $yoast_kw ) && '' !== $yoast_kw ) {
 				$keyword = $yoast_kw;
@@ -961,7 +971,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// AIOSEO.
-		if ( '' === $keyword ) {
+		if ( '' === $keyword && defined( 'AIOSEO_VERSION' ) ) {
 			$aioseo_kw = get_post_meta( $post_id, '_aioseo_keyphrases', true );
 			if ( is_string( $aioseo_kw ) && '' !== $aioseo_kw ) {
 				$parsed = json_decode( $aioseo_kw, true );
@@ -973,7 +983,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// SEOPress.
-		if ( '' === $keyword ) {
+		if ( '' === $keyword && defined( 'SEOPRESS_VERSION' ) ) {
 			$sp_kw = get_post_meta( $post_id, '_seopress_analysis_target_kw', true );
 			if ( is_string( $sp_kw ) && '' !== $sp_kw ) {
 				$keyword = explode( ',', $sp_kw )[0];
@@ -1045,11 +1055,17 @@ class SEO_Analyzer implements Analyzer_Interface {
 			$missing[] = __( 'URL slug', 'scalyn-qa-assistant' );
 		}
 
-		// Meta description.
-		$meta_desc = get_post_meta( $post_id, 'rank_math_description', true )
-			?: get_post_meta( $post_id, '_yoast_wpseo_metadesc', true )
-			?: get_post_meta( $post_id, '_aioseo_description', true )
-			?: '';
+		// Meta description (only from active SEO plugin).
+		$meta_desc = '';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$meta_desc = get_post_meta( $post_id, 'rank_math_description', true ) ?: '';
+		}
+		if ( '' === $meta_desc && defined( 'WPSEO_VERSION' ) ) {
+			$meta_desc = get_post_meta( $post_id, '_yoast_wpseo_metadesc', true ) ?: '';
+		}
+		if ( '' === $meta_desc && defined( 'AIOSEO_VERSION' ) ) {
+			$meta_desc = get_post_meta( $post_id, '_aioseo_description', true ) ?: '';
+		}
 		if ( is_string( $meta_desc ) && str_contains( mb_strtolower( $meta_desc ), $keyword_lower ) ) {
 			$placements[] = __( 'Meta description', 'scalyn-qa-assistant' );
 		} else {
@@ -1183,14 +1199,16 @@ class SEO_Analyzer implements Analyzer_Interface {
 		$source = '';
 
 		// Rank Math (0-100).
-		$rm_score = get_post_meta( $post_id, 'rank_math_seo_score', true );
-		if ( is_numeric( $rm_score ) && (int) $rm_score > 0 ) {
-			$score  = (int) $rm_score;
-			$source = 'Rank Math';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rm_score = get_post_meta( $post_id, 'rank_math_seo_score', true );
+			if ( is_numeric( $rm_score ) && (int) $rm_score > 0 ) {
+				$score  = (int) $rm_score;
+				$source = 'Rank Math';
+			}
 		}
 
 		// Yoast (0-100, stored as "linkdex").
-		if ( 0 === $score ) {
+		if ( 0 === $score && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_score = get_post_meta( $post_id, '_yoast_wpseo_linkdex', true );
 			if ( is_numeric( $yoast_score ) && (int) $yoast_score > 0 ) {
 				$score  = (int) $yoast_score;
@@ -1199,7 +1217,7 @@ class SEO_Analyzer implements Analyzer_Interface {
 		}
 
 		// SEOPress.
-		if ( 0 === $score ) {
+		if ( 0 === $score && defined( 'SEOPRESS_VERSION' ) ) {
 			$sp_data = get_post_meta( $post_id, '_seopress_analysis_data', true );
 			if ( is_array( $sp_data ) && isset( $sp_data['score'] ) ) {
 				$score  = (int) $sp_data['score'];
@@ -1254,13 +1272,17 @@ class SEO_Analyzer implements Analyzer_Interface {
 		// Get the OG image or featured image.
 		$image_id = 0;
 
-		// Check SEO plugin OG image first.
-		$og_image_url = get_post_meta( $post_id, 'rank_math_facebook_image_id', true )
-			?: get_post_meta( $post_id, '_yoast_wpseo_opengraph-image-id', true )
-			?: '';
+		// Check SEO plugin OG image first (only from active plugin).
+		$og_image_id = '';
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$og_image_id = get_post_meta( $post_id, 'rank_math_facebook_image_id', true ) ?: '';
+		}
+		if ( '' === $og_image_id && defined( 'WPSEO_VERSION' ) ) {
+			$og_image_id = get_post_meta( $post_id, '_yoast_wpseo_opengraph-image-id', true ) ?: '';
+		}
 
-		if ( is_numeric( $og_image_url ) && (int) $og_image_url > 0 ) {
-			$image_id = (int) $og_image_url;
+		if ( is_numeric( $og_image_id ) && (int) $og_image_id > 0 ) {
+			$image_id = (int) $og_image_id;
 		}
 
 		// Fallback to featured image.

@@ -216,7 +216,6 @@ foreach ( $results as $check ) {
 				?>
 			<?php endif; ?>
 		</p>
-	</div>
 
 	<?php if ( $counts['total'] > 0 ) : ?>
 		<!-- Hero: Overall Score + Category Bars -->

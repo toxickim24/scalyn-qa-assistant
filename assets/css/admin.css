@@ -808,6 +808,284 @@ a.scalyn-btn--ghost:visited {
 }
 
 /* ==========================================================================
+   Getting Started / Onboarding
+   ========================================================================== */
+
+.scalyn-onboarding {
+  background: var(--scalyn-surface);
+  border: 1px solid var(--scalyn-border-light);
+  border-left: 3px solid var(--scalyn-primary);
+  border-radius: var(--scalyn-radius-lg);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.scalyn-onboarding--complete {
+  border-left-color: var(--scalyn-success);
+}
+
+.scalyn-onboarding__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.scalyn-onboarding__header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.scalyn-onboarding__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--scalyn-text-strong);
+  margin: 0;
+  padding: 0;
+}
+
+.scalyn-onboarding__progress-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-onboarding__dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--scalyn-text-muted);
+  padding: 0.25rem;
+  border-radius: var(--scalyn-radius-sm);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.scalyn-onboarding__dismiss:hover {
+  color: var(--scalyn-text-strong);
+  background: var(--scalyn-surface-subtle, #f3f4f6);
+}
+
+/* Progress bar */
+.scalyn-onboarding__progress-bar {
+  height: 4px;
+  background: var(--scalyn-neutral-100, #f3f4f6);
+  border-radius: var(--scalyn-radius-full);
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+
+.scalyn-onboarding__progress-fill {
+  height: 100%;
+  background: var(--scalyn-primary);
+  border-radius: var(--scalyn-radius-full);
+  transition: width 0.5s ease;
+}
+
+/* Core Steps */
+.scalyn-onboarding__steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.scalyn-onboarding-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.875rem;
+  border-radius: var(--scalyn-radius-md);
+  border: 1px solid var(--scalyn-border-light);
+  background: var(--scalyn-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.scalyn-onboarding-step--active {
+  border-color: var(--scalyn-primary);
+  box-shadow: 0 0 0 1px var(--scalyn-primary);
+  background: #f5f3ff;
+}
+
+.scalyn-onboarding-step--complete {
+  border-color: var(--scalyn-success);
+  background: var(--scalyn-success-light, #ecfdf5);
+}
+
+.scalyn-onboarding-step--pending {
+  opacity: 0.5;
+}
+
+/* Step icon */
+.scalyn-onboarding-step__icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--scalyn-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.scalyn-onboarding-step--complete .scalyn-onboarding-step__icon {
+  background: var(--scalyn-success);
+  color: #fff;
+}
+
+.scalyn-onboarding-step--active .scalyn-onboarding-step__icon {
+  background: var(--scalyn-primary);
+  color: #fff;
+}
+
+.scalyn-onboarding-step--pending .scalyn-onboarding-step__icon {
+  background: var(--scalyn-neutral-100, #f3f4f6);
+  color: var(--scalyn-text-muted);
+}
+
+.scalyn-onboarding-step__number {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Step content */
+.scalyn-onboarding-step__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.scalyn-onboarding-step__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--scalyn-text-strong);
+}
+
+.scalyn-onboarding-step__desc {
+  font-size: 0.6875rem;
+  color: var(--scalyn-text-muted);
+  line-height: 1.4;
+}
+
+/* Step action */
+.scalyn-onboarding-step__action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.scalyn-onboarding-step__locked {
+  color: var(--scalyn-text-faint, #d1d5db);
+  font-size: 1rem;
+}
+
+.scalyn-onboarding-step__locked .dashicons {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Optional Enhancements */
+.scalyn-onboarding__optional {
+  border-top: 1px solid var(--scalyn-border-light);
+  padding-top: 0.875rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.scalyn-onboarding__optional-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--scalyn-text-strong);
+}
+
+.scalyn-onboarding__optional-hint {
+  font-size: 0.6875rem;
+  color: var(--scalyn-text-muted);
+  margin-right: 0.5rem;
+}
+
+.scalyn-onboarding__optional-items {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.scalyn-onboarding-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--scalyn-radius-full);
+  border: 1px solid var(--scalyn-border-light);
+  font-size: 0.75rem;
+  background: var(--scalyn-surface);
+}
+
+.scalyn-onboarding-opt--complete {
+  border-color: var(--scalyn-success);
+  background: var(--scalyn-success-light, #ecfdf5);
+}
+
+.scalyn-onboarding-opt__check {
+  color: var(--scalyn-success);
+  display: flex;
+  align-items: center;
+}
+
+.scalyn-onboarding-opt__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.scalyn-onboarding-opt__label {
+  font-weight: 600;
+  color: var(--scalyn-text-strong);
+  font-size: 0.75rem;
+}
+
+.scalyn-onboarding-opt__desc {
+  font-size: 0.625rem;
+  color: var(--scalyn-text-muted);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .scalyn-onboarding__steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+  .scalyn-onboarding__steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .scalyn-onboarding__steps {
+    grid-template-columns: 1fr;
+  }
+  .scalyn-onboarding__optional {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .scalyn-onboarding__optional-items {
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
    Dashboard Hero
    ========================================================================== */
 

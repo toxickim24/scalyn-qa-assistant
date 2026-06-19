@@ -27,6 +27,28 @@ use Scalyn\QA\Models\Check_Item;
 class Analyzer_Registry {
 
 	/**
+	 * Page audit checks that require a pro SEO plugin.
+	 */
+	private const PRO_CHECKS = array(
+		'focus_keyword',
+		'schema_markup',
+		'seo_score',
+		'social_image_dimensions',
+		'readability_score',
+	);
+
+	/**
+	 * Page audit checks that require any SEO plugin (free or pro).
+	 */
+	private const SEO_REQUIRED_CHECKS = array(
+		'focus_keyword',
+		'seo_score',
+		'canonical_url',
+		'noindex_nofollow',
+		'open_graph_tags',
+	);
+
+	/**
 	 * Registered analyzers keyed by their ID.
 	 *
 	 * @var array<string, Analyzer_Interface>
@@ -87,20 +109,30 @@ class Analyzer_Registry {
 		);
 
 		$enabled_checks = $this->get_enabled_checks();
+		$locked_checks  = $this->get_locked_checks();
 
 		foreach ( $this->analyzers as $analyzer ) {
 			$category = $analyzer->get_category();
 			$items    = $analyzer->analyze( $post_id );
 
-			// Filter out disabled checks.
-			if ( null !== $enabled_checks ) {
-				$items = array_filter(
-					$items,
-					static fn( Check_Item $item ): bool =>
-						in_array( $item->id, $enabled_checks, true )
-						|| ( str_starts_with( $item->id, 'link_' ) && in_array( 'broken_links', $enabled_checks, true ) ),
-				);
-			}
+			// Filter out disabled, pro-locked, and SEO-required checks.
+			$items = array_filter(
+				$items,
+				static function ( Check_Item $item ) use ( $enabled_checks, $locked_checks ): bool {
+					// Always skip locked checks (pro-only or requires SEO plugin).
+					if ( in_array( $item->id, $locked_checks, true ) ) {
+						return false;
+					}
+
+					// If no saved settings, all remaining checks are enabled.
+					if ( null === $enabled_checks ) {
+						return true;
+					}
+
+					return in_array( $item->id, $enabled_checks, true )
+						|| ( str_starts_with( $item->id, 'link_' ) && in_array( 'broken_links', $enabled_checks, true ) );
+				},
+			);
 
 			if ( isset( $results[ $category ] ) ) {
 				$results[ $category ] = array_merge( $results[ $category ], array_values( $items ) );
@@ -108,6 +140,40 @@ class Analyzer_Registry {
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Get all checks that should be locked based on installed SEO plugins.
+	 *
+	 * Combines pro-only checks (need pro SEO plugin) and SEO-required checks
+	 * (need any SEO plugin at all).
+	 *
+	 * @return string[]
+	 */
+	private function get_locked_checks(): array {
+		$has_any_seo = defined( 'RANK_MATH_VERSION' )
+			|| defined( 'WPSEO_VERSION' )
+			|| defined( 'AIOSEO_VERSION' )
+			|| defined( 'SEOPRESS_VERSION' )
+			|| defined( 'THE_SEO_FRAMEWORK_VERSION' );
+
+		$has_pro = defined( 'RANK_MATH_PRO_VERSION' )
+			|| defined( 'WPSEO_PREMIUM_FILE' )
+			|| defined( 'AIOSEO_PRO_VERSION' )
+			|| defined( 'SEOPRESS_PRO_VERSION' )
+			|| defined( 'THE_SEO_FRAMEWORK_EXTENSION_MANAGER_VERSION' );
+
+		$locked = array();
+
+		if ( ! $has_pro ) {
+			$locked = self::PRO_CHECKS;
+		}
+
+		if ( ! $has_any_seo ) {
+			$locked = array_unique( array_merge( $locked, self::SEO_REQUIRED_CHECKS ) );
+		}
+
+		return $locked;
 	}
 
 	/**

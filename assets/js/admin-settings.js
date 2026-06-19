@@ -634,6 +634,7 @@
 
     function initWizardTab() {
         initInstallSeoPlugin();
+        initActivateSeoPlugin();
         initDismissWizard();
         initResetWizard();
     }
@@ -680,6 +681,58 @@
                         ScalynAlert.close();
                         ScalynAlert.error('Installation Failed', err.message || 'Failed to install plugin.');
                     }
+                });
+        });
+    }
+
+    /**
+     * Handle "Activate SEO Plugin" button (AJAX, no page redirect).
+     */
+    function initActivateSeoPlugin() {
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-activate-seo-plugin');
+            if (!btn) return;
+
+            var plugin = btn.getAttribute('data-plugin');
+            if (!plugin) return;
+
+            btn.disabled = true;
+            var originalText = btn.textContent;
+            btn.textContent = 'Activating...';
+
+            if (typeof ScalynAlert !== 'undefined') {
+                ScalynAlert.loading('Activating plugin...');
+            }
+
+            fetchApi('wizard/activate', {
+                method: 'POST',
+                body: JSON.stringify({ plugin: plugin }),
+            })
+                .then(function (response) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.close();
+                    }
+
+                    if (response.success) {
+                        if (typeof ScalynAlert !== 'undefined') {
+                            ScalynAlert.success(
+                                'Plugin Activated',
+                                response.data.message || 'Plugin activated successfully.'
+                            ).then(function () {
+                                window.location.reload();
+                            });
+                        } else {
+                            window.location.reload();
+                        }
+                    }
+                })
+                .catch(function (err) {
+                    if (typeof ScalynAlert !== 'undefined') {
+                        ScalynAlert.close();
+                        ScalynAlert.error('Activation Failed', err.message || 'Failed to activate plugin.');
+                    }
+                    btn.disabled = false;
+                    btn.textContent = originalText;
                 });
         });
     }
@@ -1563,6 +1616,95 @@
     }
 
     // -------------------------------------------------------------------------
+    // Report Tab
+    // -------------------------------------------------------------------------
+
+    function initReportTab() {
+        var form = document.getElementById('scalyn-report-settings-form');
+        if (!form) return;
+
+        // Save settings.
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            var reportSettings = {
+                include_page_scores: !!form.querySelector('[name="include_page_scores"]').checked,
+                include_top_issues: !!form.querySelector('[name="include_top_issues"]').checked,
+                include_launch: !!form.querySelector('[name="include_launch"]').checked,
+                max_pages: parseInt(form.querySelector('[name="max_pages"]').value, 10) || 500,
+                company_logo_id: parseInt(form.querySelector('[name="company_logo_id"]').value, 10) || 0,
+            };
+
+            fetchApi('settings', {
+                method: 'POST',
+                body: JSON.stringify({ report_settings: reportSettings }),
+            }).then(function () {
+                ScalynAlert && ScalynAlert.toast('Report settings saved');
+            }).catch(function (err) {
+                ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to save report settings.');
+            });
+        });
+
+        // Upload logo via WP media.
+        var uploadBtn = document.getElementById('scalyn-upload-logo');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', function () {
+                var frame = wp.media({
+                    title: 'Select Company Logo',
+                    button: { text: 'Use This Logo' },
+                    multiple: false,
+                    library: { type: 'image' },
+                });
+
+                frame.on('select', function () {
+                    var attachment = frame.state().get('selection').first().toJSON();
+                    var input = document.getElementById('scalyn-company-logo-id');
+                    var preview = document.getElementById('scalyn-logo-preview');
+
+                    input.value = attachment.id;
+                    var imgUrl = attachment.sizes && attachment.sizes.medium ? attachment.sizes.medium.url : attachment.url;
+                    preview.innerHTML = '<img src="' + imgUrl + '" alt="" style="max-height:60px;border-radius:6px;border:1px solid var(--scalyn-border-light);">';
+                    preview.style.display = '';
+
+                    uploadBtn.innerHTML = '<span class="dashicons dashicons-upload" aria-hidden="true"></span> Change Logo';
+
+                    // Add remove button if not present.
+                    if (!document.getElementById('scalyn-remove-logo')) {
+                        var removeBtn = document.createElement('button');
+                        removeBtn.type = 'button';
+                        removeBtn.id = 'scalyn-remove-logo';
+                        removeBtn.className = 'scalyn-btn scalyn-btn--small scalyn-btn--ghost';
+                        removeBtn.style.marginLeft = '0.25rem';
+                        removeBtn.textContent = 'Remove';
+                        uploadBtn.parentNode.insertBefore(removeBtn, uploadBtn.nextSibling);
+                        bindRemoveLogo(removeBtn);
+                    }
+                });
+
+                frame.open();
+            });
+        }
+
+        // Remove logo.
+        var removeBtn = document.getElementById('scalyn-remove-logo');
+        if (removeBtn) {
+            bindRemoveLogo(removeBtn);
+        }
+
+        function bindRemoveLogo(btn) {
+            btn.addEventListener('click', function () {
+                document.getElementById('scalyn-company-logo-id').value = '0';
+                var preview = document.getElementById('scalyn-logo-preview');
+                preview.innerHTML = '';
+                preview.style.display = 'none';
+                var upload = document.getElementById('scalyn-upload-logo');
+                if (upload) upload.innerHTML = '<span class="dashicons dashicons-upload" aria-hidden="true"></span> Upload Logo';
+                btn.remove();
+            });
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Initialization
     // -------------------------------------------------------------------------
 
@@ -1589,6 +1731,9 @@
                 break;
             case 'wizard':
                 initWizardTab();
+                break;
+            case 'report':
+                initReportTab();
                 break;
             case 'advanced':
                 initAdvancedTab();

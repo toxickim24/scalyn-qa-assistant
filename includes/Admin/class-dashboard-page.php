@@ -36,15 +36,28 @@ class Dashboard_Page {
 	 * @since 1.0.0
 	 */
 	public function render(): void {
+		$project_scores    = $this->get_project_scores();
+		$scan_coverage     = $this->get_scan_coverage();
+		$launch_summary    = $this->get_launch_summary();
+		$seo_plugin_status = $this->get_seo_plugin_status();
+		$ai_status         = $this->get_ai_status();
+
 		$data = array(
-			'project_scores'          => $this->get_project_scores(),
+			'project_scores'          => $project_scores,
 			'pages_needing_attention' => $this->get_pages_needing_attention(),
 			'recent_scans'            => $this->get_recent_scans(),
-			'seo_plugin_status'       => $this->get_seo_plugin_status(),
-			'launch_summary'          => $this->get_launch_summary(),
+			'seo_plugin_status'       => $seo_plugin_status,
+			'launch_summary'          => $launch_summary,
 			'top_issues'              => $this->get_top_issues(),
-			'scan_coverage'           => $this->get_scan_coverage(),
-			'ai_status'               => $this->get_ai_status(),
+			'scan_coverage'           => $scan_coverage,
+			'ai_status'               => $ai_status,
+			'onboarding'              => $this->get_onboarding_data(
+				$scan_coverage,
+				$project_scores,
+				$launch_summary,
+				$seo_plugin_status,
+				$ai_status,
+			),
 		);
 
 		$this->load_template( 'dashboard/overview.php', $data );
@@ -379,6 +392,133 @@ class Dashboard_Page {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Build onboarding journey data from already-computed dashboard values.
+	 *
+	 * @since 1.4.0
+	 */
+	private function get_onboarding_data(
+		array $scan_coverage,
+		array $project_scores,
+		array $launch_summary,
+		?string $seo_plugin_status,
+		array $ai_status,
+	): array {
+		$dismissed = (bool) get_user_meta( get_current_user_id(), 'scalyn_qa_onboarding_dismissed', true );
+
+		$has_scan        = ( $scan_coverage['scanned'] ?? 0 ) > 0;
+		$has_passing     = $has_scan && $this->has_any_passing_page();
+		$has_launch_scan = ! empty( $launch_summary['last_scan'] );
+		$launch_ready    = ( $project_scores['launch_ready'] ?? 0 ) >= 80;
+		$has_seo         = null !== $seo_plugin_status;
+		$has_ai          = ! empty( $ai_status['enabled'] ) && ! empty( $ai_status['provider'] );
+
+		$core_steps = array(
+			array(
+				'id'       => 'scan_page',
+				'label'    => __( 'Scan a Page', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Run your first QA scan on any page.', 'scalyn-qa-assistant' ),
+				'complete' => $has_scan,
+				'url'      => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['audits'] ),
+				'cta'      => __( 'Go to Audits', 'scalyn-qa-assistant' ),
+			),
+			array(
+				'id'       => 'fix_issues',
+				'label'    => __( 'Fix Issues', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Get any page to a passing score.', 'scalyn-qa-assistant' ),
+				'complete' => $has_passing,
+				'url'      => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['audits'] ),
+				'cta'      => __( 'View Pages', 'scalyn-qa-assistant' ),
+			),
+			array(
+				'id'       => 'launch_checklist',
+				'label'    => __( 'Launch Checklist', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Run the site-wide readiness check.', 'scalyn-qa-assistant' ),
+				'complete' => $has_launch_scan,
+				'url'      => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['launch'] ),
+				'cta'      => __( 'Run Check', 'scalyn-qa-assistant' ),
+			),
+			array(
+				'id'       => 'launch_ready',
+				'label'    => __( 'Launch Ready', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Achieve 80%+ launch score.', 'scalyn-qa-assistant' ),
+				'complete' => $launch_ready,
+				'url'      => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['launch'] ),
+				'cta'      => __( 'View Launch', 'scalyn-qa-assistant' ),
+			),
+			array(
+				'id'       => 'generate_report',
+				'label'    => __( 'Generate Report', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Download your QA report.', 'scalyn-qa-assistant' ),
+				'complete' => (bool) get_user_meta( get_current_user_id(), 'scalyn_qa_report_generated', true ),
+				'url'      => wp_nonce_url( admin_url( 'admin-post.php?action=scalyn_qa_generate_report' ), 'scalyn_qa_report' ),
+				'cta'      => __( 'Generate', 'scalyn-qa-assistant' ),
+				'target'   => '_blank',
+			),
+		);
+
+		$optional = array(
+			array(
+				'id'       => 'seo_plugin',
+				'label'    => __( 'SEO Plugin', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Unlocks deeper SEO analysis', 'scalyn-qa-assistant' ),
+				'complete' => $has_seo,
+				'url'      => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['settings'] . '&tab=wizard' ),
+				'cta'      => __( 'Setup', 'scalyn-qa-assistant' ),
+			),
+			array(
+				'id'       => 'ai_provider',
+				'label'    => __( 'AI Provider', 'scalyn-qa-assistant' ),
+				'desc'     => __( 'Unlocks AI-powered fixes', 'scalyn-qa-assistant' ),
+				'complete' => $has_ai,
+				'url'      => admin_url( 'admin.php?page=' . Admin_Menu::PAGE_SLUGS['settings'] . '&tab=ai-providers' ),
+				'cta'      => __( 'Configure', 'scalyn-qa-assistant' ),
+			),
+		);
+
+		$completed = count( array_filter( $core_steps, static fn( array $s ): bool => $s['complete'] ) );
+
+		return array(
+			'dismissed'       => $dismissed,
+			'core_steps'      => $core_steps,
+			'optional'        => $optional,
+			'completed_count' => $completed,
+			'total_count'     => count( $core_steps ),
+			'all_complete'    => $completed === count( $core_steps ),
+		);
+	}
+
+	/**
+	 * Check if any published page has a passing QA score.
+	 *
+	 * @since 1.4.0
+	 */
+	private function has_any_passing_page(): bool {
+		global $wpdb;
+
+		$settings        = get_option( 'scalyn_qa_settings', array() );
+		$green_threshold = (int) ( $settings['green_threshold'] ?? 80 );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$post_ids = $wpdb->get_col(
+			"SELECT DISTINCT pm.post_id
+			 FROM {$wpdb->postmeta} pm
+			 INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+			 WHERE pm.meta_key = '_scalyn_qa_scores'
+			 AND p.post_status = 'publish'
+			 LIMIT 50",
+		);
+
+		foreach ( $post_ids as $pid ) {
+			$scores = get_post_meta( (int) $pid, '_scalyn_qa_scores', true );
+			if ( is_array( $scores ) && ( (int) ( $scores['overall'] ?? 0 ) ) >= $green_threshold ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

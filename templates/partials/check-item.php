@@ -176,17 +176,19 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 			}
 		}
 
-		// Collect ALL currently applied keywords from whatever SEO plugin is active.
+		// Collect ALL currently applied keywords from the active SEO plugin only.
 		$kw_current_all = array();
 
 		// Rank Math: comma-separated (free: 1, pro: up to 5).
-		$rm_kw = get_post_meta( $post_id, 'rank_math_focus_keyword', true );
-		if ( is_string( $rm_kw ) && '' !== $rm_kw ) {
-			$kw_current_all = array_map( 'trim', explode( ',', $rm_kw ) );
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
+			$rm_kw = get_post_meta( $post_id, 'rank_math_focus_keyword', true );
+			if ( is_string( $rm_kw ) && '' !== $rm_kw ) {
+				$kw_current_all = array_map( 'trim', explode( ',', $rm_kw ) );
+			}
 		}
 
 		// Yoast: primary + premium additional (JSON array).
-		if ( empty( $kw_current_all ) ) {
+		if ( empty( $kw_current_all ) && defined( 'WPSEO_VERSION' ) ) {
 			$yoast_primary = get_post_meta( $post_id, '_yoast_wpseo_focuskw', true );
 			if ( is_string( $yoast_primary ) && '' !== $yoast_primary ) {
 				$kw_current_all[] = $yoast_primary;
@@ -205,7 +207,7 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 		}
 
 		// AIOSEO: JSON keyphrases.
-		if ( empty( $kw_current_all ) ) {
+		if ( empty( $kw_current_all ) && defined( 'AIOSEO_VERSION' ) ) {
 			$aioseo_kp = get_post_meta( $post_id, '_aioseo_keyphrases', true );
 			if ( is_string( $aioseo_kp ) && '' !== $aioseo_kp ) {
 				$parsed_kp = json_decode( $aioseo_kp, true );
@@ -225,7 +227,7 @@ $icon_class = isset( $status_icons[ $status ] ) ? $status_icons[ $status ] : 'da
 		}
 
 		// SEOPress: comma-separated.
-		if ( empty( $kw_current_all ) ) {
+		if ( empty( $kw_current_all ) && defined( 'SEOPRESS_VERSION' ) ) {
 			$sp_kw = get_post_meta( $post_id, '_seopress_analysis_target_kw', true );
 			if ( is_string( $sp_kw ) && '' !== $sp_kw ) {
 				$kw_current_all = array_map( 'trim', explode( ',', $sp_kw ) );

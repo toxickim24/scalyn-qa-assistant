@@ -36,6 +36,7 @@ class Settings_Page {
 		'launch'       => 'Launch Checklist',
 		'wizard'       => 'Setup Wizard',
 		'advanced'     => 'Advanced',
+		'report'       => 'Generate Report',
 	);
 
 	/**
@@ -123,6 +124,12 @@ class Settings_Page {
 			$settings['launch_settings'] = $launch_settings;
 		}
 
+		// Merge report settings.
+		$report_settings = get_option( 'scalyn_qa_report_settings', array() );
+		if ( is_array( $report_settings ) ) {
+			$settings['report_settings'] = $report_settings;
+		}
+
 		$data = array(
 			'tabs'        => $tabs,
 			'current_tab' => $current_tab,
@@ -150,6 +157,7 @@ class Settings_Page {
 			'launch'       => 'settings/launch.php',
 			'wizard'       => 'settings/wizard.php',
 			'advanced'     => 'settings/advanced.php',
+			'report'       => 'settings/report.php',
 			default        => 'settings/general.php',
 		};
 	}

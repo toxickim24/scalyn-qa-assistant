@@ -225,38 +225,37 @@ $has_saved = ! empty( $enabled_checks );
 						</legend>
 						<?php foreach ( $category['checks'] as $check_id => $check_label ) :
 							$is_pro_check      = isset( $pro_enhanced_checks[ $check_id ] );
-							$needs_seo_plugin   = in_array( $check_id, $requires_seo_plugin, true );
+							$needs_seo_plugin  = in_array( $check_id, $requires_seo_plugin, true );
+							$is_pro_locked     = $is_pro_check && ! $has_any_pro;
+							$is_seo_missing    = $needs_seo_plugin && ! $has_any_seo_plugin;
+							$is_disabled       = $is_pro_locked || $is_seo_missing;
 
-							// Default checked logic:
-							// - If user has saved settings: use saved state
-							// - If no saved settings: pro checks default ON only if pro detected, otherwise OFF
-							// - All other checks default ON
 							if ( $has_saved ) {
-								$is_checked = in_array( $check_id, $enabled_checks, true );
+								$is_checked = $is_disabled ? false : in_array( $check_id, $enabled_checks, true );
 							} else {
-								if ( $is_pro_check ) {
-									$is_checked = $has_any_pro;
-								} else {
-									$is_checked = true;
-								}
+								$is_checked = $is_pro_check ? $has_any_pro : true;
 							}
 						?>
-							<label class="scalyn-checkbox-label scalyn-template-check" style="display:flex;align-items:center;gap:0.375rem;<?php echo ( $needs_seo_plugin && ! $has_any_seo_plugin ) ? 'opacity:0.5;' : ''; ?>">
+							<label class="scalyn-checkbox-label scalyn-template-check" style="display:flex;align-items:center;gap:0.375rem;<?php echo $is_disabled ? 'opacity:0.5;cursor:not-allowed;' : ''; ?>">
 								<input
 									type="checkbox"
 									name="enabled_checks[]"
 									value="<?php echo esc_attr( $check_id ); ?>"
 									<?php checked( $is_checked ); ?>
-									<?php echo ( $needs_seo_plugin && ! $has_any_seo_plugin ) ? 'disabled' : ''; ?>
+									<?php echo $is_disabled ? 'disabled' : ''; ?>
 								>
 								<?php echo esc_html( $check_label ); ?>
 								<?php if ( $is_pro_check ) : ?>
 									<span style="font-size:0.625rem;font-weight:600;padding:0.1rem 0.375rem;border-radius:999px;background:<?php echo $has_any_pro ? 'var(--scalyn-success-light)' : 'var(--scalyn-surface-subtle, #f3f4f6)'; ?>;color:<?php echo $has_any_pro ? 'var(--scalyn-success)' : 'var(--scalyn-text-muted)'; ?>;border:1px solid <?php echo $has_any_pro ? 'var(--scalyn-success)' : 'var(--scalyn-border-light)'; ?>;">
-										<?php echo $has_any_pro ? esc_html__( 'PRO', 'scalyn-qa-assistant' ) : esc_html__( 'PRO', 'scalyn-qa-assistant' ); ?>
+										<?php esc_html_e( 'PRO', 'scalyn-qa-assistant' ); ?>
 									</span>
-									<span style="font-size:0.6875rem;color:var(--scalyn-text-muted);"><?php echo esc_html( $pro_enhanced_checks[ $check_id ] ); ?></span>
+									<?php if ( $is_pro_locked ) : ?>
+										<span style="font-size:0.6875rem;color:var(--scalyn-text-muted);"><?php esc_html_e( 'Upgrade SEO plugin to Pro to unlock', 'scalyn-qa-assistant' ); ?></span>
+									<?php else : ?>
+										<span style="font-size:0.6875rem;color:var(--scalyn-text-muted);"><?php echo esc_html( $pro_enhanced_checks[ $check_id ] ); ?></span>
+									<?php endif; ?>
 								<?php endif; ?>
-								<?php if ( $needs_seo_plugin && ! $has_any_seo_plugin ) : ?>
+								<?php if ( $is_seo_missing ) : ?>
 									<span style="font-size:0.6875rem;color:var(--scalyn-text-muted);"><?php esc_html_e( '(requires SEO plugin)', 'scalyn-qa-assistant' ); ?></span>
 								<?php endif; ?>
 							</label>

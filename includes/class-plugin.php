@@ -139,6 +139,9 @@ final class Plugin {
 		if ( get_option( 'scalyn_qa_local_business_jsonld' ) ) {
 			add_action( 'wp_head', [ Launch\Launch_Checker::class, 'output_local_business_jsonld' ] );
 		}
+
+		// Generate QA Report (admin-post handler).
+		add_action( 'admin_post_scalyn_qa_generate_report', [ Admin\Report_Generator::class, 'handle_request' ] );
 	}
 
 	/**

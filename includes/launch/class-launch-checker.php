@@ -46,6 +46,11 @@ class Launch_Checker {
 	 * @var array<string, string>
 	 */
 	private const AUTO_FIXABLE = array(
+		'security_plugin'          => 'Activate security plugin',
+		'cache_plugin'             => 'Activate cache plugin',
+		'backup_plugin'            => 'Activate backup plugin',
+		'smtp_plugin'              => 'Activate mail plugin',
+		'image_optimization_plugin' => 'Activate image optimization plugin',
 		'comments_open'            => 'Close comments on new posts',
 		'default_tagline'          => 'Clear default tagline',
 		'default_content_cleanup'  => 'Trash sample content',
@@ -114,6 +119,11 @@ class Launch_Checker {
 			'contact_page_exists'      => $this->fix_contact_page( $content ),
 			'cornerstone_content'      => $this->fix_cornerstone_content( $content ),
 			'local_business_schema'    => $this->fix_local_business_schema( $content ),
+			'security_plugin',
+			'cache_plugin',
+			'backup_plugin',
+			'smtp_plugin',
+			'image_optimization_plugin' => $this->fix_activate_plugin( $check_id ),
 			default                    => array( 'success' => false, 'message' => __( 'Unknown fix.', 'scalyn-qa-assistant' ) ),
 		};
 	}
@@ -199,6 +209,118 @@ class Launch_Checker {
 		$wp_rewrite->set_permalink_structure( '/%postname%/' );
 		$wp_rewrite->flush_rules();
 		return array( 'success' => true, 'message' => __( 'Permalinks set to "Post name" (/%postname%/).', 'scalyn-qa-assistant' ) );
+	}
+
+	/**
+	 * Find the first installed-but-inactive plugin from a list.
+	 *
+	 * @param array<string, string> $plugins Plugin file => name map.
+	 * @return array{file: string, name: string}|null
+	 */
+	private function find_inactive_plugin( array $plugins ): ?array {
+		if ( ! function_exists( 'is_plugin_active' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		foreach ( $plugins as $file => $name ) {
+			if ( ! is_plugin_active( $file ) && file_exists( WP_PLUGIN_DIR . '/' . $file ) ) {
+				return array( 'file' => $file, 'name' => $name );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Plugin lists for each recommended-plugin check.
+	 */
+	private function get_recommended_plugins( string $check_id ): array {
+		return match ( $check_id ) {
+			'security_plugin' => array(
+				'wordfence/wordfence.php'                     => 'Wordfence',
+				'sucuri-scanner/sucuri.php'                   => 'Sucuri',
+				'better-wp-security/better-wp-security.php'  => 'Solid Security',
+				'all-in-one-wp-security-and-firewall/wp-security.php' => 'All In One WP Security',
+				'wp-simple-firewall/icwp-wpsf.php'           => 'Shield Security',
+				'defender-security/wp-defender.php'           => 'Defender',
+				'malcare-security/malcare.php'               => 'MalCare',
+				'secupress/secupress.php'                    => 'SecuPress',
+				'bulletproof-security/bulletproof-security.php' => 'BulletProof Security',
+				'wp-cerber/wp-cerber.php'                    => 'WP Cerber',
+				'ninjafirewall/ninjafirewall.php'             => 'NinjaFirewall',
+				'security-ninja/security-ninja.php'          => 'Security Ninja',
+				'patchstack/patchstack.php'                  => 'Patchstack',
+				'bbq-firewall/bbq-firewall.php'              => 'BBQ Firewall',
+				'loginizer/loginizer.php'                    => 'Loginizer',
+				'limit-login-attempts-reloaded/limit-login-attempts-reloaded.php' => 'Limit Login Attempts',
+			),
+			'cache_plugin' => array(
+				'wp-super-cache/wp-cache.php'                => 'WP Super Cache',
+				'w3-total-cache/w3-total-cache.php'          => 'W3 Total Cache',
+				'wp-fastest-cache/wpFastestCache.php'        => 'WP Fastest Cache',
+				'litespeed-cache/litespeed-cache.php'        => 'LiteSpeed Cache',
+				'wp-rocket/wp-rocket.php'                    => 'WP Rocket',
+				'autoptimize/autoptimize.php'                => 'Autoptimize',
+				'cache-enabler/cache-enabler.php'            => 'Cache Enabler',
+				'sg-cachepress/sg-cachepress.php'            => 'SG Optimizer',
+				'breeze/breeze.php'                          => 'Breeze',
+				'hummingbird-performance/wp-hummingbird.php'  => 'Hummingbird',
+				'nitropack/main.php'                         => 'NitroPack',
+			),
+			'backup_plugin' => array(
+				'updraftplus/updraftplus.php'                => 'UpdraftPlus',
+				'backwpup/backwpup.php'                     => 'BackWPup',
+				'duplicator/duplicator.php'                  => 'Duplicator',
+				'blogvault-real-time-backup/developer.php'   => 'BlogVault',
+				'all-in-one-wp-migration/all-in-one-wp-migration.php' => 'All-in-One WP Migration',
+			),
+			'smtp_plugin' => array(
+				'wp-mail-smtp/wp_mail_smtp.php'              => 'WP Mail SMTP',
+				'fluent-smtp/fluent-smtp.php'                => 'FluentSMTP',
+				'post-smtp/postman-smtp.php'                 => 'Post SMTP',
+				'easy-wp-smtp/easy-wp-smtp.php'              => 'Easy WP SMTP',
+				'smtp-mailer/main.php'                       => 'SMTP Mailer',
+				'wp-smtp/wp-smtp.php'                        => 'WP SMTP',
+			),
+			'image_optimization_plugin' => array(
+				'wp-smushit/wp-smush.php'                    => 'Smush',
+				'imagify/imagify.php'                        => 'Imagify',
+				'shortpixel-image-optimiser/wp-shortpixel.php' => 'ShortPixel',
+				'ewww-image-optimizer/ewww-image-optimizer.php' => 'EWWW Image Optimizer',
+				'tiny-compress-images/tiny-compress-images.php' => 'TinyPNG',
+				'optimole-wp/optimole-wp.php'                => 'Optimole',
+			),
+			default => array(),
+		};
+	}
+
+	/**
+	 * Fix: activate the first installed-but-inactive plugin for a check.
+	 */
+	private function fix_activate_plugin( string $check_id ): array {
+		$plugins  = $this->get_recommended_plugins( $check_id );
+		$inactive = $this->find_inactive_plugin( $plugins );
+
+		if ( null === $inactive ) {
+			return array( 'success' => false, 'message' => __( 'No installed plugin found to activate.', 'scalyn-qa-assistant' ) );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+		$result = activate_plugin( $inactive['file'] );
+
+		if ( is_wp_error( $result ) ) {
+			return array( 'success' => false, 'message' => $result->get_error_message() );
+		}
+
+		return array(
+			'success' => true,
+			'message' => sprintf(
+				/* translators: %s: plugin name */
+				__( '%s activated successfully.', 'scalyn-qa-assistant' ),
+				$inactive['name'],
+			),
+		);
 	}
 
 	/**
@@ -931,6 +1053,66 @@ HTML;
 		return in_array( $check_id, $enabled, true );
 	}
 
+	/**
+	 * Checks that require a pro SEO plugin to be meaningful.
+	 */
+	private const PRO_CHECKS = array(
+		'redirect_manager',
+		'local_business_schema',
+		'cornerstone_content',
+		'instant_indexing',
+		'woocommerce_seo',
+		'breadcrumbs_enabled',
+	);
+
+	/**
+	 * Determine whether any installed SEO plugin is a pro/premium version.
+	 */
+	private function has_any_pro_seo(): bool {
+		if ( defined( 'RANK_MATH_PRO_VERSION' ) ) {
+			return true;
+		}
+		if ( defined( 'WPSEO_PREMIUM_FILE' ) ) {
+			return true;
+		}
+		if ( defined( 'AIOSEO_PRO_VERSION' ) ) {
+			return true;
+		}
+		if ( defined( 'SEOPRESS_PRO_VERSION' ) ) {
+			return true;
+		}
+		if ( defined( 'THE_SEO_FRAMEWORK_EXTENSION_MANAGER_VERSION' ) ) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Check if a pro-enhanced check is locked (no pro SEO plugin detected).
+	 */
+	private function is_pro_locked( string $check_id ): bool {
+		return self::is_check_pro_locked( $check_id );
+	}
+
+	/**
+	 * Static helper: check if a pro-enhanced check is locked.
+	 *
+	 * @param string $check_id The check ID to test.
+	 * @return bool True if the check requires pro and no pro SEO plugin is active.
+	 */
+	public static function is_check_pro_locked( string $check_id ): bool {
+		if ( ! in_array( $check_id, self::PRO_CHECKS, true ) ) {
+			return false;
+		}
+
+		return ! ( defined( 'RANK_MATH_PRO_VERSION' )
+			|| defined( 'WPSEO_PREMIUM_FILE' )
+			|| defined( 'AIOSEO_PRO_VERSION' )
+			|| defined( 'SEOPRESS_PRO_VERSION' )
+			|| defined( 'THE_SEO_FRAMEWORK_EXTENSION_MANAGER_VERSION' )
+		);
+	}
+
 	public function run_checks(): array {
 		$all_checks = array(
 			// SEO.
@@ -985,9 +1167,12 @@ HTML;
 			'woocommerce_seo'          => $this->check_woocommerce_seo(),
 		);
 
-		// Filter to only enabled checks.
+		// Filter to only enabled checks; skip pro-locked checks on free SEO plugins.
 		$checks = array();
 		foreach ( $all_checks as $check_id => $check_item ) {
+			if ( $this->is_pro_locked( $check_id ) ) {
+				continue;
+			}
 			if ( $this->is_check_enabled( $check_id ) ) {
 				$checks[] = $check_item;
 			}
@@ -1863,14 +2048,18 @@ HTML;
 			);
 		}
 
+		$inactive = $this->find_inactive_plugin( $security_plugins );
+
 		return new Check_Item(
 			id:        'security_plugin',
 			label:     __( 'Security Plugin', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No security plugin detected. Consider installing Wordfence, Sucuri, or Solid Security.', 'scalyn-qa-assistant' ),
+			message:   null !== $inactive
+				? sprintf( __( '%s is deactivated. Click Auto Fix to activate %s.', 'scalyn-qa-assistant' ), $inactive['name'], $inactive['name'] )
+				: __( 'No security plugin detected. Consider installing Wordfence, Sucuri, or Solid Security.', 'scalyn-qa-assistant' ),
 			category:  'functionality',
 			severity:  'warning',
-			quick_fix: null,
+			quick_fix: null !== $inactive ? 'auto_fix' : null,
 			tooltip:   __( 'A security plugin adds firewall protection, malware scanning, and login security to your WordPress site.', 'scalyn-qa-assistant' ),
 		);
 	}
@@ -1920,14 +2109,18 @@ HTML;
 			);
 		}
 
+		$inactive = $this->find_inactive_plugin( $cache_plugins );
+
 		return new Check_Item(
 			id:        'cache_plugin',
 			label:     __( 'Cache Plugin', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No caching plugin detected. Consider installing WP Rocket, LiteSpeed Cache, or WP Super Cache.', 'scalyn-qa-assistant' ),
+			message:   null !== $inactive
+				? sprintf( __( '%s is deactivated. Click Auto Fix to activate %s.', 'scalyn-qa-assistant' ), $inactive['name'], $inactive['name'] )
+				: __( 'No caching plugin detected. Consider installing WP Rocket, LiteSpeed Cache, or WP Super Cache.', 'scalyn-qa-assistant' ),
 			category:  'functionality',
 			severity:  'warning',
-			quick_fix: null,
+			quick_fix: null !== $inactive ? 'auto_fix' : null,
 			tooltip:   __( 'Caching significantly improves page load times and reduces server load. Essential for production sites.', 'scalyn-qa-assistant' ),
 		);
 	}
@@ -2364,14 +2557,18 @@ HTML;
 			);
 		}
 
+		$inactive = $this->find_inactive_plugin( $smtp_plugins );
+
 		return new Check_Item(
 			id:        'smtp_plugin',
 			label:     __( 'SMTP / Mail Plugin', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No SMTP plugin detected. WordPress default mail often lands in spam. Consider WP Mail SMTP or FluentSMTP.', 'scalyn-qa-assistant' ),
+			message:   null !== $inactive
+				? sprintf( __( '%s is deactivated. Click Auto Fix to activate %s.', 'scalyn-qa-assistant' ), $inactive['name'], $inactive['name'] )
+				: __( 'No SMTP plugin detected. WordPress default mail often lands in spam. Consider WP Mail SMTP or FluentSMTP.', 'scalyn-qa-assistant' ),
 			category:  'functionality',
 			severity:  'warning',
-			quick_fix: null,
+			quick_fix: null !== $inactive ? 'auto_fix' : null,
 			tooltip:   __( 'WordPress uses PHP mail() by default which is unreliable. An SMTP plugin routes emails through a proper mail server.', 'scalyn-qa-assistant' ),
 		);
 	}
@@ -2419,14 +2616,18 @@ HTML;
 			);
 		}
 
+		$inactive = $this->find_inactive_plugin( $backup_plugins );
+
 		return new Check_Item(
 			id:        'backup_plugin',
 			label:     __( 'Backup Plugin', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No backup plugin detected. Install UpdraftPlus, BlogVault, or BackWPup to protect your data.', 'scalyn-qa-assistant' ),
+			message:   null !== $inactive
+				? sprintf( __( '%s is deactivated. Click Auto Fix to activate %s.', 'scalyn-qa-assistant' ), $inactive['name'], $inactive['name'] )
+				: __( 'No backup plugin detected. Install UpdraftPlus, BlogVault, or BackWPup to protect your data.', 'scalyn-qa-assistant' ),
 			category:  'functionality',
 			severity:  'warning',
-			quick_fix: null,
+			quick_fix: null !== $inactive ? 'auto_fix' : null,
 			tooltip:   __( 'Without a backup solution, a failed update, hack, or server crash could mean permanent data loss.', 'scalyn-qa-assistant' ),
 		);
 	}
@@ -2473,14 +2674,18 @@ HTML;
 			);
 		}
 
+		$inactive = $this->find_inactive_plugin( $img_plugins );
+
 		return new Check_Item(
 			id:        'image_optimization_plugin',
 			label:     __( 'Image Optimization', 'scalyn-qa-assistant' ),
 			status:    'warning',
-			message:   __( 'No image optimization plugin detected. Consider ShortPixel, Imagify, or Smush for faster page loads.', 'scalyn-qa-assistant' ),
+			message:   null !== $inactive
+				? sprintf( __( '%s is deactivated. Click Auto Fix to activate %s.', 'scalyn-qa-assistant' ), $inactive['name'], $inactive['name'] )
+				: __( 'No image optimization plugin detected. Consider ShortPixel, Imagify, or Smush for faster page loads.', 'scalyn-qa-assistant' ),
 			category:  'functionality',
 			severity:  'info',
-			quick_fix: null,
+			quick_fix: null !== $inactive ? 'auto_fix' : null,
 			tooltip:   __( 'Unoptimized images are the #1 cause of slow page loads. An optimization plugin compresses images automatically on upload.', 'scalyn-qa-assistant' ),
 		);
 	}

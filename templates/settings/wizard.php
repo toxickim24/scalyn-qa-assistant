@@ -32,16 +32,56 @@ try {
 	// Integration detection failed; treat as not detected.
 }
 
-// Plugin install URLs.
-$rankmath_install_url = wp_nonce_url(
-	admin_url( 'update.php?action=install-plugin&plugin=seo-by-rank-math' ),
-	'install-plugin_seo-by-rank-math',
-);
+// Check if plugins are installed (but possibly inactive).
+if ( ! function_exists( 'is_plugin_active' ) ) {
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+}
 
-$yoast_install_url = wp_nonce_url(
-	admin_url( 'update.php?action=install-plugin&plugin=wordpress-seo' ),
-	'install-plugin_wordpress-seo',
-);
+$rankmath_plugin_file     = 'seo-by-rank-math/rank-math.php';
+$rankmath_pro_plugin_file = 'seo-by-rank-math-pro/rank-math-pro.php';
+$yoast_plugin_file        = 'wordpress-seo/wp-seo.php';
+$yoast_pro_plugin_file    = 'wordpress-seo-premium/wp-seo-premium.php';
+
+$rankmath_installed     = file_exists( WP_PLUGIN_DIR . '/' . $rankmath_plugin_file );
+$rankmath_pro_installed = file_exists( WP_PLUGIN_DIR . '/' . $rankmath_pro_plugin_file );
+$rankmath_active        = is_plugin_active( $rankmath_plugin_file );
+$rankmath_pro_active    = is_plugin_active( $rankmath_pro_plugin_file );
+
+$yoast_installed     = file_exists( WP_PLUGIN_DIR . '/' . $yoast_plugin_file );
+$yoast_pro_installed = file_exists( WP_PLUGIN_DIR . '/' . $yoast_pro_plugin_file );
+$yoast_active        = is_plugin_active( $yoast_plugin_file );
+$yoast_pro_active    = is_plugin_active( $yoast_pro_plugin_file );
+
+// Build the appropriate URL and label for each plugin.
+if ( $rankmath_installed ) {
+	$rankmath_url   = wp_nonce_url( admin_url( 'plugins.php?action=activate&plugin=' . urlencode( $rankmath_plugin_file ) ), 'activate-plugin_' . $rankmath_plugin_file );
+	$rankmath_label = __( 'Activate Rank Math', 'scalyn-qa-assistant' );
+	$rankmath_icon  = 'admin-plugins';
+} else {
+	$rankmath_url   = wp_nonce_url( admin_url( 'update.php?action=install-plugin&plugin=seo-by-rank-math' ), 'install-plugin_seo-by-rank-math' );
+	$rankmath_label = __( 'Install Rank Math', 'scalyn-qa-assistant' );
+	$rankmath_icon  = 'download';
+}
+
+if ( $rankmath_pro_installed && ! $rankmath_pro_active ) {
+	$rankmath_pro_url   = wp_nonce_url( admin_url( 'plugins.php?action=activate&plugin=' . urlencode( $rankmath_pro_plugin_file ) ), 'activate-plugin_' . $rankmath_pro_plugin_file );
+	$rankmath_pro_label = __( 'Activate Rank Math Pro', 'scalyn-qa-assistant' );
+}
+
+if ( $yoast_installed ) {
+	$yoast_url   = wp_nonce_url( admin_url( 'plugins.php?action=activate&plugin=' . urlencode( $yoast_plugin_file ) ), 'activate-plugin_' . $yoast_plugin_file );
+	$yoast_label = __( 'Activate Yoast SEO', 'scalyn-qa-assistant' );
+	$yoast_icon  = 'admin-plugins';
+} else {
+	$yoast_url   = wp_nonce_url( admin_url( 'update.php?action=install-plugin&plugin=wordpress-seo' ), 'install-plugin_wordpress-seo' );
+	$yoast_label = __( 'Install Yoast SEO', 'scalyn-qa-assistant' );
+	$yoast_icon  = 'download';
+}
+
+if ( $yoast_pro_installed && ! $yoast_pro_active ) {
+	$yoast_pro_url   = wp_nonce_url( admin_url( 'plugins.php?action=activate&plugin=' . urlencode( $yoast_pro_plugin_file ) ), 'activate-plugin_' . $yoast_pro_plugin_file );
+	$yoast_pro_label = __( 'Activate Yoast Premium', 'scalyn-qa-assistant' );
+}
 ?>
 <div class="scalyn-wrap">
 
@@ -139,13 +179,31 @@ $yoast_install_url = wp_nonce_url(
 						<li><?php esc_html_e( 'Built-in SEO audit tools', 'scalyn-qa-assistant' ); ?></li>
 						<li><?php esc_html_e( 'Google Search Console integration', 'scalyn-qa-assistant' ); ?></li>
 					</ul>
-					<a
-						href="<?php echo esc_url( $rankmath_install_url ); ?>"
-						class="scalyn-btn"
+					<?php if ( $rankmath_installed ) : ?>
+					<button
+						type="button"
+						class="scalyn-btn scalyn-activate-seo-plugin"
+						data-plugin="rank-math"
+					>
+						<span class="dashicons dashicons-admin-plugins" aria-hidden="true"></span>
+						<?php
+						if ( $rankmath_pro_installed ) {
+							esc_html_e( 'Activate Rank Math + Pro', 'scalyn-qa-assistant' );
+						} else {
+							esc_html_e( 'Activate Rank Math', 'scalyn-qa-assistant' );
+						}
+						?>
+					</button>
+					<?php else : ?>
+					<button
+						type="button"
+						class="scalyn-btn scalyn-install-seo-plugin"
+						data-plugin="rank-math"
 					>
 						<span class="dashicons dashicons-download" aria-hidden="true"></span>
 						<?php esc_html_e( 'Install Rank Math', 'scalyn-qa-assistant' ); ?>
-					</a>
+					</button>
+					<?php endif; ?>
 				</div>
 
 				<!-- Yoast SEO -->
@@ -161,13 +219,31 @@ $yoast_install_url = wp_nonce_url(
 						<li><?php esc_html_e( 'XML sitemap generation', 'scalyn-qa-assistant' ); ?></li>
 						<li><?php esc_html_e( 'Social media previews', 'scalyn-qa-assistant' ); ?></li>
 					</ul>
-					<a
-						href="<?php echo esc_url( $yoast_install_url ); ?>"
-						class="scalyn-btn scalyn-btn--secondary"
+					<?php if ( $yoast_installed ) : ?>
+					<button
+						type="button"
+						class="scalyn-btn scalyn-btn--secondary scalyn-activate-seo-plugin"
+						data-plugin="yoast"
+					>
+						<span class="dashicons dashicons-admin-plugins" aria-hidden="true"></span>
+						<?php
+						if ( $yoast_pro_installed ) {
+							esc_html_e( 'Activate Yoast SEO + Premium', 'scalyn-qa-assistant' );
+						} else {
+							esc_html_e( 'Activate Yoast SEO', 'scalyn-qa-assistant' );
+						}
+						?>
+					</button>
+					<?php else : ?>
+					<button
+						type="button"
+						class="scalyn-btn scalyn-btn--secondary scalyn-install-seo-plugin"
+						data-plugin="yoast"
 					>
 						<span class="dashicons dashicons-download" aria-hidden="true"></span>
 						<?php esc_html_e( 'Install Yoast SEO', 'scalyn-qa-assistant' ); ?>
-					</a>
+					</button>
+					<?php endif; ?>
 				</div>
 			</div>
 

@@ -328,23 +328,25 @@ class Content_Analyzer implements Analyzer_Interface {
 	private function check_readability( int $post_id, string $plain_text ): Check_Item {
 		$tooltip = __( 'Readability measures how easy your content is to understand. Aim for short sentences and simple words. Tools like Hemingway Editor can help.', 'scalyn-qa-assistant' );
 
-		// Try to read readability score from SEO plugins.
+		// Try to read readability score from the active SEO plugin.
 		$score  = 0;
 		$source = '';
 
-		// Yoast readability score (0-100).
-		$yoast_rs = get_post_meta( $post_id, '_yoast_wpseo_content_score', true );
-		if ( is_numeric( $yoast_rs ) && (int) $yoast_rs > 0 ) {
-			$score  = (int) $yoast_rs;
-			$source = 'Yoast SEO';
-		}
-
 		// Rank Math content AI score.
-		if ( 0 === $score ) {
+		if ( defined( 'RANK_MATH_VERSION' ) ) {
 			$rm_rs = get_post_meta( $post_id, 'rank_math_contentai_score', true );
 			if ( is_numeric( $rm_rs ) && (int) $rm_rs > 0 ) {
 				$score  = (int) $rm_rs;
 				$source = 'Rank Math';
+			}
+		}
+
+		// Yoast readability score (0-100).
+		if ( 0 === $score && defined( 'WPSEO_VERSION' ) ) {
+			$yoast_rs = get_post_meta( $post_id, '_yoast_wpseo_content_score', true );
+			if ( is_numeric( $yoast_rs ) && (int) $yoast_rs > 0 ) {
+				$score  = (int) $yoast_rs;
+				$source = 'Yoast SEO';
 			}
 		}
 
