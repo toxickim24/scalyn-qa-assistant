@@ -1209,6 +1209,100 @@
         }
     }
 
+    /**
+     * Handle "Generate with AI" for favicon.
+     */
+    function initGenerateFavicon() {
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.scalyn-generate-favicon');
+            if (!btn) return;
+
+            if (typeof ScalynAlert === 'undefined') return;
+
+            ScalynAlert.confirm(
+                'Generate Favicon',
+                'AI will generate a site icon based on your site name. This requires an OpenAI API key.',
+                'Generate'
+            ).then(function (result) {
+                if (!result.isConfirmed) return;
+
+                btn.disabled = true;
+                var origHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="dashicons dashicons-update spin" aria-hidden="true"></span> Generating...';
+                ScalynAlert.loading('Generating favicon with AI...');
+
+                fetchApi('ai/generate-favicon', {
+                    method: 'POST',
+                    body: JSON.stringify({ apply: false }),
+                })
+                    .then(function (response) {
+                        ScalynAlert.close();
+                        var data = response.data || response;
+
+                        if (!data.url || !data.attachment_id) {
+                            ScalynAlert.error('Error', 'Failed to generate favicon.');
+                            btn.disabled = false;
+                            btn.innerHTML = origHtml;
+                            return;
+                        }
+
+                        // Show preview with Apply/Regenerate options.
+                        Swal.fire({
+                            title: 'Favicon Generated',
+                            html: '<div style="text-align:center;margin:1rem 0;">' +
+                                '<img src="' + data.url + '" style="width:128px;height:128px;border-radius:12px;border:2px solid #e5e7eb;image-rendering:auto;" alt="Generated favicon">' +
+                                '<p style="margin-top:0.75rem;font-size:0.8125rem;color:#64748b;">Preview — how it will look in browser tabs</p>' +
+                                '<div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-top:0.5rem;padding:0.5rem;background:#f9fafb;border-radius:8px;">' +
+                                '<img src="' + data.url + '" style="width:16px;height:16px;" alt="">' +
+                                '<span style="font-size:0.75rem;color:#374151;">' + document.title.split(' —')[0] + '</span>' +
+                                '</div>' +
+                                '</div>',
+                            showCancelButton: true,
+                            showDenyButton: true,
+                            confirmButtonText: 'Apply as Site Icon',
+                            denyButtonText: 'Regenerate',
+                            cancelButtonText: 'Cancel',
+                            confirmButtonColor: '#10B981',
+                            denyButtonColor: '#4F46E5',
+                        }).then(function (action) {
+                            if (action.isConfirmed) {
+                                // Apply the generated image as site icon.
+                                ScalynAlert.loading('Applying favicon...');
+                                fetchApi('ai/generate-favicon', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ apply: true, attachment_id: data.attachment_id }),
+                                }).then(function () {
+                                    ScalynAlert.close();
+                                    ScalynAlert.success('Favicon Set', 'Site icon has been updated. Rescanning...').then(function () {
+                                        // Trigger rescan.
+                                        var scanBtn = document.getElementById('scalyn-launch-scan');
+                                        if (scanBtn) scanBtn.click();
+                                    });
+                                }).catch(function (err) {
+                                    ScalynAlert.close();
+                                    ScalynAlert.error('Error', err.message || 'Failed to apply favicon.');
+                                });
+                            } else if (action.isDenied) {
+                                // Regenerate — click the button again.
+                                btn.disabled = false;
+                                btn.innerHTML = origHtml;
+                                btn.click();
+                            } else {
+                                btn.disabled = false;
+                                btn.innerHTML = origHtml;
+                            }
+                        });
+                    })
+                    .catch(function (err) {
+                        ScalynAlert.close();
+                        ScalynAlert.error('Generation Failed', err.message || 'Failed to generate favicon.');
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    });
+            });
+        });
+    }
+
     function init() {
         // Animate existing score circles rendered server-side.
         animateAllScoreCircles();
@@ -1233,6 +1327,7 @@
         initLaunchAiCopy();
         initLaunchAiRegenerate();
         initOnboardingDismiss();
+        initGenerateFavicon();
 
         // Start auto-refresh.
         startAutoRefresh();

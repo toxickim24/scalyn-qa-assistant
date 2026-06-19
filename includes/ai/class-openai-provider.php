@@ -256,14 +256,23 @@ class OpenAI_Provider extends AI_Provider {
 	 * @param string $prompt The image generation prompt.
 	 * @return string Base64-encoded image data (PNG).
 	 */
-	public function generate_image( string $prompt ): string {
+	public function generate_image( string $prompt, string $size = '' ): string {
+		$gpt_size  = '' !== $size ? $size : '1536x1024';
+		$dall_size = '' !== $size ? $size : '1792x1024';
+
+		// DALL-E 3 only supports 1024x1024, 1024x1792, 1792x1024.
+		$dalle_valid = array( '1024x1024', '1024x1792', '1792x1024' );
+		if ( ! in_array( $dall_size, $dalle_valid, true ) ) {
+			$dall_size = '1024x1024';
+		}
+
 		$models = array(
 			array(
 				'params' => array(
 					'model'         => 'gpt-image-1',
 					'prompt'        => $prompt,
 					'n'             => 1,
-					'size'          => '1536x1024',
+					'size'          => $gpt_size,
 					'output_format' => 'png',
 				),
 				'extract' => 'b64_json',
@@ -273,7 +282,7 @@ class OpenAI_Provider extends AI_Provider {
 					'model'   => 'dall-e-3',
 					'prompt'  => $prompt,
 					'n'       => 1,
-					'size'    => '1792x1024',
+					'size'    => $dall_size,
 					'quality' => 'standard',
 				),
 				'extract' => 'url',

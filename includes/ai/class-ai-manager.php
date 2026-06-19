@@ -528,6 +528,99 @@ class AI_Manager {
 	}
 
 	/**
+	 * Generate a favicon/site icon using AI image generation.
+	 *
+	 * Creates a 512x512 icon and optionally sets it as the site icon.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @param bool $apply Whether to immediately set as site icon.
+	 * @return array{attachment_id: int, url: string, provider: string}
+	 */
+	public function generate_favicon( bool $apply = false ): array {
+		if ( ! $this->is_enabled() ) {
+			throw new \RuntimeException( __( 'AI features are not enabled.', 'scalyn-qa-assistant' ) );
+		}
+
+		if ( ! $this->check_rate_limit() ) {
+			throw new \RuntimeException( __( 'Daily AI request limit reached.', 'scalyn-qa-assistant' ) );
+		}
+
+		// Find an OpenAI provider (DALL-E requires OpenAI).
+		$chain    = $this->get_priority_chain();
+		$provider = null;
+
+		foreach ( $chain as $key ) {
+			$p = $this->build_provider_by_key( $key );
+			if ( $p instanceof \Scalyn\QA\AI\OpenAI_Provider ) {
+				$provider = $p;
+				break;
+			}
+		}
+
+		if ( null === $provider ) {
+			throw new \RuntimeException( __( 'AI image generation requires an OpenAI provider. Configure one in Settings → AI Providers.', 'scalyn-qa-assistant' ) );
+		}
+
+		$site_name = get_bloginfo( 'name' );
+		$site_desc = get_bloginfo( 'description' );
+
+		$prompt  = "Create a professional, minimal favicon/site icon for a website called \"{$site_name}\". ";
+		if ( ! empty( $site_desc ) ) {
+			$prompt .= "Description: {$site_desc}. ";
+		}
+		$prompt .= 'Style: Clean, modern, minimal icon design suitable for a browser tab favicon. ';
+		$prompt .= 'Use bold, simple shapes with strong contrast. Should be recognizable at very small sizes (16x16px). ';
+		$prompt .= 'CRITICAL: The image must contain absolutely NO text, NO words, NO letters, NO numbers. Pure iconic imagery only. ';
+		$prompt .= 'Use a clean background. The icon should work as a small square favicon.';
+
+		$start    = microtime( true );
+		$b64_data = $provider->generate_image( $prompt, '1024x1024' );
+		$elapsed  = ( microtime( true ) - $start ) * 1000;
+
+		AI_Health_Monitor::record_success( 'openai', $elapsed );
+		$this->log_request( 0, 'OpenAI', 'gpt-image-1', true, strlen( $prompt ) );
+
+		// Save to media library.
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$filename = sanitize_file_name( sanitize_title( $site_name ) . '-favicon-ai.png' );
+		$tmp      = wp_tempnam( $filename );
+		$decoded  = base64_decode( $b64_data ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+
+		if ( false === $decoded ) {
+			throw new \RuntimeException( __( 'Failed to decode generated image data.', 'scalyn-qa-assistant' ) );
+		}
+
+		file_put_contents( $tmp, $decoded ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+
+		$file_array = array(
+			'name'     => $filename,
+			'tmp_name' => $tmp,
+		);
+
+		$attachment_id = media_handle_sideload( $file_array, 0, $site_name . ' Favicon' );
+
+		if ( is_wp_error( $attachment_id ) ) {
+			@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			throw new \RuntimeException( 'Failed to save favicon: ' . $attachment_id->get_error_message() );
+		}
+
+		if ( $apply ) {
+			update_option( 'site_icon', $attachment_id );
+		}
+
+		return array(
+			'attachment_id' => $attachment_id,
+			'url'           => wp_get_attachment_url( $attachment_id ),
+			'applied'       => $apply,
+			'provider'      => 'OpenAI (GPT Image)',
+		);
+	}
+
+	/**
 	 * Test a provider connection by its key.
 	 *
 	 * @since 1.0.0

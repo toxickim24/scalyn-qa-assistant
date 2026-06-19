@@ -1572,10 +1572,10 @@ HTML;
 			id:        'favicon_exists',
 			label:     'Favicon',
 			status:    'warning',
-			message:   __( 'No site icon (favicon) found. Set one in Appearance > Customize > Site Identity.', 'scalyn-qa-assistant' ),
+			message:   __( 'No site icon (favicon) found. Set one in Appearance > Customize > Site Identity, or generate one with AI.', 'scalyn-qa-assistant' ),
 			category:  'content',
 			severity:  'warning',
-			quick_fix: null,
+			quick_fix: 'generate_ai_favicon',
 			tooltip:   __( 'A favicon improves brand recognition in browser tabs and bookmarks.', 'scalyn-qa-assistant' ),
 		);
 	}

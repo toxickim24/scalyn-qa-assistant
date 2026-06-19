@@ -226,6 +226,19 @@ class AI_Controller extends REST_Controller {
 			),
 		);
 
+		// POST /ai/generate-favicon — generate a site icon with DALL-E.
+		register_rest_route(
+			$this->namespace,
+			'/ai/generate-favicon',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'generate_favicon' ),
+				'permission_callback' => function (): bool {
+					return current_user_can( 'manage_options' );
+				},
+			),
+		);
+
 		// POST /ai/apply-featured-image/{post_id} — set an attachment as the featured image.
 		register_rest_route(
 			$this->namespace,
@@ -693,6 +706,44 @@ PROMPT;
 			$result = $ai_manager->generate_featured_image( $post_id );
 		} catch ( \Throwable $e ) {
 			return $this->error( 'image_generation_failed', $e->getMessage(), 500 );
+		}
+
+		return $this->success( $result );
+	}
+
+	/**
+	 * Generate a favicon/site icon using AI.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @param \WP_REST_Request $request The REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function generate_favicon( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$params        = $request->get_json_params();
+		$apply         = ! empty( $params['apply'] );
+		$attachment_id = absint( $params['attachment_id'] ?? 0 );
+
+		// If applying an already-generated image, just set it as site icon.
+		if ( $apply && $attachment_id > 0 ) {
+			update_option( 'site_icon', $attachment_id );
+			return $this->success( array(
+				'applied'       => true,
+				'attachment_id' => $attachment_id,
+				'message'       => __( 'Site icon updated.', 'scalyn-qa-assistant' ),
+			) );
+		}
+
+		$ai_manager = new AI_Manager();
+
+		if ( ! $ai_manager->is_enabled() ) {
+			return $this->error( 'ai_not_enabled', __( 'AI features are not enabled.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		try {
+			$result = $ai_manager->generate_favicon( false );
+		} catch ( \Throwable $e ) {
+			return $this->error( 'favicon_generation_failed', $e->getMessage(), 500 );
 		}
 
 		return $this->success( $result );

@@ -409,6 +409,17 @@ foreach ( $results as $check ) {
 
 								<?php endif; ?>
 
+								<?php if ( 'favicon_exists' === $check_id && 'pass' !== $c_status && $ai_configured ) : ?>
+								<button
+									type="button"
+									class="scalyn-btn scalyn-btn--small scalyn-btn--ai scalyn-generate-favicon"
+									data-check-id="favicon_exists"
+								>
+									<span class="dashicons dashicons-admin-customizer" aria-hidden="true"></span>
+									<?php esc_html_e( 'Generate with AI', 'scalyn-qa-assistant' ); ?>
+								</button>
+								<?php endif; ?>
+
 								<?php
 								// Show Auto Fix button if:
 								// 1. Check is not passing AND
