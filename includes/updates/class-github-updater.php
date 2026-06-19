@@ -46,11 +46,11 @@ final class GitHub_Updater {
 	private const CACHE_KEY = 'scalyn_qa_github_update';
 
 	/**
-	 * Cache time-to-live in seconds (12 hours).
+	 * Cache time-to-live in seconds (3 hours).
 	 *
 	 * @var int
 	 */
-	private const CACHE_TTL = 12 * HOUR_IN_SECONDS;
+	private const CACHE_TTL = 3 * HOUR_IN_SECONDS;
 
 	/**
 	 * Plugin basename (e.g. "scalyn-qa-assistant/scalyn-qa-assistant.php").
@@ -118,6 +118,20 @@ final class GitHub_Updater {
 
 		// Disable WordPress.org updates for this plugin.
 		add_filter( 'http_request_args', [ $this, 'disable_wporg_update' ], 5, 2 );
+
+		// Clear our GitHub cache when WordPress forces a fresh update check.
+		add_action( 'load-plugins.php', [ $this, 'maybe_clear_cache' ] );
+		add_action( 'load-update-core.php', [ $this, 'maybe_clear_cache' ] );
+		add_action( 'wp_update_plugins', [ $this, 'maybe_clear_cache' ] );
+	}
+
+	/**
+	 * Clear the GitHub release cache so the next update check fetches fresh data.
+	 *
+	 * @since 1.4.2
+	 */
+	public function maybe_clear_cache(): void {
+		delete_transient( self::CACHE_KEY );
 	}
 
 	/**

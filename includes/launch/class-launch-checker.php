@@ -310,7 +310,10 @@ class Launch_Checker {
 
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
+		// Buffer output — some plugins echo content or trigger redirects during activation.
+		ob_start();
 		$result = activate_plugin( $inactive['file'] );
+		ob_end_clean();
 
 		if ( is_wp_error( $result ) ) {
 			return array( 'success' => false, 'message' => $result->get_error_message() );

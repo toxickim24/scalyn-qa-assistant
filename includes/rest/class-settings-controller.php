@@ -570,7 +570,9 @@ class Settings_Controller extends REST_Controller {
 
 		// Activate free version first (pro depends on it).
 		if ( file_exists( WP_PLUGIN_DIR . '/' . $info['free'] ) && ! is_plugin_active( $info['free'] ) ) {
+			ob_start();
 			$result = activate_plugin( $info['free'] );
+			ob_end_clean();
 			if ( is_wp_error( $result ) ) {
 				$errors[] = $result->get_error_message();
 			} else {
@@ -580,7 +582,9 @@ class Settings_Controller extends REST_Controller {
 
 		// Activate pro version if installed.
 		if ( file_exists( WP_PLUGIN_DIR . '/' . $info['pro'] ) && ! is_plugin_active( $info['pro'] ) ) {
+			ob_start();
 			$result = activate_plugin( $info['pro'] );
+			ob_end_clean();
 			if ( is_wp_error( $result ) ) {
 				$errors[] = $result->get_error_message();
 			} else {
