@@ -46,6 +46,7 @@ class Launch_Checker {
 	 * @var array<string, string>
 	 */
 	private const AUTO_FIXABLE = array(
+		'default_plugins_cleanup'  => 'Remove default plugins',
 		'security_plugin'          => 'Activate security plugin',
 		'cache_plugin'             => 'Activate cache plugin',
 		'backup_plugin'            => 'Activate backup plugin',
@@ -104,6 +105,7 @@ class Launch_Checker {
 		}
 
 		return match ( $check_id ) {
+			'default_plugins_cleanup'  => $this->fix_default_plugins(),
 			'comments_open'            => $this->fix_comments_open(),
 			'default_tagline'          => $this->fix_default_tagline( $content ),
 			'default_content_cleanup'  => $this->fix_default_content(),
@@ -1165,6 +1167,7 @@ HTML;
 			'four_oh_four_page'        => $this->check_404_page(),
 			'menu_exists'              => $this->check_menu_exists(),
 			// Plugin health.
+			'default_plugins_cleanup'  => $this->check_default_plugins(),
 			'plugin_conflicts'         => $this->check_plugin_conflicts(),
 			'security_plugin'          => $this->check_security_plugin(),
 			'cache_plugin'             => $this->check_cache_plugin(),
@@ -1553,7 +1556,31 @@ HTML;
 	 * @return Check_Item
 	 */
 	private function check_favicon_exists(): Check_Item {
-		$icon_url = get_site_icon_url();
+		$icon_url    = get_site_icon_url();
+		$icon_id     = (int) get_option( 'site_icon', 0 );
+		$ai_history  = get_option( 'scalyn_qa_ai_favicons', array() );
+		$ai_history  = is_array( $ai_history ) ? $ai_history : array();
+
+		// Build AI favicon list with URLs.
+		$ai_favicons = array();
+		foreach ( $ai_history as $att_id ) {
+			$att_id = (int) $att_id;
+			$url    = wp_get_attachment_url( $att_id );
+			if ( $url ) {
+				$ai_favicons[] = array(
+					'attachment_id' => $att_id,
+					'url'           => $url,
+					'filename'      => basename( get_attached_file( $att_id ) ?: '' ),
+					'is_active'     => $att_id === $icon_id,
+				);
+			}
+		}
+
+		$details = array(
+			'icon_url'    => $icon_url ?: '',
+			'icon_id'     => $icon_id,
+			'ai_favicons' => $ai_favicons,
+		);
 
 		if ( ! empty( $icon_url ) ) {
 			return new Check_Item(
@@ -1563,8 +1590,9 @@ HTML;
 				message:   __( 'Site icon (favicon) is configured.', 'scalyn-qa-assistant' ),
 				category:  'content',
 				severity:  'warning',
+				quick_fix: 'generate_ai_favicon',
 				tooltip:   __( 'A favicon improves brand recognition in browser tabs and bookmarks.', 'scalyn-qa-assistant' ),
-				details:   array( 'icon_url' => $icon_url ),
+				details:   $details,
 			);
 		}
 
@@ -1577,6 +1605,7 @@ HTML;
 			severity:  'warning',
 			quick_fix: 'generate_ai_favicon',
 			tooltip:   __( 'A favicon improves brand recognition in browser tabs and bookmarks.', 'scalyn-qa-assistant' ),
+			details:   $details,
 		);
 	}
 
@@ -1734,6 +1763,108 @@ HTML;
 	 *
 	 * @return Check_Item
 	 */
+	/**
+	 * Check if default WordPress plugins (Akismet, Hello Dolly) are still installed.
+	 *
+	 * @since 1.4.4
+	 */
+	private function check_default_plugins(): Check_Item {
+		if ( ! function_exists( 'is_plugin_active' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$default_plugins = array(
+			'akismet/akismet.php'          => 'Akismet Anti-spam',
+			'hello.php'                    => 'Hello Dolly',
+			'hello-dolly/hello.php'        => 'Hello Dolly',
+		);
+
+		$found = array();
+		foreach ( $default_plugins as $file => $name ) {
+			if ( file_exists( WP_PLUGIN_DIR . '/' . $file ) ) {
+				$found[ $file ] = $name;
+			}
+		}
+
+		if ( empty( $found ) ) {
+			return new Check_Item(
+				id:        'default_plugins_cleanup',
+				label:     __( 'Default Plugins Cleanup', 'scalyn-qa-assistant' ),
+				status:    'pass',
+				message:   __( 'Default WordPress plugins (Akismet, Hello Dolly) have been removed.', 'scalyn-qa-assistant' ),
+				category:  'plugin_health',
+				severity:  'info',
+				quick_fix: null,
+				tooltip:   __( 'Fresh WordPress installs include Akismet and Hello Dolly. These are unnecessary for most sites and should be removed to keep the plugin list clean.', 'scalyn-qa-assistant' ),
+			);
+		}
+
+		$names = array_unique( array_values( $found ) );
+
+		return new Check_Item(
+			id:        'default_plugins_cleanup',
+			label:     __( 'Default Plugins Cleanup', 'scalyn-qa-assistant' ),
+			status:    'warning',
+			message:   sprintf(
+				__( 'Default WordPress plugins still installed: %s. Click Auto Fix to remove them.', 'scalyn-qa-assistant' ),
+				implode( ', ', $names ),
+			),
+			category:  'plugin_health',
+			severity:  'info',
+			quick_fix: 'auto_fix',
+			tooltip:   __( 'Fresh WordPress installs include Akismet and Hello Dolly. These are unnecessary for most sites and should be removed to keep the plugin list clean.', 'scalyn-qa-assistant' ),
+			details:   array( 'plugins' => $found ),
+		);
+	}
+
+	/**
+	 * Fix: deactivate and delete default WordPress plugins.
+	 *
+	 * @since 1.4.4
+	 */
+	private function fix_default_plugins(): array {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+
+		$default_plugins = array(
+			'akismet/akismet.php'   => 'Akismet',
+			'hello.php'            => 'Hello Dolly',
+			'hello-dolly/hello.php' => 'Hello Dolly',
+		);
+
+		$removed = array();
+
+		foreach ( $default_plugins as $file => $name ) {
+			if ( ! file_exists( WP_PLUGIN_DIR . '/' . $file ) ) {
+				continue;
+			}
+
+			// Deactivate first if active.
+			if ( is_plugin_active( $file ) ) {
+				deactivate_plugins( $file, true );
+			}
+
+			// Delete the plugin.
+			$result = delete_plugins( array( $file ) );
+
+			if ( ! is_wp_error( $result ) ) {
+				$removed[] = $name;
+			}
+		}
+
+		if ( empty( $removed ) ) {
+			return array( 'success' => false, 'message' => __( 'No default plugins found to remove.', 'scalyn-qa-assistant' ) );
+		}
+
+		return array(
+			'success' => true,
+			'message' => sprintf(
+				__( 'Removed: %s.', 'scalyn-qa-assistant' ),
+				implode( ', ', array_unique( $removed ) ),
+			),
+		);
+	}
+
 	private function check_plugin_conflicts(): Check_Item {
 		if ( ! function_exists( 'is_plugin_active' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';

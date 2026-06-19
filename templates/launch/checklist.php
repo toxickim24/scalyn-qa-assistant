@@ -75,6 +75,7 @@ $category_map = array(
 	'four_oh_four_page'        => 'content',
 	'menu_exists'              => 'content',
 	// Plugin health.
+	'default_plugins_cleanup'  => 'plugin_health',
 	'plugin_conflicts'         => 'plugin_health',
 	'security_plugin'          => 'plugin_health',
 	'cache_plugin'             => 'plugin_health',
@@ -409,7 +410,7 @@ foreach ( $results as $check ) {
 
 								<?php endif; ?>
 
-								<?php if ( 'favicon_exists' === $check_id && 'pass' !== $c_status && $ai_configured ) : ?>
+								<?php if ( 'favicon_exists' === $check_id && $ai_configured && empty( get_option( 'scalyn_qa_ai_favicons', array() ) ) ) : ?>
 								<button
 									type="button"
 									class="scalyn-btn scalyn-btn--small scalyn-btn--ai scalyn-generate-favicon"
@@ -461,6 +462,72 @@ foreach ( $results as $check ) {
 								</button>
 								<?php endif; ?>
 							</div>
+
+							<?php
+							// Inline AI favicon panel — load live from wp_options (not stored scan results).
+							if ( 'favicon_exists' === $check_id ) :
+								$fav_history     = get_option( 'scalyn_qa_ai_favicons', array() );
+								$fav_history     = is_array( $fav_history ) ? $fav_history : array();
+								$current_icon_id = (int) get_option( 'site_icon', 0 );
+								$current_icon_url = get_site_icon_url();
+
+								$ai_favicons = array();
+								foreach ( $fav_history as $att_id ) {
+									$att_id = (int) $att_id;
+									$url    = wp_get_attachment_url( $att_id );
+									if ( $url ) {
+										$ai_favicons[] = array(
+											'attachment_id' => $att_id,
+											'url'           => $url,
+											'filename'      => basename( get_attached_file( $att_id ) ?: '' ),
+											'is_active'     => $att_id === $current_icon_id,
+										);
+									}
+								}
+
+								if ( ! empty( $ai_favicons ) ) :
+							?>
+							<div class="scalyn-ai-featured-image-results scalyn-favicon-preview" data-check-id="favicon_exists">
+								<div class="scalyn-ai-inline-result">
+									<div class="scalyn-ai-inline-result__content">
+										<span class="scalyn-ai-inline-result__label"><?php esc_html_e( 'AI Generated Favicons', 'scalyn-qa-assistant' ); ?></span>
+										<div class="scalyn-fi-grid">
+											<?php foreach ( $ai_favicons as $fi_idx => $fav ) :
+												$is_active   = $fav['is_active'];
+												$is_selected = $is_active || ( ! $current_icon_id && 0 === $fi_idx );
+											?>
+											<label class="scalyn-fi-option<?php echo $is_selected ? ' selected' : ''; ?>">
+												<img src="<?php echo esc_url( $fav['url'] ); ?>" alt="<?php echo esc_attr( $fav['filename'] ); ?>" />
+												<div class="scalyn-fi-option-footer">
+													<input type="radio" name="scalyn-favicon-choice" value="<?php echo esc_attr( (string) $fav['attachment_id'] ); ?>" <?php checked( $is_selected ); ?> class="scalyn-favicon-radio">
+													<span><?php echo esc_html( $fav['filename'] ); ?></span>
+													<?php if ( $is_active ) : ?>
+														<span style="color:var(--scalyn-success);font-size:0.6875rem;margin-left:auto;"><?php esc_html_e( '(active)', 'scalyn-qa-assistant' ); ?></span>
+													<?php endif; ?>
+												</div>
+											</label>
+											<?php endforeach; ?>
+										</div>
+										<span class="scalyn-ai-inline-result__meta"></span>
+									</div>
+									<div class="scalyn-ai-inline-result__actions">
+										<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-favicon-apply-selected" data-current="<?php echo esc_attr( (string) $current_icon_id ); ?>">
+											<span class="dashicons dashicons-yes" aria-hidden="true"></span>
+											<?php esc_html_e( 'Apply', 'scalyn-qa-assistant' ); ?>
+										</button>
+										<?php if ( $ai_configured ) : ?>
+										<button type="button" class="scalyn-btn scalyn-btn--small scalyn-generate-favicon" data-check-id="favicon_exists">
+											<span class="dashicons dashicons-update" aria-hidden="true"></span>
+											<?php esc_html_e( 'Regenerate', 'scalyn-qa-assistant' ); ?>
+										</button>
+										<?php endif; ?>
+									</div>
+								</div>
+							</div>
+							<?php
+								endif;
+							endif;
+							?>
 
 							<?php
 							// Inline AI panel — visible as long as AI content exists for this check.

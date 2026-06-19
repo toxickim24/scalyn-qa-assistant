@@ -608,6 +608,12 @@ class AI_Manager {
 			throw new \RuntimeException( 'Failed to save favicon: ' . $attachment_id->get_error_message() );
 		}
 
+		// Track AI-generated favicon history.
+		$history   = get_option( 'scalyn_qa_ai_favicons', array() );
+		$history   = is_array( $history ) ? $history : array();
+		$history[] = $attachment_id;
+		update_option( 'scalyn_qa_ai_favicons', array_unique( $history ), false );
+
 		if ( $apply ) {
 			update_option( 'site_icon', $attachment_id );
 		}
@@ -615,6 +621,7 @@ class AI_Manager {
 		return array(
 			'attachment_id' => $attachment_id,
 			'url'           => wp_get_attachment_url( $attachment_id ),
+			'filename'      => basename( get_attached_file( $attachment_id ) ?: '' ),
 			'applied'       => $apply,
 			'provider'      => 'OpenAI (GPT Image)',
 		);

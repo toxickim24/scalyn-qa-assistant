@@ -91,6 +91,7 @@ class Launch_Page {
 			'four_oh_four_page'        => 'content',
 			'menu_exists'              => 'content',
 			// Plugin health.
+			'default_plugins_cleanup'  => 'plugin_health',
 			'plugin_conflicts'         => 'plugin_health',
 			'security_plugin'          => 'plugin_health',
 			'cache_plugin'             => 'plugin_health',

@@ -1214,93 +1214,168 @@
      */
     function initGenerateFavicon() {
         document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.scalyn-generate-favicon');
-            if (!btn) return;
+            // Generate button.
+            var genBtn = e.target.closest('.scalyn-generate-favicon');
+            if (genBtn) {
+                handleFaviconGenerate(genBtn);
+                return;
+            }
 
-            if (typeof ScalynAlert === 'undefined') return;
+            // Regenerate button.
+            var regenBtn = e.target.closest('.scalyn-favicon-regenerate');
+            if (regenBtn) {
+                var origGenBtn = regenBtn.closest('.scalyn-check-item').querySelector('.scalyn-generate-favicon');
+                if (origGenBtn) handleFaviconGenerate(origGenBtn);
+                return;
+            }
 
-            ScalynAlert.confirm(
-                'Generate Favicon',
-                'AI will generate a site icon based on your site name. This requires an OpenAI API key.',
-                'Generate'
-            ).then(function (result) {
-                if (!result.isConfirmed) return;
+            // Apply button (inline after generation).
+            var applyBtn = e.target.closest('.scalyn-favicon-apply');
+            if (applyBtn) {
+                var attachmentId = applyBtn.getAttribute('data-attachment-id');
+                if (!attachmentId) return;
+                applyFavicon(applyBtn, parseInt(attachmentId, 10));
+                return;
+            }
 
-                btn.disabled = true;
-                var origHtml = btn.innerHTML;
-                btn.innerHTML = '<span class="dashicons dashicons-update spin" aria-hidden="true"></span> Generating...';
+            // Apply selected (from radio list).
+            var applySelectedBtn = e.target.closest('.scalyn-favicon-apply-selected');
+            if (applySelectedBtn) {
+                var selected = document.querySelector('.scalyn-favicon-radio:checked');
+                if (!selected) {
+                    ScalynAlert && ScalynAlert.error('Error', 'Select a favicon first.');
+                    return;
+                }
+                var currentId = applySelectedBtn.getAttribute('data-current');
+                if (selected.value === currentId) {
+                    ScalynAlert && ScalynAlert.toast('This favicon is already active.');
+                    return;
+                }
+                applyFavicon(applySelectedBtn, parseInt(selected.value, 10));
+                return;
+            }
+
+            // Radio change — update selected class (same pattern as featured image).
+            var radio = e.target.closest('.scalyn-favicon-radio');
+            if (radio) {
+                var panel = radio.closest('.scalyn-favicon-preview');
+                if (!panel) return;
+                panel.querySelectorAll('.scalyn-fi-option').forEach(function (opt) {
+                    opt.classList.toggle('selected', opt.contains(radio));
+                });
+                return;
+            }
+        });
+
+        function applyFavicon(btn, attachmentId) {
+            btn.disabled = true;
+            var origText = btn.textContent;
+            btn.textContent = 'Applying...';
+
+            fetchApi('ai/generate-favicon', {
+                method: 'POST',
+                body: JSON.stringify({ apply: true, attachment_id: attachmentId }),
+            }).then(function () {
+                ScalynAlert && ScalynAlert.toast('Favicon set! Rescanning...');
+                var scanBtn = document.getElementById('scalyn-launch-scan');
+                if (scanBtn) scanBtn.click();
+            }).catch(function (err) {
+                ScalynAlert && ScalynAlert.error('Error', err.message || 'Failed to apply favicon.');
+                btn.disabled = false;
+                btn.textContent = origText;
+            });
+        }
+
+        function handleFaviconGenerate(btn) {
+            var checkItem = btn.closest('.scalyn-check-item');
+            if (!checkItem) return;
+
+            btn.disabled = true;
+            var origHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="dashicons dashicons-update spin" aria-hidden="true"></span> Generating...';
+
+            if (typeof ScalynAlert !== 'undefined') {
                 ScalynAlert.loading('Generating favicon with AI...');
+            }
 
-                fetchApi('ai/generate-favicon', {
-                    method: 'POST',
-                    body: JSON.stringify({ apply: false }),
-                })
-                    .then(function (response) {
-                        ScalynAlert.close();
-                        var data = response.data || response;
+            fetchApi('ai/generate-favicon', {
+                method: 'POST',
+                body: JSON.stringify({ apply: false }),
+            })
+                .then(function (response) {
+                    ScalynAlert && ScalynAlert.close();
+                    var data = response.data || response;
 
-                        if (!data.url || !data.attachment_id) {
-                            ScalynAlert.error('Error', 'Failed to generate favicon.');
-                            btn.disabled = false;
-                            btn.innerHTML = origHtml;
-                            return;
-                        }
-
-                        // Show preview with Apply/Regenerate options.
-                        Swal.fire({
-                            title: 'Favicon Generated',
-                            html: '<div style="text-align:center;margin:1rem 0;">' +
-                                '<img src="' + data.url + '" style="width:128px;height:128px;border-radius:12px;border:2px solid #e5e7eb;image-rendering:auto;" alt="Generated favicon">' +
-                                '<p style="margin-top:0.75rem;font-size:0.8125rem;color:#64748b;">Preview — how it will look in browser tabs</p>' +
-                                '<div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-top:0.5rem;padding:0.5rem;background:#f9fafb;border-radius:8px;">' +
-                                '<img src="' + data.url + '" style="width:16px;height:16px;" alt="">' +
-                                '<span style="font-size:0.75rem;color:#374151;">' + document.title.split(' —')[0] + '</span>' +
-                                '</div>' +
-                                '</div>',
-                            showCancelButton: true,
-                            showDenyButton: true,
-                            confirmButtonText: 'Apply as Site Icon',
-                            denyButtonText: 'Regenerate',
-                            cancelButtonText: 'Cancel',
-                            confirmButtonColor: '#10B981',
-                            denyButtonColor: '#4F46E5',
-                        }).then(function (action) {
-                            if (action.isConfirmed) {
-                                // Apply the generated image as site icon.
-                                ScalynAlert.loading('Applying favicon...');
-                                fetchApi('ai/generate-favicon', {
-                                    method: 'POST',
-                                    body: JSON.stringify({ apply: true, attachment_id: data.attachment_id }),
-                                }).then(function () {
-                                    ScalynAlert.close();
-                                    ScalynAlert.success('Favicon Set', 'Site icon has been updated. Rescanning...').then(function () {
-                                        // Trigger rescan.
-                                        var scanBtn = document.getElementById('scalyn-launch-scan');
-                                        if (scanBtn) scanBtn.click();
-                                    });
-                                }).catch(function (err) {
-                                    ScalynAlert.close();
-                                    ScalynAlert.error('Error', err.message || 'Failed to apply favicon.');
-                                });
-                            } else if (action.isDenied) {
-                                // Regenerate — click the button again.
-                                btn.disabled = false;
-                                btn.innerHTML = origHtml;
-                                btn.click();
-                            } else {
-                                btn.disabled = false;
-                                btn.innerHTML = origHtml;
-                            }
-                        });
-                    })
-                    .catch(function (err) {
-                        ScalynAlert.close();
-                        ScalynAlert.error('Generation Failed', err.message || 'Failed to generate favicon.');
+                    if (!data.url || !data.attachment_id) {
+                        ScalynAlert && ScalynAlert.error('Error', 'Failed to generate favicon.');
                         btn.disabled = false;
                         btn.innerHTML = origHtml;
-                    });
-            });
-        });
+                        return;
+                    }
+
+                    var existingPanel = checkItem.querySelector('.scalyn-favicon-preview');
+                    var filename = data.filename || ('favicon-' + data.attachment_id + '.png');
+
+                    if (existingPanel) {
+                        // Add to existing grid.
+                        var grid = existingPanel.querySelector('.scalyn-fi-grid');
+                        if (grid) {
+                            // Deselect all.
+                            existingPanel.querySelectorAll('.scalyn-favicon-radio').forEach(function (r) { r.checked = false; });
+                            existingPanel.querySelectorAll('.scalyn-fi-option').forEach(function (o) { o.classList.remove('selected'); });
+
+                            var newLabel = document.createElement('label');
+                            newLabel.className = 'scalyn-fi-option selected';
+                            newLabel.innerHTML = '<img src="' + data.url + '" alt="' + filename + '" />' +
+                                '<div class="scalyn-fi-option-footer">' +
+                                    '<input type="radio" name="scalyn-favicon-choice" value="' + data.attachment_id + '" checked class="scalyn-favicon-radio">' +
+                                    '<span>' + filename + '</span>' +
+                                '</div>';
+                            grid.appendChild(newLabel);
+                        }
+                    } else {
+                        // Create new panel matching featured image design.
+                        var panel = document.createElement('div');
+                        panel.className = 'scalyn-ai-featured-image-results scalyn-favicon-preview';
+                        panel.setAttribute('data-check-id', 'favicon_exists');
+
+                        panel.innerHTML = '<div class="scalyn-ai-inline-result">' +
+                            '<div class="scalyn-ai-inline-result__content">' +
+                                '<span class="scalyn-ai-inline-result__label">AI Generated Favicons</span>' +
+                                '<div class="scalyn-fi-grid">' +
+                                    '<label class="scalyn-fi-option selected">' +
+                                        '<img src="' + data.url + '" alt="' + filename + '" />' +
+                                        '<div class="scalyn-fi-option-footer">' +
+                                            '<input type="radio" name="scalyn-favicon-choice" value="' + data.attachment_id + '" checked class="scalyn-favicon-radio">' +
+                                            '<span>' + filename + '</span>' +
+                                        '</div>' +
+                                    '</label>' +
+                                '</div>' +
+                                '<span class="scalyn-ai-inline-result__meta">' + (data.provider || 'OpenAI') + '</span>' +
+                            '</div>' +
+                            '<div class="scalyn-ai-inline-result__actions">' +
+                                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-btn--secondary scalyn-favicon-apply-selected" data-current="0">' +
+                                    '<span class="dashicons dashicons-yes" aria-hidden="true"></span> Apply' +
+                                '</button>' +
+                                '<button type="button" class="scalyn-btn scalyn-btn--small scalyn-generate-favicon" data-check-id="favicon_exists">' +
+                                    '<span class="dashicons dashicons-update" aria-hidden="true"></span> Regenerate' +
+                                '</button>' +
+                            '</div>' +
+                        '</div>';
+
+                        checkItem.appendChild(panel);
+                    }
+
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                })
+                .catch(function (err) {
+                    ScalynAlert && ScalynAlert.close();
+                    ScalynAlert && ScalynAlert.error('Generation Failed', err.message || 'Failed to generate favicon.');
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                });
+        }
     }
 
     function init() {

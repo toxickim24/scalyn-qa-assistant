@@ -61,9 +61,9 @@ $overall_label  = match ( $overall_status ) {
 		<span class="scalyn-version"><?php echo esc_html( 'v' . SCALYN_QA_VERSION ); ?></span>
 	</div>
 
-	<?php if ( ! empty( $onboarding ) && empty( $onboarding['dismissed'] ) ) : ?>
+	<?php if ( ! empty( $onboarding ) && ( empty( $onboarding['dismissed'] ) || ! empty( $onboarding['all_complete'] ) ) ) : ?>
 		<?php include SCALYN_QA_PLUGIN_DIR . 'templates/dashboard/widgets/getting-started.php'; ?>
-	<?php elseif ( ! empty( $onboarding['dismissed'] ) ) : ?>
+	<?php elseif ( ! empty( $onboarding['dismissed'] ) && empty( $onboarding['all_complete'] ) ) : ?>
 		<div id="scalyn-onboarding-reset-bar" style="text-align:right;margin-bottom:0.25rem;">
 			<button type="button" id="scalyn-show-onboarding" class="scalyn-btn scalyn-btn--small scalyn-btn--ghost" style="font-size:0.75rem;">
 				<span class="dashicons dashicons-info-outline" aria-hidden="true" style="font-size:14px;width:14px;height:14px;margin-right:2px;"></span>

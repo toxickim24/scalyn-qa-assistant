@@ -51,9 +51,11 @@ foreach ( $core_steps as $i => $step ) {
 				<?php endif; ?>
 			</span>
 		</div>
+		<?php if ( ! $all_complete ) : ?>
 		<button type="button" class="scalyn-onboarding__dismiss" title="<?php esc_attr_e( 'Dismiss', 'scalyn-qa-assistant' ); ?>">
 			<span class="dashicons dashicons-no-alt"></span>
 		</button>
+		<?php endif; ?>
 	</div>
 
 	<!-- Progress Bar -->

@@ -84,6 +84,7 @@ $check_categories = array(
 	'plugin_health' => array(
 		'label'  => __( 'Plugin Health', 'scalyn-qa-assistant' ),
 		'checks' => array(
+			'default_plugins_cleanup'   => __( 'Default Plugins Cleanup', 'scalyn-qa-assistant' ),
 			'plugin_conflicts'          => __( 'Plugin Conflicts', 'scalyn-qa-assistant' ),
 			'security_plugin'           => __( 'Security Plugin', 'scalyn-qa-assistant' ),
 			'cache_plugin'              => __( 'Cache Plugin', 'scalyn-qa-assistant' ),
