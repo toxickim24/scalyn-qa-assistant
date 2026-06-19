@@ -1053,26 +1053,48 @@ class Settings_Controller extends REST_Controller {
 
 		$plugin_basename = SCALYN_QA_PLUGIN_BASENAME;
 
-		// Get the update info from WordPress transient.
-		$transient = get_site_transient( 'update_plugins' );
+		// Get the download URL directly from GitHub (don't rely on WP transient).
+		$updater = new GitHub_Updater();
+		$release = $updater->get_latest_release( true );
 
-		if ( ! isset( $transient->response[ $plugin_basename ] ) ) {
-			// Force a fresh check.
-			$updater = new GitHub_Updater();
-			$updater->manual_check();
-			$transient = get_site_transient( 'update_plugins' );
+		if ( is_wp_error( $release ) ) {
+			return $this->error( 'check_failed', $release->get_error_message(), 500 );
 		}
 
-		if ( ! isset( $transient->response[ $plugin_basename ] ) ) {
+		$latest_version = ltrim( trim( $release['tag_name'] ?? '' ), 'vV' );
+
+		if ( empty( $latest_version ) || version_compare( SCALYN_QA_VERSION, $latest_version, '>=' ) ) {
 			return $this->error( 'no_update', __( 'No update available.', 'scalyn-qa-assistant' ), 400 );
 		}
 
-		$update  = $transient->response[ $plugin_basename ];
-		$package = $update->package ?? '';
+		// Find the download URL — prefer .zip asset, fallback to source zipball.
+		$package = '';
+		foreach ( $release['assets'] ?? array() as $asset ) {
+			if ( str_ends_with( $asset['name'] ?? '', '.zip' ) && ! empty( $asset['browser_download_url'] ) ) {
+				$package = $asset['browser_download_url'];
+				break;
+			}
+		}
+		if ( '' === $package ) {
+			$package = $release['zipball_url'] ?? '';
+		}
 
-		if ( empty( $package ) ) {
+		if ( '' === $package ) {
 			return $this->error( 'no_package', __( 'No download URL found for this update.', 'scalyn-qa-assistant' ), 400 );
 		}
+
+		// Inject into WP transient so Plugin_Upgrader can find it.
+		$transient = get_site_transient( 'update_plugins' );
+		if ( ! is_object( $transient ) ) {
+			$transient = new \stdClass();
+		}
+		$transient->response[ $plugin_basename ] = (object) array(
+			'slug'        => 'scalyn-qa-assistant',
+			'plugin'      => $plugin_basename,
+			'new_version' => $latest_version,
+			'package'     => $package,
+		);
+		set_site_transient( 'update_plugins', $transient );
 
 		// Run the upgrade.
 		$skin     = new \Automatic_Upgrader_Skin();
