@@ -119,6 +119,10 @@ $max_ai_requests_per_day  = isset( $settings['max_ai_requests_per_day'] ) ? (int
 			<button type="button" class="scalyn-btn" id="scalyn-check-updates">
 				<?php esc_html_e( 'Check for Updates', 'scalyn-qa-assistant' ); ?>
 			</button>
+			<button type="button" class="scalyn-btn scalyn-btn--secondary" id="scalyn-update-now" style="display:none;">
+				<span class="dashicons dashicons-update" aria-hidden="true"></span>
+				<?php esc_html_e( 'Update Now', 'scalyn-qa-assistant' ); ?>
+			</button>
 			<button type="button" class="scalyn-btn scalyn-btn--secondary" id="scalyn-save-github-settings">
 				<?php esc_html_e( 'Save GitHub Settings', 'scalyn-qa-assistant' ); ?>
 			</button>

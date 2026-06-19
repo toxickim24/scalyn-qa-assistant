@@ -274,6 +274,7 @@ class Launch_Checker {
 				'duplicator/duplicator.php'                  => 'Duplicator',
 				'blogvault-real-time-backup/developer.php'   => 'BlogVault',
 				'all-in-one-wp-migration/all-in-one-wp-migration.php' => 'All-in-One WP Migration',
+				'All-In-One-WP-Migration-With-Import-master/all-in-one-wp-migration-wi.php' => 'All-in-One WP Migration',
 				'jetpack/jetpack.php'                        => 'Jetpack',
 				'backup-backup/developer.php'                => 'Starter Templates',
 			),
@@ -310,14 +311,25 @@ class Launch_Checker {
 
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
-		// Buffer output — some plugins echo content or trigger redirects during activation.
+		// Prevent plugins from redirecting during activation (kills REST response).
+		add_filter( 'wp_redirect', '__return_false', 9999 );
+
+		// Buffer output — some plugins echo content during activation.
 		ob_start();
-		$result = activate_plugin( $inactive['file'] );
+
+		// Use silent activation to prevent activation hooks from interfering.
+		$result = activate_plugin( $inactive['file'], '', false, true );
+
 		ob_end_clean();
+
+		remove_filter( 'wp_redirect', '__return_false', 9999 );
 
 		if ( is_wp_error( $result ) ) {
 			return array( 'success' => false, 'message' => $result->get_error_message() );
 		}
+
+		// Manually fire the activation hook now that we're safe.
+		do_action( 'activated_plugin', $inactive['file'], false );
 
 		return array(
 			'success' => true,

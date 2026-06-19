@@ -1191,6 +1191,8 @@
                         latestEl.innerHTML = '<code>' + data.latest_version + '</code>';
                         if (data.status === 'update_available') {
                             latestEl.innerHTML += ' <span style="color:var(--scalyn-warning);font-weight:600;">— Update available</span>';
+                            var updateBtn = document.getElementById('scalyn-update-now');
+                            if (updateBtn) updateBtn.style.display = '';
                         } else {
                             latestEl.innerHTML += ' <span style="color:var(--scalyn-success);">✓ Up to date</span>';
                         }
@@ -1255,9 +1257,15 @@
                             statusEl.style.color = data.status === 'error' ? '#EF4444' : '#10B981';
                         }
 
+                        // Show/hide Update Now button.
+                        var updateBtn = document.getElementById('scalyn-update-now');
+                        if (updateBtn) {
+                            updateBtn.style.display = data.status === 'update_available' ? '' : 'none';
+                        }
+
                         if (typeof ScalynAlert !== 'undefined') {
                             if (data.status === 'update_available') {
-                                ScalynAlert.success('Update Available', 'Version ' + data.latest_version + ' is available.');
+                                ScalynAlert.success('Update Available', 'Version ' + data.latest_version + ' is available. Click "Update Now" to install.');
                             } else if (data.status === 'up_to_date') {
                                 ScalynAlert.toast('You are running the latest version.', 'success');
                             } else if (data.status === 'error' && data.message && data.message.indexOf('No GitHub release') !== -1) {
@@ -1322,6 +1330,43 @@
                             ScalynAlert.error('Error', 'Failed to save GitHub settings.');
                         }
                     });
+            });
+        }
+
+        // Update Now button.
+        var updateBtn = document.getElementById('scalyn-update-now');
+        if (updateBtn) {
+            updateBtn.addEventListener('click', function () {
+                if (typeof ScalynAlert === 'undefined') return;
+
+                ScalynAlert.confirm(
+                    'Update Plugin',
+                    'This will download and install the latest version. The page will reload after the update.',
+                    'Update Now'
+                ).then(function (result) {
+                    if (!result.isConfirmed) return;
+
+                    updateBtn.disabled = true;
+                    updateBtn.textContent = 'Updating...';
+                    ScalynAlert.loading('Installing update...');
+
+                    fetchApi('updates/install', { method: 'POST' })
+                        .then(function (response) {
+                            ScalynAlert.close();
+                            var data = response.data || response;
+                            if (data.updated) {
+                                ScalynAlert.success('Updated', data.message || 'Update installed successfully.').then(function () {
+                                    window.location.reload();
+                                });
+                            }
+                        })
+                        .catch(function (err) {
+                            ScalynAlert.close();
+                            ScalynAlert.error('Update Failed', err.message || 'Failed to install update.');
+                            updateBtn.disabled = false;
+                            updateBtn.innerHTML = '<span class="dashicons dashicons-update" aria-hidden="true"></span> Update Now';
+                        });
+                });
             });
         }
     }

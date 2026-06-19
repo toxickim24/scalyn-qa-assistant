@@ -126,12 +126,13 @@ final class GitHub_Updater {
 	}
 
 	/**
-	 * Clear the GitHub release cache so the next update check fetches fresh data.
+	 * Clear GitHub cache and force WordPress to re-check for updates.
 	 *
 	 * @since 1.4.2
 	 */
 	public function maybe_clear_cache(): void {
 		delete_transient( self::CACHE_KEY );
+		delete_site_transient( 'update_plugins' );
 	}
 
 	/**

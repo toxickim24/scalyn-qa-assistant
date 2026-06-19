@@ -200,6 +200,17 @@ class Settings_Controller extends REST_Controller {
 			)
 		);
 
+		// POST /updates/install — install available update.
+		register_rest_route(
+			$this->namespace,
+			'/updates/install',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'install_update' ),
+				'permission_callback' => array( $this, 'check_manage_permission' ),
+			)
+		);
+
 		// POST /updates/save-token — save GitHub settings (owner, repo, token).
 		register_rest_route(
 			$this->namespace,
@@ -1019,6 +1030,82 @@ class Settings_Controller extends REST_Controller {
 		$result  = $updater->manual_check();
 
 		return $this->success( $result );
+	}
+
+	/**
+	 * POST /updates/install — install the available plugin update.
+	 *
+	 * Uses the WordPress Plugin_Upgrader to install the update directly.
+	 *
+	 * @since 1.4.3
+	 *
+	 * @param \WP_REST_Request $request The request object.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function install_update( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			return $this->error( 'forbidden', __( 'You do not have permission to update plugins.', 'scalyn-qa-assistant' ), 403 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+
+		$plugin_basename = SCALYN_QA_PLUGIN_BASENAME;
+
+		// Get the update info from WordPress transient.
+		$transient = get_site_transient( 'update_plugins' );
+
+		if ( ! isset( $transient->response[ $plugin_basename ] ) ) {
+			// Force a fresh check.
+			$updater = new GitHub_Updater();
+			$updater->manual_check();
+			$transient = get_site_transient( 'update_plugins' );
+		}
+
+		if ( ! isset( $transient->response[ $plugin_basename ] ) ) {
+			return $this->error( 'no_update', __( 'No update available.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		$update  = $transient->response[ $plugin_basename ];
+		$package = $update->package ?? '';
+
+		if ( empty( $package ) ) {
+			return $this->error( 'no_package', __( 'No download URL found for this update.', 'scalyn-qa-assistant' ), 400 );
+		}
+
+		// Run the upgrade.
+		$skin     = new \Automatic_Upgrader_Skin();
+		$upgrader = new \Plugin_Upgrader( $skin );
+
+		ob_start();
+		$result = $upgrader->upgrade( $plugin_basename );
+		ob_end_clean();
+
+		if ( is_wp_error( $result ) ) {
+			return $this->error( 'upgrade_failed', $result->get_error_message(), 500 );
+		}
+
+		if ( false === $result ) {
+			$errors = $skin->get_errors();
+			$msg    = is_wp_error( $errors ) ? $errors->get_error_message() : __( 'Update failed.', 'scalyn-qa-assistant' );
+			return $this->error( 'upgrade_failed', $msg, 500 );
+		}
+
+		// Re-activate the plugin if needed.
+		if ( ! is_plugin_active( $plugin_basename ) ) {
+			activate_plugin( $plugin_basename );
+		}
+
+		return $this->success( array(
+			'updated'     => true,
+			'new_version' => $update->new_version ?? '',
+			'message'     => sprintf(
+				/* translators: %s: new version */
+				__( 'Successfully updated to v%s. Reloading...', 'scalyn-qa-assistant' ),
+				$update->new_version ?? '',
+			),
+		) );
 	}
 
 	/**
