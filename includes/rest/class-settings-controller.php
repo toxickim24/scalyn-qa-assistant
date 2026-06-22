@@ -109,24 +109,6 @@ class Settings_Controller extends REST_Controller {
 			)
 		);
 
-		// POST|DELETE /settings/onboarding-dismiss.
-		register_rest_route(
-			$this->namespace,
-			'/settings/onboarding-dismiss',
-			array(
-				array(
-					'methods'             => \WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'dismiss_onboarding' ),
-					'permission_callback' => array( $this, 'check_manage_permission' ),
-				),
-				array(
-					'methods'             => \WP_REST_Server::DELETABLE,
-					'callback'            => array( $this, 'reset_onboarding' ),
-					'permission_callback' => array( $this, 'check_manage_permission' ),
-				),
-			)
-		);
-
 		// GET /settings/export.
 		register_rest_route(
 			$this->namespace,
@@ -633,29 +615,6 @@ class Settings_Controller extends REST_Controller {
 		update_option( self::WIZARD_DISMISSED_OPTION, true, false );
 
 		return $this->success( array( 'dismissed' => true ) );
-	}
-
-	/**
-	 * POST /settings/onboarding-dismiss — dismiss the Getting Started guide (per-user).
-	 *
-	 * @since 1.4.0
-	 *
-	 * @param \WP_REST_Request $request The request object.
-	 * @return \WP_REST_Response
-	 */
-	public function dismiss_onboarding( \WP_REST_Request $request ): \WP_REST_Response {
-		update_user_meta( get_current_user_id(), 'scalyn_qa_onboarding_dismissed', true );
-		return $this->success( array( 'dismissed' => true ) );
-	}
-
-	/**
-	 * DELETE /settings/onboarding-dismiss — reset (show again) the Getting Started guide.
-	 *
-	 * @since 1.4.0
-	 */
-	public function reset_onboarding( \WP_REST_Request $request ): \WP_REST_Response {
-		delete_user_meta( get_current_user_id(), 'scalyn_qa_onboarding_dismissed' );
-		return $this->success( array( 'reset' => true ) );
 	}
 
 	/**

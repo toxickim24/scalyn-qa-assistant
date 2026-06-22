@@ -303,6 +303,14 @@
   border-bottom: 1px solid var(--scalyn-border-light);
 }
 
+.scalyn-card--article h2 + * {
+  margin-top: 0;
+}
+
+.scalyn-card--article h2 ~ h2 {
+  margin-top: 2rem;
+}
+
 .scalyn-card h3 {
   margin: 1rem 0 0.75rem;
 }
@@ -849,23 +857,6 @@ a.scalyn-btn--ghost:visited {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--scalyn-text-muted);
-}
-
-.scalyn-onboarding__dismiss {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--scalyn-text-muted);
-  padding: 0.25rem;
-  border-radius: var(--scalyn-radius-sm);
-  display: flex;
-  align-items: center;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.scalyn-onboarding__dismiss:hover {
-  color: var(--scalyn-text-strong);
-  background: var(--scalyn-surface-subtle, #f3f4f6);
 }
 
 /* Progress bar */

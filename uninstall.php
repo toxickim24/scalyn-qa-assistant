@@ -64,6 +64,16 @@ $wpdb->query(
 );
 
 /*
- * 4. Clear any lingering object cache entries.
+ * 4. Delete all usermeta with keys starting with 'scalyn_qa_'.
+ */
+$wpdb->query(
+	$wpdb->prepare(
+		"DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s",
+		$wpdb->esc_like( 'scalyn_qa_' ) . '%'
+	)
+);
+
+/*
+ * 5. Clear any lingering object cache entries.
  */
 wp_cache_flush();

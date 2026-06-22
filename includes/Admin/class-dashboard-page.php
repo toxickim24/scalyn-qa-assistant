@@ -406,8 +406,6 @@ class Dashboard_Page {
 		?string $seo_plugin_status,
 		array $ai_status,
 	): array {
-		$dismissed = (bool) get_user_meta( get_current_user_id(), 'scalyn_qa_onboarding_dismissed', true );
-
 		$has_scan        = ( $scan_coverage['scanned'] ?? 0 ) > 0;
 		$has_passing     = $has_scan && $this->has_any_passing_page();
 		$has_launch_scan = ! empty( $launch_summary['last_scan'] );
@@ -481,7 +479,6 @@ class Dashboard_Page {
 		$completed = count( array_filter( $core_steps, static fn( array $s ): bool => $s['complete'] ) );
 
 		return array(
-			'dismissed'       => $dismissed,
 			'core_steps'      => $core_steps,
 			'optional'        => $optional,
 			'completed_count' => $completed,
